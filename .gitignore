@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Data: downloaded and derived data is never committed (see docs/DATA.md)
+data/*
+!data/README.md
+private/
+*.eml
+*.mbox
+*.mbox.gz
+*.msg
+
+# Model artifacts and experiment tracking (models are versioned in S3, not git)
+mlruns/
+artifacts/
+*.onnx
+*.safetensors
+*.pt
+*.joblib
+*.pkl
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+
+# Node / Apps Script
+node_modules/
+.clasprc.json
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
