@@ -5,14 +5,24 @@ description = "Phishing triage with a measured cheap-model-first cascade, a grou
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "numpy>=2.5.4",
+    "scikit-learn>=1.9.1",
+]
 
 [dependency-groups]
+data = [
+    "datasketch>=2.0.0",
+]
 dev = [
     "pre-commit>=4",
     "pytest>=8",
     "ruff>=0.17",
 ]
+
+[tool.uv]
+# The data pipeline (datasketch) is installed for development and CI, but is not a runtime dependency.
+default-groups = ["dev", "data"]
 
 [build-system]
 requires = ["hatchling"]
@@ -30,6 +40,7 @@ extend-exclude = ["./data"]  # downloaded data only; the src/phish_triage/data p
 select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
 ignore = [
     "S101",  # assert is fine in tests
+    "S311",  # random is used for reproducible sampling, never for secrets
 ]
 
 [tool.ruff.lint.isort]
