@@ -25,8 +25,8 @@ score, and is built so the evaluation can't be fooled the same way:
 
 ## Progress
 
-- [ ] **Phase 0** — repo, CI, [threat model](docs/THREAT_MODEL.md)
-- [ ] **Phase 1** — data you can trust: sources, de-duplication, leakage audit, splits
+- [x] **Phase 0** — repo, CI, [threat model](docs/THREAT_MODEL.md)
+- [ ] **Phase 1** — data you can trust: [sources and data card](docs/DATA.md), de-duplication, leakage audit, splits
 - [ ] **Phase 2** — features and baseline models, metrics module
 - [ ] **Phase 3** — DistilBERT (ONNX int8), LLM comparison, cascade
 - [ ] **Phase 4** — grounded LLM analyst step, prompt-injection tests, CI eval gate
@@ -44,8 +44,9 @@ make check   # lint, raw-data guard, tests (what CI runs)
 ```
 
 Raw email datasets are never committed. A pre-commit hook and a CI check block `.eml`/`.mbox` files and
-anything under `data/`; download scripts fetch the data instead (Phase 1).
+anything under `data/`. Instead, `make data` downloads every source, checks it against pinned checksums,
+and parses it into one unified record format (see [docs/DATA.md](docs/DATA.md)).
 
 ## License
 
-MIT. Datasets keep their own licenses, documented in `docs/DATA.md` (Phase 1).
+MIT. Datasets keep their own licenses, documented in [docs/DATA.md](docs/DATA.md).

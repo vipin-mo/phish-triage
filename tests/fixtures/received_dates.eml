@@ -1,0 +1,18 @@
+Received: from mx.receiver.test (mx.receiver.test [192.0.2.10])
+	by inbox.receiver.test with ESMTPS id abc123; Tue, 12 Mar 2024 10:05:00 +0000
+Received: from relay.sender.example (relay.sender.example [198.51.100.7])
+	by mx.receiver.test with ESMTP id def456; Tue, 12 Mar 2024 10:04:30 +0000
+Received: from localhost (localhost [127.0.0.1])
+	by relay.sender.example; Tue, 12 Mar 2024 11:04:00 +0100
+From: "Billing Team" <billing@sender.example>
+To: user@receiver.test
+Subject: Your invoice is ready
+Date: Sat, 01 Jan 2000 00:00:00 +0000
+Message-ID: <fixture-1@sender.example>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+
+Hello,
+
+Your invoice is ready at https://billing.sender.example/invoice/42.
+Questions? See www.sender.example/help, or reply to this email.

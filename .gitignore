@@ -23,6 +23,8 @@ private/
 *.mbox
 *.mbox.gz
 *.msg
+# hand-made synthetic test emails (reserved example/.test domains only)
+!tests/fixtures/*.eml
 
 # Model artifacts and experiment tracking (models are versioned in S3, not git)
 mlruns/

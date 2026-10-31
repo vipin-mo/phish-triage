@@ -2,10 +2,10 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help setup lint format test check-data check
+.PHONY: help setup lint format test check-data check data data-download data-build
 
 help:  ## list targets
-	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
 setup:  ## create .venv (Python 3.12), install dev deps, install git hooks
 	uv sync
@@ -26,3 +26,11 @@ check-data:  ## fail if any tracked file looks like raw data
 	uv run python scripts/check_no_raw_data.py
 
 check: lint check-data test  ## everything CI runs
+
+data: data-download data-build  ## download every dataset and build the unified records
+
+data-download:  ## download raw datasets into data/raw/ and verify checksums
+	uv run python -m phish_triage.data.download
+
+data-build:  ## parse data/raw/ into data/interim/records.jsonl.gz (+ summary.json)
+	uv run python -m phish_triage.data.build

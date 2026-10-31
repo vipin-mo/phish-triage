@@ -1,0 +1,31 @@
+Received: from mx.receiver.test by inbox.receiver.test; Wed, 05 Jun 2024 08:00:00 +0000
+From: =?utf-8?B?UGF5UGFsIFNlY3VyaXR5?= <alerts@paypa1-security.example>
+Reply-To: collect@other.example
+To: user@receiver.test
+Subject: =?utf-8?Q?Action_required:_verify_your_account?=
+Date: Wed, 05 Jun 2024 07:59:00 +0000
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="outer"
+
+--outer
+Content-Type: multipart/alternative; boundary="inner"
+
+--inner
+Content-Type: text/html; charset="utf-8"
+
+<html><head><title>Notice</title><style>.x{color:red}</style></head>
+<body><p>Dear customer,</p>
+<p>Please confirm at <a href="http://198.51.100.23/login.php">https://www.paypal.com/verify</a> within 24 hours.</p>
+<script>var tracking = "https://track.example/never-shown";</script>
+<p>Thanks</p></body></html>
+
+--inner--
+
+--outer
+Content-Type: application/zip; name="invoice.zip"
+Content-Disposition: attachment; filename="invoice.zip"
+Content-Transfer-Encoding: base64
+
+UEsDBBQAAAAIAAAAIQAAAAAAAAAAAAAAAAAAAAA=
+
+--outer--
