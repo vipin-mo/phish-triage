@@ -1,0 +1,456 @@
+{
+ "cheat_baselines": [
+  {
+   "group": "header names",
+   "raw": {
+    "auc": 1.0,
+    "top_phish": [
+     "x-fda",
+     "x-he-tag",
+     "x-uid",
+     "status",
+     "x-status",
+     "x-keywords",
+     "x-spam-summary",
+     "x-filterd-recvd-size",
+     "x-pm-transfer-encryption",
+     "x-pm-content-encryption"
+    ],
+    "top_legit": [
+     "mailing-list",
+     "list-help",
+     "list-post",
+     "list-id",
+     "precedence",
+     "list-unsubscribe",
+     "x-original-to",
+     "reply-to",
+     "x-spam-score",
+     "x-spam-flag"
+    ]
+   },
+   "masked": {
+    "auc": 0.776,
+    "top_phish": [
+     "mime-version",
+     "from",
+     "importance",
+     "x-priority",
+     "reply-to",
+     "x-msmail-priority",
+     "content-type",
+     "x-mailer",
+     "dkim-signature",
+     "content-transfer-encoding"
+    ],
+    "top_legit": [
+     "to",
+     "user-agent",
+     "date",
+     "content-language",
+     "cc",
+     "subject",
+     "content-transfer-encoding",
+     "dkim-signature",
+     "x-mailer",
+     "content-type"
+    ]
+   }
+  },
+  {
+   "group": "header order",
+   "raw": {
+    "auc": 1.0,
+    "top_phish": [
+     "return-path > delivered-to",
+     "delivered-to > x-fda",
+     "x-keywords > x-uid",
+     "status > x-status",
+     "x-status > x-keywords",
+     "authentication-results > authentication-results",
+     "mime-version > content-type",
+     "x-pm-spamscore > x-pm-spam-action",
+     "x-pm-transfer-encryption > x-pm-content-encryption",
+     "x-pm-content-encryption > x-pm-spamscore"
+    ],
+    "top_legit": [
+     "list-unsubscribe > list-post",
+     "list-help > list-unsubscribe",
+     "received > mailing-list",
+     "precedence > list-help",
+     "list-post > list-id",
+     "mailing-list > precedence",
+     "return-path > x-original-to",
+     "x-original-to > delivered-to",
+     "list-post > delivered-to",
+     "list-id > precedence"
+    ]
+   },
+   "masked": {
+    "auc": 0.787,
+    "top_phish": [
+     "content-transfer-encoding > x-priority",
+     "x-priority > importance",
+     "from > subject",
+     "subject > mime-version",
+     "x-priority > x-msmail-priority",
+     "dkim-signature > dkim-signature",
+     "content-type > x-priority",
+     "user-agent > x-priority",
+     "mime-version > content-type",
+     "content-type > content-type"
+    ],
+    "top_legit": [
+     "content-transfer-encoding > user-agent",
+     "content-language > user-agent",
+     "x-mailer > user-agent",
+     "content-transfer-encoding > content-language",
+     "to > cc",
+     "to > subject",
+     "content-type > user-agent",
+     "content-type > content-language",
+     "cc > cc",
+     "date > content-type"
+    ]
+   }
+  },
+  {
+   "group": "recipient domain",
+   "raw": {
+    "auc": 1.0,
+    "top_phish": [
+     "to:pot",
+     "delivered-to:monkey.org",
+     "none",
+     "to:monkey.org",
+     "to:aol.com",
+     "cc:aol.com",
+     "to:hotmail.com",
+     "delivered-to:gmail.com",
+     "to:gmail.com",
+     "cc:pot"
+    ],
+    "top_legit": [
+     "delivered-to:cust-asf.ponee.io",
+     "x-original-to:cust-asf.ponee.io",
+     "x-original-to:www.apache.org",
+     "delivered-to:www.apache.org",
+     "delivered-to:community.apache.org",
+     "to:community.apache.org",
+     "delivered-to:tomcat.apache.org",
+     "to:tomcat.apache.org",
+     "delivered-to:cassandra.apache.org",
+     "to:cassandra.apache.org"
+    ]
+   },
+   "masked": {
+    "auc": 0.571,
+    "top_phish": [
+     "none",
+     "cc:example.com",
+     "to:example.com"
+    ],
+    "top_legit": [
+     "to:example.com",
+     "cc:example.com",
+     "none"
+    ]
+   }
+  },
+  {
+   "group": "Authentication-Results",
+   "raw": {
+    "auc": 0.996,
+    "top_phish": [
+     "smtp.auth",
+     "reason",
+     "dmarc",
+     "dkim-adsp",
+     "header.i",
+     "spf",
+     "header.from",
+     "good",
+     "no",
+     "login"
+    ],
+    "top_legit": [
+     "apache.org",
+     "amavisd-new",
+     "tomcat.apache.org",
+     "key",
+     "auth",
+     "none",
+     "bad",
+     "1024-bit",
+     "sqs.com",
+     "195.227.92.58"
+    ]
+   },
+   "masked": {
+    "auc": 0.5,
+    "top_phish": [
+     "absent"
+    ],
+    "top_legit": [
+     "absent"
+    ]
+   }
+  },
+  {
+   "group": "Message-ID domain",
+   "raw": {
+    "auc": 0.922,
+    "top_phish": [
+     "google.com",
+     "email.amazonses.com",
+     "localhost.localdomain",
+     "sa0pr04mb7370.namprd04.prod.outlook.com",
+     "mx.google.com",
+     "stayfriends.de",
+     "correios",
+     "none",
+     "monkey.org",
+     "bradesco.com.br"
+    ],
+    "top_legit": [
+     "apache.org",
+     "christopherschultz.net",
+     "gitbox.apache.org",
+     "atlassian.jira",
+     "rcbowen.com",
+     "touchtonecorp.com",
+     "bso.ng",
+     "community.apache.org",
+     "f1-outsourcing.eu",
+     "speed4trade.com"
+    ]
+   },
+   "masked": {
+    "auc": 0.5,
+    "top_phish": [
+     "none"
+    ],
+    "top_legit": [
+     "none"
+    ]
+   }
+  },
+  {
+   "group": "date",
+   "raw": {
+    "auc": 0.47,
+    "top_phish": [
+     "year:2017",
+     "month:01",
+     "year:2021",
+     "month:11",
+     "year:2023",
+     "year:2024",
+     "month:08",
+     "month:10",
+     "year:2016",
+     "month:03"
+    ],
+    "top_legit": [
+     "month:12",
+     "year:2015",
+     "year:2020",
+     "year:2019",
+     "year:2026",
+     "month:09",
+     "year:2022",
+     "month:02",
+     "year:2018",
+     "year:2025"
+    ]
+   },
+   "masked": {
+    "auc": 0.47,
+    "top_phish": [
+     "year:2017",
+     "month:01",
+     "year:2021",
+     "month:11",
+     "year:2023",
+     "year:2024",
+     "month:08",
+     "month:10",
+     "year:2016",
+     "month:03"
+    ],
+    "top_legit": [
+     "month:12",
+     "year:2015",
+     "year:2020",
+     "year:2019",
+     "year:2026",
+     "month:09",
+     "year:2022",
+     "month:02",
+     "year:2018",
+     "year:2025"
+    ]
+   }
+  }
+ ],
+ "kept_aside": [
+  {
+   "field": "auth",
+   "auc": 0.993,
+   "top_phish": [
+    "spf=pass",
+    "dmarc=none",
+    "dmarc=pass",
+    "spf=fail",
+    "dkim=none",
+    "dmarc=fail",
+    "dmarc=permerror",
+    "spf=none",
+    "spf=softfail",
+    "dmarc=bestguesspass"
+   ],
+   "top_legit": [
+    "none",
+    "dkim=pass",
+    "dkim=permerror",
+    "dkim=neutral",
+    "dkim=timeout",
+    "spf=neutral",
+    "dkim=fail",
+    "spf=permerror",
+    "absent",
+    "dmarc=temperror"
+   ]
+  }
+ ],
+ "text": [
+  {
+   "view": "raw",
+   "auc": 1.0,
+   "top_phish": [
+    "your",
+    "monkey",
+    "account",
+    "click",
+    "you",
+    "jose",
+    "email",
+    "de",
+    "free",
+    "wallet"
+   ],
+   "top_legit": [
+    "apache",
+    "tomcat",
+    "org",
+    "cassandra",
+    "the",
+    "users",
+    "httpd",
+    "wrote",
+    "hi",
+    "community"
+   ]
+  },
+  {
+   "view": "masked",
+   "auc": 0.999,
+   "top_phish": [
+    "your",
+    "account",
+    "click",
+    "you",
+    "email",
+    "de",
+    "example",
+    "unsubscribe",
+    "free",
+    "wallet"
+   ],
+   "top_legit": [
+    "project",
+    "org",
+    "the",
+    "wrote",
+    "hi",
+    "on",
+    "thanks",
+    "re",
+    "but",
+    "java"
+   ]
+  }
+ ],
+ "phishing_source": [
+  {
+   "features": "header names",
+   "auc": 0.754,
+   "top_phishing_pot": [
+    "date",
+    "cc",
+    "importance",
+    "to",
+    "mime-version",
+    "x-mailer",
+    "dkim-signature",
+    "content-type",
+    "reply-to",
+    "content-transfer-encoding"
+   ],
+   "top_nazario": [
+    "x-msmail-priority",
+    "x-priority",
+    "subject",
+    "from",
+    "content-language",
+    "user-agent",
+    "content-transfer-encoding",
+    "reply-to",
+    "content-type",
+    "dkim-signature"
+   ]
+  },
+  {
+   "features": "text",
+   "auc": 0.982,
+   "top_phishing_pot": [
+    "wallet",
+    "hotmail",
+    "unsubscribe",
+    "claim",
+    "ledger",
+    "free",
+    "sie",
+    "wish",
+    "payout",
+    "bonus"
+   ],
+   "top_nazario": [
+    "account",
+    "user",
+    "usaa",
+    "dear",
+    "notification",
+    "com",
+    "mail",
+    "attached",
+    "mailbox",
+    "monkey"
+   ]
+  }
+ ],
+ "old_era": [
+  {
+   "features": "date",
+   "auc": 1.0
+  },
+  {
+   "features": "text",
+   "auc": 0.999
+  }
+ ],
+ "sizes": {
+  "random_train": 13258,
+  "random_test": 2840
+ }
+}
