@@ -24,7 +24,7 @@ packages = ["src/phish_triage"]
 [tool.ruff]
 line-length = 120
 target-version = "py312"
-extend-exclude = ["data"]
+extend-exclude = ["./data"]  # downloaded data only; the src/phish_triage/data package is linted
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "S", "SIM"]
