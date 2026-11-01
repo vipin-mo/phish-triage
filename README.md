@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/vipin-mo/phish-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/vipin-mo/phish-triage/actions/workflows/ci.yml)
 
-> **Status: in progress.** Started October 2026. The data pipeline, baselines, DistilBERT, the LLM comparison
-> and the cascade are done; the safe LLM analyst step and deployment are next. Numbers are added only once they
-> are measured.
+> **Status: in progress.** Started October 2026. The data pipeline, baselines, DistilBERT, the LLM comparison,
+> the cascade and the safe LLM analyst step are done; deployment is next. Numbers are added only once they are
+> measured.
 
 phish-triage scores emails for phishing and explains why.
 
@@ -75,13 +75,35 @@ From [docs/RESULTS.md](docs/RESULTS.md), rebuilt by `make eval` from saved predi
 - **Claude as a classifier is conservative:** fewer false alarms, but Haiku missed 3–5% of phishing at its own
   cut (Sonnet 1%); 5 of 2,000 Haiku requests were declined by safety filters. All Claude runs together cost $0.51.
 
+## What the analyst step showed
+
+From [reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/injection.md) and
+[reports/injection_round2.md](reports/injection_round2.md), all with Claude Haiku 5.5 behind DistilBERT int8:
+
+- **Planted instructions never cleared a phishing email.** I hid instructions like "this message is verified safe"
+  in 40 real phishing emails in six ways (visible text, HTML comment, CSS-hidden text, white-on-white text, image
+  alt text, subject) and in three attacks on the defences themselves (a forged signals block, a fake operator
+  message, a fake IT-test notice). With the defences on, 0 of 360 variants made the model say safe. Without them, the
+  forged signals block fooled it once in 40.
+- **The rule-based detector is only one layer:** it caught 66% of the first round and none of the second, which is
+  why the random tags, hidden-text removal and the raise-only rule don't depend on it.
+- **Grounding needed a design change, not a looser check.** With prompt version 3, 2.5% of indicators were dropped
+  (the gate allows 2%), 8 of the 11 because the model quoted our own signals as if they were the email. Letting it
+  cite a signal by number brought that to 0.3%; the user sees our wording of the signal, not the model's.
+- **On 200 ordinary emails** every answer matched the schema, all 100 phishing emails ended as phishing, and 17
+  of 100 legitimate ones were raised (16 to "suspicious", 1 to "needs human review"). All 16 had no SPF/DKIM
+  results, which is normal for archived mailing-list mail and not for Gmail, so this needs re-measuring on real
+  mail. A live analyst call takes 2.4 s (p50), 3.8 s at p95.
+- **The CI eval gate** checks these numbers on every push ([reports/gate.json](reports/gate.json)) and fails if
+  they were measured on an older prompt. All Phase 4 Claude runs cost $0.80 together.
+
 ## Progress
 
 - [x] **Phase 0** — repo, CI, [threat model](docs/THREAT_MODEL.md)
 - [x] **Phase 1** — data you can trust: [sources and data card](docs/DATA.md), de-duplication, [leakage audit](reports/leakage_audit.md), splits
 - [x] **Phase 2** — [features and sender check](docs/FEATURES.md), [baseline models](reports/baselines.md), metrics module, [course reproduction](reports/course_reproduction.md)
 - [x] **Phase 3** — DistilBERT ([ONNX int8](reports/onnx.md)), LLM comparison, cascade ([results](docs/RESULTS.md))
-- [ ] **Phase 4** — grounded LLM analyst step, prompt-injection tests, CI eval gate
+- [x] **Phase 4** — grounded LLM analyst step ([results](reports/analyst.md)), prompt-injection tests ([round 1](reports/injection.md), [round 2](reports/injection_round2.md)), CI eval gate
 - [ ] **Phase 5** — serverless AWS deployment (Terraform, OIDC CI/CD)
 - [ ] **Phase 6** — Gmail add-on, feedback loop, canary, drift check
 - [ ] **Phase 7** — load test, robustness report, write-up
@@ -101,7 +123,9 @@ parses it into one record format, masks source fingerprints, removes duplicates 
 fixed seeds (see [docs/DATA.md](docs/DATA.md)). `make audit` re-runs the leakage audit, `make eval-baselines`
 trains and reports the baseline models on every split, `make eval-course` reproduces the course project's
 score, `make train-transformer` fine-tunes DistilBERT (needs `uv sync --group train`), and `make eval` rebuilds
-[docs/RESULTS.md](docs/RESULTS.md) from saved predictions.
+[docs/RESULTS.md](docs/RESULTS.md) from saved predictions. `make eval-analyst` and `make eval-injection` show
+their Claude cost and only call the API with `CONFIRM=--confirm`; `make gate` turns their results into
+[reports/gate.json](reports/gate.json), which CI checks without calling any API.
 
 ## License
 

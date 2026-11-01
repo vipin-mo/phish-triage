@@ -253,6 +253,8 @@ def run_batch(name: str, client, poll_seconds: int = 30) -> dict:
 
     prepared = prepare(name)
     state_path = LLM_DIR / f"{name}.batch.json"
+    if (LLM_DIR / f"{name}.answers.jsonl").exists():
+        raise RuntimeError(f"{name} was already collected (and paid for); delete its files in {LLM_DIR} to rerun")
     if state_path.exists():
         batch_id = json.loads(state_path.read_text())["batch_id"]
         print(f"{name}: resuming batch {batch_id}", file=sys.stderr)

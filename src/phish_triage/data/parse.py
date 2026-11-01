@@ -53,6 +53,31 @@ class EmailRecord:
 
 
 def parse_email(raw: bytes, *, source: str, label: str, origin: str, now: datetime | None = None) -> EmailRecord:
+    """Parse one email. Deeply nested MIME (which makes Python's parser exceed its recursion limit) doesn't crash:
+    the record keeps the raw text and says why."""
+    try:
+        return _parse_email(raw, source=source, label=label, origin=origin, now=now)
+    except RecursionError:
+        text = raw[:MAX_BODY_CHARS].decode("utf-8", errors="replace")
+        return EmailRecord(
+            id=hashlib.sha256(raw).hexdigest()[:16],
+            source=source,
+            label=label,
+            origin=origin,
+            date=None,
+            date_from="none",
+            headers=[],
+            subject="",
+            text=text,
+            html="",
+            urls=extract_urls(text, ""),
+            raw_bytes=len(raw),
+            truncated=len(raw) > MAX_BODY_CHARS,
+            parse_errors=["MIME nesting too deep to parse"],
+        )
+
+
+def _parse_email(raw: bytes, *, source: str, label: str, origin: str, now: datetime | None = None) -> EmailRecord:
     errors: list[str] = []
     msg = email.message_from_bytes(raw, policy=email.policy.default)
     headers = [(name, _decode_header(name, value, errors)) for name, value in msg.raw_items()]
