@@ -1,6 +1,6 @@
 """Download the raw datasets into data/raw/ and check them against pinned SHA-256 checksums.
 
-    python -m phish_triage.data.download                 # every source
+    python -m phish_triage.data.download                 # every source and reference file
     python -m phish_triage.data.download nazario apache  # some sources
     python -m phish_triage.data.download --pin           # record checksums after a first download
 
@@ -16,16 +16,18 @@ import json
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 
-from phish_triage.data.sources import SOURCES, RemoteFile, Source
+from phish_triage.data.sources import COURSE, REFERENCE, SOURCES, RemoteFile, Source
 
 RAW_DIR = Path("data/raw")
 CHECKSUMS_PATH = Path(__file__).with_name("checksums.json")
 USER_AGENT = "phish-triage-dataset-builder/0.1 (+https://github.com/vipin-mo/phish-triage)"
 RETRIES = 3
+DOWNLOADS: dict[str, Source] = {**SOURCES, **REFERENCE, **COURSE}
 
 
 def sha256_file(path: Path) -> str:
@@ -40,15 +42,27 @@ def load_checksums() -> dict[str, dict[str, str]]:
     return json.loads(CHECKSUMS_PATH.read_text()) if CHECKSUMS_PATH.exists() else {}
 
 
-def fetch(url: str, dest: Path) -> None:
+class _DropAuthOnRedirect(urllib.request.HTTPRedirectHandler):
+    """Never forward an API token when a download redirects to another host (e.g. a signed storage URL)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new is not None and urllib.parse.urlsplit(newurl).hostname != urllib.parse.urlsplit(req.full_url).hostname:
+            new.remove_header("Authorization")
+        return new
+
+
+def fetch(url: str, dest: Path, token: str | None = None) -> None:
     """Stream url to dest atomically (via a .part file), retrying transient errors with backoff."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     part = dest.with_name(dest.name + ".part")
+    headers = {"User-Agent": USER_AGENT} | ({"Authorization": f"Bearer {token}"} if token else {})
+    opener = urllib.request.build_opener(_DropAuthOnRedirect)
     for attempt in range(1, RETRIES + 1):
         try:
             # Only the fixed https URLs from sources.py are fetched here; never URLs found inside emails.
-            request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})  # noqa: S310
-            with urllib.request.urlopen(request, timeout=120) as response, part.open("wb") as out:  # noqa: S310
+            request = urllib.request.Request(url, headers=headers)  # noqa: S310
+            with opener.open(request, timeout=120) as response, part.open("wb") as out:
                 while chunk := response.read(1 << 20):
                     out.write(chunk)
             part.replace(dest)
@@ -61,16 +75,22 @@ def fetch(url: str, dest: Path) -> None:
             time.sleep(wait)
 
 
+def read_token(source: Source) -> str | None:
+    path = Path(source.credential_file).expanduser() if source.credential_file else None
+    return path.read_text().strip() if path and path.exists() else None
+
+
 def download_source(source: Source, pinned: dict[str, str]) -> tuple[dict[str, dict], list[str]]:
     """Download every file of one source. Returns its manifest entries and any checksum problems."""
     manifest, problems = {}, []
+    token = read_token(source)
     for i, remote in enumerate(source.files, 1):
         dest = RAW_DIR / source.name / remote.filename
         expected = pinned.get(remote.filename)
         if dest.exists() and (expected is None or sha256_file(dest) == expected):
             status = "cached"
         else:
-            fetch(remote.url, dest)
+            fetch(remote.url, dest, token)
             status = "downloaded"
             time.sleep(source.seconds_between_requests)
         actual = sha256_file(dest)
@@ -94,16 +114,19 @@ def _entry(remote: RemoteFile, dest: Path, sha: str) -> dict:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("sources", nargs="*", help=f"any of: {', '.join(SOURCES)} (default: all)")
+    parser.add_argument("sources", nargs="*", help=f"any of: {', '.join(DOWNLOADS)} (default: all)")
     parser.add_argument("--pin", action="store_true", help="write the current checksums to checksums.json")
     args = parser.parse_args(argv)
-    if unknown := set(args.sources) - set(SOURCES):
+    if unknown := set(args.sources) - set(DOWNLOADS):
         parser.error(f"unknown source(s): {', '.join(sorted(unknown))}")
 
     checksums = load_checksums()
     failed = False
-    for name in args.sources or list(SOURCES):
-        source = SOURCES[name]
+    for name in args.sources or list(DOWNLOADS):
+        source = DOWNLOADS[name]
+        if source.credential_file and read_token(source) is None:
+            print(f"{name}: skipped, it needs an API token in {source.credential_file}")
+            continue
         print(f"{name}: {len(source.files)} files")
         manifest, problems = download_source(source, checksums.get(name, {}))
         (RAW_DIR / name / "MANIFEST.json").write_text(json.dumps(manifest, indent=1, sort_keys=True) + "\n")

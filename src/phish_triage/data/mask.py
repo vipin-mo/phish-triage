@@ -16,8 +16,9 @@ The same rules are applied to every source, so masking itself doesn't create a n
 - for mail delivered through a mailing list, drop what the list software adds: the subject tag, a `Reply-To` that
   points back to the list, and the unsubscribe footer;
 - replace recipient addresses, and the collection inboxes' names and domains, with neutral placeholders;
-- replace the legitimate source's own names (`apache`, `tomcat`, ...) with "project". They are this dataset's
-  version of the `enron` that leaked the label in my course project.
+- in the subject and body, replace the legitimate source's own names (`apache`, `tomcat`, ...) with "project".
+  They are this dataset's version of the `enron` that leaked the label in my course project. Addresses and URLs
+  keep them, because domain features (popularity, look-alikes) need the real domain.
 
 The record's `date` is kept: it is used to build the splits, not as a model feature.
 """
@@ -115,7 +116,10 @@ def mask_record(record: dict) -> dict:
         elif key == "dkim-signature":
             value = "; ".join(f"{tag}={val}" for tag, val in _DKIM_TAG_RE.findall(value))
         position, canonical = _HEADER_ORDER[key]
-        headers.append((position, canonical, replace(value)))
+        value = replace(value)
+        if key == "subject":
+            value = mask_source_names(value)
+        headers.append((position, canonical, value))
     headers.sort(key=lambda h: h[0])  # stable: repeated headers (several DKIM signatures) keep their order
 
     subject = record["subject"] or ""
@@ -125,9 +129,9 @@ def mask_record(record: dict) -> dict:
         **record,
         "headers": [(name, value) for _, name, value in headers],
         "auth": auth_results(raw_headers),
-        "subject": replace(subject),
-        "text": replace(strip_list_footer(record["text"] or "")),
-        "html": replace(strip_list_footer(record["html"] or "")),
+        "subject": mask_source_names(replace(subject)),
+        "text": mask_source_names(replace(strip_list_footer(record["text"] or ""))),
+        "html": mask_source_names(replace(strip_list_footer(record["html"] or ""))),
         "urls": [replace(url) for url in record["urls"]],
         "attachments": [
             {**a, "filename": replace(a["filename"]) if a["filename"] else None} for a in record["attachments"]
@@ -175,10 +179,13 @@ def _replacer(recipients: set[str]):
         if address_re is not None:
             value = address_re.sub(PLACEHOLDER_ADDRESS, value)
         value = _DOMAIN_RE.sub(PLACEHOLDER_DOMAIN, value)
-        value = _NAME_RE.sub(PLACEHOLDER_NAME, value)
-        return _SOURCE_NAME_RE.sub(PLACEHOLDER_PROJECT, value)
+        return _NAME_RE.sub(PLACEHOLDER_NAME, value)
 
     return replace
+
+
+def mask_source_names(value: str) -> str:
+    return _SOURCE_NAME_RE.sub(PLACEHOLDER_PROJECT, value)
 
 
 def _addresses(value: str) -> set[str]:

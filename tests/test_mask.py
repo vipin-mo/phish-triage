@@ -119,6 +119,16 @@ def test_headers_use_one_fixed_order_and_auth_is_kept_aside():
     assert mask_record(_record([("From", "a@evil.test")]))["auth"] is None
 
 
-def test_source_names_are_replaced():
-    masked = mask_record(_record([("From", "a@b.test")], text="Apache Tomcat 9 at https://tomcat.apache.org/"))
+def test_source_names_are_replaced_in_text_but_not_in_addresses_or_urls():
+    masked = mask_record(
+        _record(
+            [("From", "Mark <markt@apache.org>"), ("Subject", "Apache Tomcat 9")],
+            subject="Apache Tomcat 9",
+            text="Apache Tomcat 9 at https://tomcat.apache.org/",
+            urls=["https://tomcat.apache.org/"],
+        )
+    )
     assert masked["text"] == "project project 9 at https://project.project.org/"
+    assert masked["subject"] == dict(masked["headers"])["Subject"] == "project project 9"
+    assert dict(masked["headers"])["From"] == "Mark <markt@apache.org>"
+    assert masked["urls"] == ["https://tomcat.apache.org/"]
