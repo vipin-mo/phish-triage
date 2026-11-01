@@ -118,25 +118,30 @@ def head_vs_tail(y: dict[str, int]) -> list[str]:
     ]
 
 
-def llm_section(y: dict[str, int]) -> tuple[list[str], list[str] | None]:
+def llm_sample() -> list[str] | None:
+    """The fixed sample sent to Claude: every email of the largest runs, answered or not."""
     found = set(predictions.available().get("random", []))
-    runs = [r for r in LLM_RUNS if r in found]
-    if not runs:
-        return ["Pending: the Claude runs haven't been made yet (they need the API key and spend approval).", ""], None
-    sample = predictions.load("random", runs[0]).test_ids  # the 1,000-email sample (the largest run)
-    for r in runs:
-        ids = predictions.load("random", r).test_ids
-        if len(ids) > len(sample):
-            sample = ids
+    sample: set[str] = set()
+    for run in (r for r in LLM_RUNS if r in found):
+        p = predictions.load("random", run)
+        if p.extra["emails"] >= max(len(sample), 1):
+            sample |= set(p.test_ids) | set(p.extra.get("failed", {}))
+    return sorted(sample) or None
+
+
+def llm_section(y: dict[str, int], sample: list[str] | None) -> list[str]:
+    found = set(predictions.available().get("random", []))
+    if sample is None:
+        return ["Pending: the Claude runs haven't been made yet (they need the API key and spend approval).", ""]
     lines = [
-        f"On the fixed sample of the `random` test split ({len(sample):,} emails, half phishing). Local models use "
-        "their validation threshold for 1% false alarms; Claude flags an email when its phishing likelihood is 50 or "
-        "more. "
-        "Cost is at standard (not batch) prices, because live triage can't wait for a batch.",
+        f"On a fixed sample of the `random` test split ({len(sample):,} emails, half phishing; Sonnet on 200 of them). "
+        "Local models use their validation threshold for 1% false alarms; Claude flags an email when its phishing "
+        "likelihood is 50 or more. Emails Claude didn't answer (safety refusals) are left out of its recall and false "
+        "alarms here; in the cascade they fall back to DistilBERT. Cost is at standard (not batch) prices, because "
+        "live triage can't wait for a batch.",
         "",
-        "| Model | Emails | Recall | False alarms | ROC AUC | Answer failures | Cost per 1,000 emails | "
-        "Latency per email |",
-        "|---|---:|---:|---:|---:|---:|---:|---|",
+        "| Model | Emails answered | Recall | False alarms | ROC AUC | Cost per 1,000 emails | Latency per email |",
+        "|---|---:|---:|---:|---:|---:|---|",
     ]
     for model in (STAGE_1, STAGE_2):
         if model in found:
@@ -147,20 +152,19 @@ def llm_section(y: dict[str, int]) -> tuple[list[str], list[str] | None]:
             recall, fpr = metrics.rates_at_threshold(_y(sample, y), s, threshold)
             auc = roc_auc_score(_y(sample, y), s)
             lines.append(
-                f"| {MODELS[model]} | {len(sample):,} | {recall:.3f} | {fpr:.2%} | {auc:.4f} | 0 | "
+                f"| {MODELS[model]} | {len(sample):,} of {len(sample):,} | {recall:.3f} | {fpr:.2%} | {auc:.4f} | "
                 f"$0 (local) | {_latency_ms(p.extra)} |"
             )
-    for r in runs:
-        p = predictions.load("random", r)
+    for run in (r for r in LLM_RUNS if r in found):
+        p = predictions.load("random", run)
         yt = _y(p.test_ids, y)
         recall, fpr = metrics.rates_at_threshold(yt, p.test_scores, 0.495)
-        failed = len(p.extra.get("failed", {}))
         auc = roc_auc_score(yt, p.test_scores)
         lines.append(
-            f"| {LLM_RUNS[r]} | {p.extra['emails']:,} | {recall:.3f} | {fpr:.2%} | {auc:.4f} | "
-            f"{failed} | ${2 * p.extra['cost_per_1000_emails_usd']:.2f} | {_llm_latency(r)} |"
+            f"| {LLM_RUNS[run]} | {len(p.test_ids):,} of {p.extra['emails']:,} | {recall:.3f} | {fpr:.2%} | "
+            f"{auc:.4f} | ${2 * p.extra['cost_per_1000_emails_usd']:.2f} | {_llm_latency(run)} |"
         )
-    return lines + [""], sample
+    return lines + [""]
 
 
 def cascade_section(
@@ -179,68 +183,71 @@ def cascade_section(
     val2 = (val1[0], np.array([s2_val[i] for i in p1.val_ids]))
     t1 = metrics.threshold_at_fpr(*val1, 0.01)
     t2 = metrics.threshold_at_fpr(*val2, 0.01)
-    lat1 = _latency_value(p1.extra) or _latency_value(predictions.load("random", STAGE_1).extra)
+    lat1 = _latency_value(p1.extra) or _latency_value(predictions.load("random", STAGE_1).extra) or 0.0
     # DistilBERT's latency is measured on the exported int8 model (same network on every split).
     int8 = predictions.load("random", STAGE_2) if STAGE_2 in predictions.available().get("random", []) else None
-    lat2 = _latency_value(p2.extra) or (_latency_value(int8.extra) if int8 else None)
+    lat2 = _latency_value(p2.extra) or (_latency_value(int8.extra) if int8 else None) or 0.0
     test1, test2 = np.array([s1[i] for i in ids]), np.array([s2[i] for i in ids])
+    fallback = (test2 > t2).astype(int)  # DistilBERT's own decision, used when the LLM gives no answer
 
     rows = []
 
-    def add(name, decisions, shares, llm_cost_per_email=0.0, llm_seconds=None, api_free=True):
+    def add(name, decisions, shares, local_ms, llm_cost_per_email=0.0, llm_seconds=None, without_api="yes"):
         recall = metrics.bootstrap(lambda yy, d: float(d[yy == 1].mean()), y_test, decisions, n_bootstrap)
         fpr = metrics.bootstrap(lambda yy, d: float(d[yy == 0].mean()), y_test, decisions, n_bootstrap)
         precision = metrics.precision_at_prevalence(recall.value, fpr.value)
         cost_1000 = llm_cost_per_email * shares[2] * 1000
-        latency = (lat1 or 0) * shares_reaching(shares, 0) + (lat2 or 0) * shares_reaching(shares, 1)
-        latency_text = f"{latency:.0f} ms" + (
-            f" + {shares[2]:.0%} x {llm_seconds:.1f} s" if shares[2] and llm_seconds else ""
-        )
-        if shares[2] and llm_seconds is None:
-            latency_text += f" + {shares[2]:.0%} x LLM (not measured)"
-        stages = f"{shares[0]:.0%} / {shares[1]:.0%} / {shares[2]:.0%}"
+        llm_part = f"{llm_seconds:.1f} s" if llm_seconds else "LLM (not measured)"
+        if shares[2] == 1.0 and not local_ms:
+            latency = llm_part
+        else:
+            latency = f"{local_ms:.0f} ms" + (f" + {shares[2]:.1%} x {llm_part}" if shares[2] else "")
+        stages = f"{shares[0]:.1%} / {shares[1]:.1%} / {shares[2]:.1%}"
         rows.append(
-            f"| {name} | {recall} | {_pct(fpr)} | {precision:.3f} | {stages} | "
-            f"{shares[2]:.0%} | ${cost_1000:.2f} | ${cost_1000 * EMAILS_PER_DAY / 1000:,.0f} | {latency_text} | "
-            f"{'yes' if api_free else 'no'} |"
+            f"| {name} | {recall} | {_pct(fpr)} | {precision:.3f} | {stages} | {shares[2]:.1%} | {_usd(cost_1000)} | "
+            f"{_usd(cost_1000 * EMAILS_PER_DAY / 1000)} | {latency} | {without_api} |"
         )
 
-    def shares_reaching(shares, stage):
-        return sum(shares[stage:])
-
-    stage_2_name = MODELS[stage_2].removeprefix("DistilBERT, ")
-    stage_2_name = "DistilBERT" if stage_2 == "distilbert_head" else f"DistilBERT {stage_2_name}"
-    add("Stacked model only", (test1 > t1).astype(int), [1.0, 0.0, 0.0])
-    add(f"{stage_2_name} only", (test2 > t2).astype(int), [0.0, 1.0, 0.0])
+    stage_2_name = "DistilBERT" if stage_2 == "distilbert_head" else "DistilBERT int8"
+    add("Stacked model only", (test1 > t1).astype(int), [1.0, 0.0, 0.0], lat1)
+    add(f"{stage_2_name} only", fallback, [0.0, 1.0, 0.0], lat2)
     two_stage = run_cascade([val1], [test1, test2], final_threshold=t2)
     shares2 = two_stage.shares(2) + [0.0]
-    add(f"Cascade: stacked -> {stage_2_name}", two_stage.decisions, shares2)
+    add(f"Cascade: stacked -> {stage_2_name}", two_stage.decisions, shares2, lat1 + shares2[1] * lat2)
     # A fairer single-model comparison: the same false-alarm rate as the cascade, with the threshold read off the
     # test set itself (which flatters these rows).
     cascade_fpr = float(two_stage.decisions[y_test == 0].mean())
-    for name, scores, shares in (("Stacked", test1, [1.0, 0.0, 0.0]), (stage_2_name, test2, [0.0, 1.0, 0.0])):
+    for name, scores, shares, ms in (
+        ("Stacked", test1, [1.0, 0.0, 0.0], lat1),
+        (stage_2_name, test2, [0.0, 1.0, 0.0], lat2),
+    ):
         threshold = metrics.threshold_at_fpr(y_test, scores, cascade_fpr)
-        add(f"{name} only, at the cascade's false-alarm rate (test-tuned)", (scores > threshold).astype(int), shares)
+        add(
+            f"{name} only, at the cascade's false-alarm rate (test-tuned)", (scores > threshold).astype(int), shares, ms
+        )
 
     for llm in CASCADE_LLM if split == "random" else ():
         if llm not in found:
             continue
         p3 = predictions.load("random", llm)
         s3 = dict(zip(p3.test_ids, p3.test_scores, strict=True))
-        if not set(ids) <= set(s3):
-            continue
-        test3 = np.array([s3[i] for i in ids])
+        test3 = np.array([s3.get(i, np.nan) for i in ids])
+        unanswered = np.isnan(test3)
         per_email = 2 * p3.extra["cost_per_1000_emails_usd"] / 1000
-        seconds = _llm_seconds(llm.removeprefix("claude_"))
-        add(f"{LLM_RUNS[llm]} on everything", (test3 > 0.495).astype(int), [0.0, 0.0, 1.0], per_email, seconds, False)
-        three = run_cascade([val1, val2], [test1, test2, test3], final_threshold=0.495)
+        seconds, _ = _llm_seconds(llm)
+        everything = np.where(unanswered, fallback, test3 > 0.495).astype(int)
+        add(f"{LLM_RUNS[llm]} on everything", everything, [0.0, 0.0, 1.0], 0.0, per_email, seconds, "no")
+        three = run_cascade([val1, val2], [test1, test2, np.nan_to_num(test3)], final_threshold=0.495)
+        decisions = np.where((three.stage == 2) & unanswered, fallback, three.decisions)
+        shares3 = three.shares(3)
         add(
-            f"Cascade: stacked -> DistilBERT -> {LLM_RUNS[llm]}",
-            three.decisions,
-            three.shares(3),
+            f"Cascade: stacked -> {stage_2_name} -> {LLM_RUNS[llm]}",
+            decisions,
+            shares3,
+            lat1 + (shares3[1] + shares3[2]) * lat2,
             per_email,
             seconds,
-            False,
+            "yes (DistilBERT decides)" if shares3[2] else "yes",
         )
 
     return [
@@ -248,7 +255,8 @@ def cascade_section(
         f"(probability below {cascade.CONFIDENT_SAFE:.0%} or above {cascade.CONFIDENT_PHISH:.0%}) and, on validation, "
         f"marking safe lets through at most {cascade.MAX_MISSED:.1%} of the phishing that reaches it and flagging hits "
         f"at most {cascade.MAX_FALSE_ALARMS:.1%} of the legitimate mail; everything else goes to the next stage. "
-        "Stage latency is the single-email p50 on one CPU thread, added for every email that reaches the stage.",
+        "Latency is the single-email p50 on one CPU thread for each local stage an email passes through, plus the "
+        "measured LLM call for the share that reaches it. Emails the LLM doesn't answer fall back to DistilBERT.",
         "",
         "| Setup | Recall | False alarms | Precision @ 1 in 100 | Decided by stage 1 / 2 / LLM | "
         "Sent to a third party | Cost per 1,000 | Cost at 1M emails/day | Typical latency per email | "
@@ -257,6 +265,12 @@ def cascade_section(
         *rows,
         "",
     ]
+
+
+def _usd(amount: float) -> str:
+    if amount == 0:
+        return "$0"
+    return f"${amount:.4f}" if amount < 0.01 else f"${amount:,.2f}"
 
 
 def _pct(estimate) -> str:
@@ -273,20 +287,28 @@ def _latency_ms(extra: dict | None) -> str:
     return f"{value:.1f} ms (p50)" if value is not None else "not measured"
 
 
-def _llm_seconds(run: str) -> float | None:
-    path = Path("data/llm") / f"{run}.latency.json"
-    return json.loads(path.read_text())["p50_s"] if path.exists() else None
+def _llm_seconds(run: str) -> tuple[float | None, bool]:
+    """(p50 seconds per live call, measured on this run itself). Example-free Haiku stands in for the few-shot run."""
+    name = run.removeprefix("claude_")
+    for candidate, own in ((name, True), (name.replace("few_shot", "zero_shot"), False)):
+        path = Path("data/llm") / f"{candidate}.latency.json"
+        if path.exists():
+            return json.loads(path.read_text())["p50_s"], own
+    return None, False
 
 
 def _llm_latency(run: str) -> str:
-    seconds = _llm_seconds(run.removeprefix("claude_"))
-    return f"{seconds:.1f} s (p50)" if seconds is not None else "not measured"
+    seconds, own = _llm_seconds(run)
+    if seconds is None:
+        return "not measured"
+    return f"{seconds:.1f} s (p50)" + ("" if own else ", measured without examples")
 
 
 def build(n_bootstrap: int) -> str:
     y = labels()
     table, pending = model_table(y, n_bootstrap)
-    llm_lines, sample = llm_section(y)
+    sample = llm_sample()
+    llm_lines = llm_section(y, sample)
     onnx = (
         (REPORTS_DIR / "onnx.md").read_text().split("\n", 2)[2] if (REPORTS_DIR / "onnx.md").exists() else "Pending.\n"
     )
