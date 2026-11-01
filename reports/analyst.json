@@ -1,0 +1,22 @@
+{
+ "prompt_version": 4,
+ "emails": 200,
+ "schema_valid_rate": 1.0,
+ "indicators": 668,
+ "grounding_failures": 2,
+ "grounding_failure_rate": 0.0029940119760479044,
+ "kept_indicators_citing_a_signal": 350,
+ "answers_with_a_dropped_indicator": 2,
+ "errors": {},
+ "verdicts": {
+  "legit -> needs_human_review": 1,
+  "legit -> safe": 83,
+  "legit -> suspicious": 16,
+  "phish -> phish": 100
+ },
+ "latency_s": {
+  "p50": 2.4353200625009777,
+  "p95": 3.768780125600461,
+  "cost_usd": 0.005782770000000001
+ }
+}
