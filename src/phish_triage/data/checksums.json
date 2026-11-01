@@ -706,6 +706,9 @@
   "users@tomcat.apache.org/2026-08.mbox": "44fae726da533ae55ba37211727178fe11386f726afa9742150dbe3ec18f3d77",
   "users@tomcat.apache.org/2026-09.mbox": "9fb1b331575169ee33a1b8c8aa34e119263b7df4d62185b4e7b282dfc006a46c"
  },
+ "course": {
+  "phishing-email-dataset-v1.zip": "3a21343518a3a5e762d964ef6eced697f3cbde3a6d0ab7c9cbe0c17dc93b98f8"
+ },
  "nazario": {
   "20051114.mbox": "928cbf1c394d01d0b398ded8dc7cbd94dd4ce9cb0d4efdecd12696338c247926",
   "phishing-2015": "7523e62a5e6e4ee8134ab8b1a628e423097a7779e1003b28422864aa34f1c319",
@@ -738,5 +741,8 @@
   "20030228_spam.tar.bz2": "c08debc32413804949a866be45ef78195cec2cbafd1da744ed76cdb860589743",
   "20030228_spam_2.tar.bz2": "40bc444c596ff3e71505ae334f115b16f9b946786ee68f09b921b6b99217fd00",
   "20050311_spam_2.tar.bz2": "44280a0e28bf7645b2279e8e42659271ad82c6f40bf8d364dbda7f1df344a765"
+ },
+ "tranco": {
+  "tranco-746VX.csv": "6851c471538d3b4e6eddfc6a260e57f671921e8b38ef024fd69d5d462a702da5"
  }
 }

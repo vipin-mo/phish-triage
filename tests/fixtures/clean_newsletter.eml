@@ -1,0 +1,16 @@
+Authentication-Results: mx.receiver.test; spf=pass smtp.mailfrom=news.example.com; dkim=pass header.d=example.com; dmarc=pass header.from=example.com
+Received: from out.news.example.com (out.news.example.com [192.0.2.10]) by mx.receiver.test; Wed, 4 Mar 2026 08:00:05 +0000
+DKIM-Signature: v=1; a=rsa-sha256; d=example.com; s=news; bh=abc=; b=def=
+From: Example News <news@news.example.com>
+To: user@receiver.test
+Subject: This week's articles
+Date: Wed, 4 Mar 2026 08:00:00 +0000
+Message-ID: <weekly-42@news.example.com>
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body>
+<p>Here are this week's articles.</p>
+<p><a href="https://www.example.com/articles/42">Read more on www.example.com</a></p>
+<p><a href="https://www.example.com/unsubscribe">Unsubscribe</a></p>
+</body></html>

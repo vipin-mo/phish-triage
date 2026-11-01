@@ -6,8 +6,11 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "confusable-homoglyphs>=3.3.1",
     "numpy>=2.5.4",
+    "rapidfuzz>=3.14.6",
     "scikit-learn>=1.9.1",
+    "tldextract>=5.4.0",
 ]
 
 [dependency-groups]
@@ -19,10 +22,13 @@ dev = [
     "pytest>=8",
     "ruff>=0.17",
 ]
+eval = [
+    "matplotlib>=3.11.2",
+]
 
 [tool.uv]
-# The data pipeline (datasketch) is installed for development and CI, but is not a runtime dependency.
-default-groups = ["dev", "data"]
+# The data pipeline (datasketch) and report plots (matplotlib) are installed for development and CI, not at runtime.
+default-groups = ["dev", "data", "eval"]
 
 [build-system]
 requires = ["hatchling"]

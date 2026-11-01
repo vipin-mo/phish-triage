@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit
+.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course
 
 help:  ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -43,3 +43,9 @@ data-splits:  ## build every split with fixed seeds (data/splits/)
 
 audit:  ## leakage audit on the splits (reports/leakage_audit.md)
 	uv run python -m phish_triage.data.audit
+
+eval-baselines:  ## train and evaluate the baseline models on every split (reports/baselines.md)
+	uv run python -m phish_triage.evaluation.baselines
+
+eval-course:  ## reproduce the course project's score and test how much survives (reports/course_reproduction.md)
+	uv run python -m phish_triage.evaluation.course

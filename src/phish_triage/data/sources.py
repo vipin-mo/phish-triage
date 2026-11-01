@@ -48,6 +48,7 @@ class Source:
     # checksum change is reported as a warning instead of an error.
     byte_stable: bool = True
     seconds_between_requests: float = 0.5
+    credential_file: str | None = None  # an API token the download needs (sent to the source's own host only)
 
 
 def _months(first: date, last: date) -> list[date]:
@@ -150,4 +151,49 @@ SOURCES: dict[str, Source] = {
             ),
         ),
     )
+}
+
+# Reference data used by the features, not emails. Downloaded and checksummed like the sources, never parsed as mail.
+TRANCO_LIST_ID = "746VX"  # generated 2026-10-30 from 30 days of data, https://tranco-list.eu/list/746VX
+REFERENCE: dict[str, Source] = {
+    "tranco": Source(
+        name="tranco",
+        description=f"Tranco top-1M domain ranking, list {TRANCO_LIST_ID}, used for the domain-popularity features.",
+        license="Research use; aggregates ranking lists published under their own licenses (some CC BY-NC 4.0)",
+        homepage="https://tranco-list.eu/",
+        attribution="Le Pochat et al., Tranco: A Research-Oriented Top Sites Ranking Hardened Against Manipulation, "
+        f"NDSS 2019; list {TRANCO_LIST_ID}, https://tranco-list.eu/list/{TRANCO_LIST_ID}",
+        fmt="csv",
+        files=(
+            RemoteFile(
+                f"https://tranco-list.eu/download/{TRANCO_LIST_ID}/1000000", f"tranco-{TRANCO_LIST_ID}.csv", "reference"
+            ),
+        ),
+    ),
+}
+
+
+# My course project's dataset, used only to reproduce its score and show what happens to it (Phase 2).
+# Kaggle needs an API token (~/.kaggle/access_token); without one this download is skipped.
+COURSE_DATASET_VERSION = 1  # the version the course notebook downloaded
+COURSE: dict[str, Source] = {
+    "course": Source(
+        name="course",
+        description="Naser Abdullah Alam's Kaggle phishing email dataset (version 1): phishing_email.csv, the "
+        "combined file my course project used, plus the six per-source CSVs it was built from.",
+        license="CC BY-SA 4.0",
+        homepage="https://www.kaggle.com/datasets/naserabdullahalam/phishing-email-dataset",
+        attribution="Naser Abdullah Alam, Phishing Email Dataset, Kaggle; built from Champa et al., "
+        "Phishing Email Curated Datasets, Zenodo 8339691 (CC-BY-4.0)",
+        fmt="csv-zip",
+        files=(
+            RemoteFile(
+                "https://www.kaggle.com/api/v1/datasets/download/naserabdullahalam/phishing-email-dataset"
+                f"?datasetVersionNumber={COURSE_DATASET_VERSION}",
+                f"phishing-email-dataset-v{COURSE_DATASET_VERSION}.zip",
+                "mixed",
+            ),
+        ),
+        credential_file="~/.kaggle/access_token",
+    ),
 }

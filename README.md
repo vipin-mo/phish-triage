@@ -2,8 +2,8 @@
 
 [![CI](https://github.com/vipin-mo/phish-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/vipin-mo/phish-triage/actions/workflows/ci.yml)
 
-> **Status: in progress.** Started October 2026. The data pipeline is done; there are no model results
-> yet. Numbers are added only once they are measured.
+> **Status: in progress.** Started October 2026. The data pipeline and the baseline models are done;
+> the deep model, LLM step and deployment are next. Numbers are added only once they are measured.
 
 phish-triage scores emails for phishing and explains why.
 
@@ -36,11 +36,29 @@ From the [data card](docs/DATA.md) and the [leakage audit](reports/leakage_audit
   mailing-list discussion. So the random split will look too easy, and I report the cross-source,
   time-based and private-inbox tests next to it.
 
+## What the baselines showed
+
+From [reports/course_reproduction.md](reports/course_reproduction.md) and [reports/baselines.md](reports/baselines.md):
+
+- **My course number reproduces:** 98.4% precision and 98.9% recall on its own random split. Removing duplicates
+  barely changes it.
+- **It doesn't survive a new source.** Trained on five of the course data's six sources and tested on the sixth,
+  the same model flags 7–24% of legitimate mail at its default threshold, and catches only 51% of the Nazario
+  phishing. Most of its "phishing" label turned out to be spam (about 89%).
+- **On this project's 2023–2026 test mail,** the course model catches 80.5% of phishing at a 1% false-alarm rate;
+  the new text model catches 99.1%, and 80.7% at 0.1%.
+- **This project's own numbers are optimistic too,** for the reason the leakage audit found: the legitimate mail
+  is mailing-list discussion. The text-based models flag 98–100% of 2002 spam as phishing, and at a realistic
+  rate of 1 phishing email in 100, only 31–59% of what they flag would really be phishing.
+- **The threshold drifts on new data:** chosen for 1% false alarms on validation, the text-based models' threshold
+  gives 1.0–2.3% on the cross-source and later-time tests. Calibration (isotonic, fitted on validation) cuts the 2023–2026 calibration
+  error from 0.076 to 0.019 for the text model.
+
 ## Progress
 
 - [x] **Phase 0** — repo, CI, [threat model](docs/THREAT_MODEL.md)
 - [x] **Phase 1** — data you can trust: [sources and data card](docs/DATA.md), de-duplication, [leakage audit](reports/leakage_audit.md), splits
-- [ ] **Phase 2** — features and baseline models, metrics module
+- [x] **Phase 2** — [features and sender check](docs/FEATURES.md), [baseline models](reports/baselines.md), metrics module, [course reproduction](reports/course_reproduction.md)
 - [ ] **Phase 3** — DistilBERT (ONNX int8), LLM comparison, cascade
 - [ ] **Phase 4** — grounded LLM analyst step, prompt-injection tests, CI eval gate
 - [ ] **Phase 5** — serverless AWS deployment (Terraform, OIDC CI/CD)
@@ -59,7 +77,9 @@ make check   # lint, raw-data guard, tests (what CI runs)
 Raw email datasets are never committed. A pre-commit hook and a CI check block `.eml`/`.mbox` files and
 anything under `data/`. Instead, `make data` downloads every source, checks it against pinned checksums,
 parses it into one record format, masks source fingerprints, removes duplicates and builds every split with
-fixed seeds (see [docs/DATA.md](docs/DATA.md)). `make audit` re-runs the leakage audit.
+fixed seeds (see [docs/DATA.md](docs/DATA.md)). `make audit` re-runs the leakage audit, `make eval-baselines`
+trains and reports the baseline models on every split, and `make eval-course` reproduces the course project's
+score.
 
 ## License
 
