@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course
+.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval
 
 help:  ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -49,3 +49,10 @@ eval-baselines:  ## train and evaluate the baseline models on every split (repor
 
 eval-course:  ## reproduce the course project's score and test how much survives (reports/course_reproduction.md)
 	uv run python -m phish_triage.evaluation.course
+
+train-transformer:  ## fine-tune DistilBERT on every split (+ head/tail variant), export ONNX int8 (~2 h on an M5)
+	uv run --group train python -m phish_triage.models.train_transformer --strategy head
+	uv run --group train python -m phish_triage.models.train_transformer random by_time --strategy head_tail
+
+eval:  ## rebuild docs/RESULTS.md from saved predictions (no training, no API calls)
+	uv run python -m phish_triage.evaluation.results
