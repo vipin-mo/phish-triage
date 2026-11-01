@@ -6,8 +6,10 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "anthropic>=2.3.0",
     "confusable-homoglyphs>=3.3.1",
     "numpy>=2.5.4",
+    "onnxruntime>=1.31.1",
     "rapidfuzz>=3.14.6",
     "scikit-learn>=1.9.1",
     "tldextract>=5.4.0",
@@ -24,6 +26,12 @@ dev = [
 ]
 eval = [
     "matplotlib>=3.11.2",
+]
+train = [
+    "mlflow>=3.17.2",
+    "onnx>=1.23.2",
+    "torch>=2.15.0",
+    "transformers>=5.22.1",
 ]
 
 [tool.uv]

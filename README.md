@@ -2,8 +2,9 @@
 
 [![CI](https://github.com/vipin-mo/phish-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/vipin-mo/phish-triage/actions/workflows/ci.yml)
 
-> **Status: in progress.** Started October 2026. The data pipeline and the baseline models are done;
-> the deep model, LLM step and deployment are next. Numbers are added only once they are measured.
+> **Status: in progress.** Started October 2026. The data pipeline, baselines, DistilBERT, the LLM comparison
+> and the cascade are done; the safe LLM analyst step and deployment are next. Numbers are added only once they
+> are measured.
 
 phish-triage scores emails for phishing and explains why.
 
@@ -54,12 +55,32 @@ From [reports/course_reproduction.md](reports/course_reproduction.md) and [repor
   gives 1.0–2.3% on the cross-source and later-time tests. Calibration (isotonic, fitted on validation) cuts the 2023–2026 calibration
   error from 0.076 to 0.019 for the text model.
 
+## What DistilBERT, Claude and the cascade showed
+
+From [docs/RESULTS.md](docs/RESULTS.md), rebuilt by `make eval` from saved predictions:
+
+- **How much LLM is needed: about 0.2% of emails.** On a fixed 1,000-email sample, the cascade (a 4 ms model,
+  then DistilBERT, then Claude Haiku 5.5 for what's left) caught every phishing email with 0.2% false alarms. Haiku
+  on every email caught 97.2% at the same false-alarm rate, sent all mail to a third party, and would cost about
+  $154 a day at 1 million emails versus about $0.31 for the cascade. With 500 legitimate emails in the sample,
+  0.2% is one false alarm, so the intervals are wide.
+- **On 2023–2026 mail,** the cascade (recall 0.987, 0.40% false alarms) matches DistilBERT alone (0.985, 0.41%)
+  while 98% of emails are decided by the 4 ms model.
+- **DistilBERT's strength is calibration, not ranking:** at a strict 0.1% false-alarm rate on new sources and later
+  mail it catches 59–71%, no better than TF-IDF (76–81%), but its validation threshold holds up much better
+  (0.41% false alarms on 2023–2026 mail where 1% was targeted, against 1.19% for TF-IDF).
+- **The first 512 tokens beat the first 256 + last 256** on both splits tested.
+- **ONNX int8 is 4x smaller (67 MB) with the same test metrics, but not faster** on my laptop's CPU; the size is
+  what lets it fit a Lambda package.
+- **Claude as a classifier is conservative:** fewer false alarms, but Haiku missed 3–5% of phishing at its own
+  cut (Sonnet 1%); 5 of 2,000 Haiku requests were declined by safety filters. All Claude runs together cost $0.51.
+
 ## Progress
 
 - [x] **Phase 0** — repo, CI, [threat model](docs/THREAT_MODEL.md)
 - [x] **Phase 1** — data you can trust: [sources and data card](docs/DATA.md), de-duplication, [leakage audit](reports/leakage_audit.md), splits
 - [x] **Phase 2** — [features and sender check](docs/FEATURES.md), [baseline models](reports/baselines.md), metrics module, [course reproduction](reports/course_reproduction.md)
-- [ ] **Phase 3** — DistilBERT (ONNX int8), LLM comparison, cascade
+- [x] **Phase 3** — DistilBERT ([ONNX int8](reports/onnx.md)), LLM comparison, cascade ([results](docs/RESULTS.md))
 - [ ] **Phase 4** — grounded LLM analyst step, prompt-injection tests, CI eval gate
 - [ ] **Phase 5** — serverless AWS deployment (Terraform, OIDC CI/CD)
 - [ ] **Phase 6** — Gmail add-on, feedback loop, canary, drift check
@@ -78,8 +99,9 @@ Raw email datasets are never committed. A pre-commit hook and a CI check block `
 anything under `data/`. Instead, `make data` downloads every source, checks it against pinned checksums,
 parses it into one record format, masks source fingerprints, removes duplicates and builds every split with
 fixed seeds (see [docs/DATA.md](docs/DATA.md)). `make audit` re-runs the leakage audit, `make eval-baselines`
-trains and reports the baseline models on every split, and `make eval-course` reproduces the course project's
-score.
+trains and reports the baseline models on every split, `make eval-course` reproduces the course project's
+score, `make train-transformer` fine-tunes DistilBERT (needs `uv sync --group train`), and `make eval` rebuilds
+[docs/RESULTS.md](docs/RESULTS.md) from saved predictions.
 
 ## License
 
