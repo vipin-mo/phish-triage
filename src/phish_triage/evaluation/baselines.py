@@ -25,7 +25,7 @@ from sklearn.metrics import roc_auc_score
 
 from phish_triage.data.records import MASKED_RECORDS, read_records
 from phish_triage.data.splits import SPLITS_DIR
-from phish_triage.evaluation import metrics
+from phish_triage.evaluation import metrics, predictions
 from phish_triage.features.domains import default_ranks
 from phish_triage.features.extract import FEATURE_NAMES, matrix
 from phish_triage.models.baselines import email_text, fit_all
@@ -78,6 +78,7 @@ def run(split_names: list[str], n_bootstrap: int) -> dict:
         fitted = fit_all(*train, *val)
         val_scores, test_scores = fitted.scores(val[0], val[1]), fitted.scores(test[0], test[1])
         thresholds = {m: metrics.threshold_at_fpr(val[2], s, 0.01) for m, s in val_scores.items()}
+        extra: dict[str, dict] = {m: {} for m in MODEL_LABELS}
         results["splits"][name] = {
             m: metrics.evaluate(
                 test[2], test_scores[m], threshold=thresholds[m], probabilities=True, n_bootstrap=n_bootstrap
@@ -88,12 +89,40 @@ def run(split_names: list[str], n_bootstrap: int) -> dict:
             spam_texts, spam_features, _ = part("spam", "test")
             spam_scores = fitted.scores(spam_texts, spam_features)
             results["spam"] = {m: float(np.mean(spam_scores[m] > thresholds[m])) for m in MODEL_LABELS}
+            latency = _latency(fitted, splits[name]["test"], records, ranks)
+            for m in MODEL_LABELS:
+                extra[m] |= {"spam_ids": splits["spam"]["test"], "spam_scores": spam_scores[m].tolist()}
+                extra[m] |= {"latency_ms": latency.get(m)} if m in latency else {}
         if name == RELIABILITY_SPLIT:
             _reliability_plot(test[2], test_scores, name)
         if name in FEATURE_CHECK_SPLITS:
             results["feature_signal"][name] = _feature_signal(test[1], test[2])
+        for m in MODEL_LABELS:
+            predictions.save(
+                predictions.Predictions(
+                    m, name, splits[name]["val"], val_scores[m], splits[name]["test"], test_scores[m], extra[m]
+                )
+            )
         print(f"{name}: {time.time() - started:.0f}s", file=sys.stderr)
     return results
+
+
+def _latency(fitted, ids: list[str], records: dict, ranks, emails: int = 300) -> dict[str, dict]:
+    """Per-email CPU latency in ms, one email at a time, from the record (features and TF-IDF included)."""
+    sample = ids[:emails]
+    timings: dict[str, list[float]] = {"text": [], "stacked": []}
+    for i in sample:
+        started = time.perf_counter()
+        fitted.text.predict_proba([email_text(records[i])])
+        timings["text"].append((time.perf_counter() - started) * 1000)
+        started = time.perf_counter()
+        text_score = fitted.text.predict_proba([email_text(records[i])])[:, 1]
+        fitted.stacked.predict_proba(np.column_stack([matrix([records[i]], ranks), text_score]))
+        timings["stacked"].append((time.perf_counter() - started) * 1000)
+    return {
+        m: {"p50": float(np.percentile(t, 50)), "p95": float(np.percentile(t, 95)), "emails": len(t)}
+        for m, t in timings.items()
+    }
 
 
 def _feature_signal(x: np.ndarray, y: np.ndarray) -> dict[str, float]:
