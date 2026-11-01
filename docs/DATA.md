@@ -26,6 +26,7 @@ To avoid that, this project uses:
 | [phishing_pot](https://github.com/rf-peixoto/phishing_pot) (commit `80a486701223`) | phishing | about 2022–2026 | `.eml`, full headers | CC BY-NC 4.0 (non-commercial) | Main pool; cross-source and newest-phishing tests |
 | [Apache mailing-list archives](https://lists.apache.org/) (5 lists, every month 2015-01 to 2026-09) | legitimate | 2015–2026 | mbox, full headers | Public archives, no explicit license | Main pool, sampled by month to match the phishing dates |
 | [SpamAssassin public corpus](https://spamassassin.apache.org/old/publiccorpus/) | legitimate + spam | 2001–2002 (released 2002–2005) | Maildir, full headers | No explicit license; published for research | Old-era comparison and the spam slice only |
+| [Naser Alam's Kaggle phishing email dataset](https://www.kaggle.com/datasets/naserabdullahalam/phishing-email-dataset) (version 1), built from [Champa et al., Zenodo 8339691](https://zenodo.org/records/8339691) | "phishing" (mostly spam) + legitimate | mostly 2000–2008; its Nazario part is 2015–2019 | CSV, cleaned text, no headers | CC BY-SA 4.0 / CC-BY-4.0 | My course project's data: reproducing its score only ([reports/course_reproduction.md](../reports/course_reproduction.md)). Downloading it needs a Kaggle API token; without one `make data-download` skips it |
 
 The Apache lists are `announce@apache.org`, `users@httpd`, `users@tomcat`, `user@cassandra` and
 `dev@community`: announcements, user support and project discussion from different communities.
@@ -34,10 +35,15 @@ The Apache lists are `announce@apache.org`, `users@httpd`, `users@tomcat`, `user
 
 | Source | Why | License |
 |---|---|---|
-| [Champa et al., Zenodo 8339691](https://zenodo.org/records/8339691) / the Naser Alam Kaggle CSV | Reproduce the course project's number, then show what happens to it | CC-BY-4.0 / CC BY-SA 4.0 |
 | [Greco et al., Kaggle](https://www.kaggle.com/datasets/francescogreco97/human-llm-generated-phishing-legitimate-emails) | LLM-written phishing, robustness test only | CC BY-NC-SA 4.0 |
 | A second legitimate source (e.g. another public mailing-list archive) | Cross-source test for the legitimate class | to be checked |
 | A private test inbox (a new Gmail account subscribed to newsletters, shops and job sites) | Realistic notification-style legitimate mail; test only, never committed, only counts and metrics published | private |
+
+**Reference data (not emails):**
+
+| Data | Used for | License |
+|---|---|---|
+| [Tranco top-1M list](https://tranco-list.eu/list/746VX), list `746VX` (generated 2026-10-30), pinned by checksum | Domain popularity features and the sender check | Research use; combines ranking lists that have their own licenses (some CC BY-NC 4.0) |
 
 **Not used, and why:**
 
@@ -53,6 +59,10 @@ The Apache lists are `announce@apache.org`, `users@httpd`, `users@tomcat`, `user
 - rf-peixoto, Phishing Pot, <https://github.com/rf-peixoto/phishing_pot> (CC BY-NC 4.0).
 - The Apache Software Foundation, public mailing-list archives, <https://lists.apache.org/>.
 - The Apache SpamAssassin project, public corpus, <https://spamassassin.apache.org/old/publiccorpus/>.
+- Naser Abdullah Alam, Phishing Email Dataset, Kaggle, built from Champa et al., "Phishing Email Curated
+  Datasets", Zenodo 8339691 (CC-BY-4.0).
+- Le Pochat et al., "Tranco: A Research-Oriented Top Sites Ranking Hardened Against Manipulation", NDSS 2019;
+  list `746VX`, <https://tranco-list.eu/list/746VX>.
 
 ## Pipeline
 
@@ -126,9 +136,10 @@ with phishing. I counted header presence and recipient addresses per source:
 - for list mail, remove the subject tag, a `Reply-To` that points back to the list, and the unsubscribe footer
   (also when it is quoted in a reply);
 - replace recipient addresses with `user@example.com`, the collection domains (`monkey.org`, `ponee.io`,
-  `taint.org`, ...) with `example.com`, the collectors' names (`jose`, `yyyy`) with `user`, and the Apache lists'
-  own names (`apache`, `tomcat`, `cassandra`, `httpd`) with `project`. These names are this dataset's version of
-  the `enron` that leaked the label in my course project.
+  `taint.org`, ...) with `example.com`, and the collectors' names (`jose`, `yyyy`) with `user`;
+- in the subject and body only, replace the Apache lists' own names (`apache`, `tomcat`, `cassandra`, `httpd`)
+  with `project`. These names are this dataset's version of the `enron` that leaked the label in my course
+  project. Addresses and links keep the real domain, because the domain features (popularity, look-alikes) need it.
 
 The date is kept on the record, because the splits need it; month matching (below) makes it carry no label
 signal.

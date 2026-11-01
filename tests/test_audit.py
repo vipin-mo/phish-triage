@@ -2,6 +2,7 @@ import gzip
 import json
 
 from phish_triage.data import audit
+from phish_triage.data.records import read_records
 
 RECORD = {
     "id": "abcdef0123456789",
@@ -34,4 +35,4 @@ def test_read_selects_records_by_id_prefix(tmp_path):
     other = {**RECORD, "id": "ffffffffffffffff"}
     with gzip.open(path, "wt") as out:
         out.write(json.dumps(RECORD) + "\n" + json.dumps(other) + "\n")
-    assert list(audit.read(path, {RECORD["id"]})) == [RECORD["id"]]
+    assert list(read_records(path, {RECORD["id"]})) == [RECORD["id"]]

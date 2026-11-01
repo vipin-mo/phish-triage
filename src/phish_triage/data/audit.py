@@ -18,7 +18,6 @@ written, never email content.
 from __future__ import annotations
 
 import argparse
-import gzip
 import json
 import re
 import sys
@@ -32,6 +31,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 
 from phish_triage.data.build import INTERIM_DIR
+from phish_triage.data.records import MASKED_RECORDS, RAW_RECORDS, read_records
 from phish_triage.data.splits import SPLITS_DIR
 
 REPORTS_DIR = Path("reports")
@@ -86,17 +86,6 @@ def text(r: dict) -> str:
     return f"{r['subject']}\n{r['text'][:TEXT_CHARS]}"
 
 
-def read(path: Path, ids: set[str]) -> dict[str, dict]:
-    """Records whose id is in `ids`. The id is the first field, so other lines are skipped without parsing."""
-    found = {}
-    with gzip.open(path, "rt", encoding="utf-8") as lines:
-        for line in lines:
-            if line[8:24] in ids and line[8:24] not in found:
-                record = json.loads(line)
-                found[record["id"]] = record
-    return found
-
-
 def fit(
     train: list, y_train: np.ndarray, test: list, y_test: np.ndarray, *, tokens: bool
 ) -> tuple[float, list[str], list[str]]:
@@ -124,8 +113,8 @@ def audit(interim: Path = INTERIM_DIR, splits_dir: Path = SPLITS_DIR) -> dict:
     splits = json.loads((splits_dir / "splits.json").read_text())
     main, old = splits["random"], splits["old_era"]
     wanted = {i for part in (main["train"], main["test"], old["train"], old["test"]) for i in part}
-    raw = read(interim / "records.jsonl.gz", wanted)
-    masked = read(interim / "masked.jsonl.gz", wanted)
+    raw = read_records(interim / RAW_RECORDS.name, wanted)
+    masked = read_records(interim / MASKED_RECORDS.name, wanted)
     print(f"read {len(raw)} raw and {len(masked)} masked records", file=sys.stderr)
 
     def data(view: dict, ids: list[str], positive: Callable[[dict], bool]) -> tuple[list[dict], np.ndarray]:
