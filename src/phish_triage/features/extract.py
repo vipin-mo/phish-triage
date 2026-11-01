@@ -114,7 +114,10 @@ PAYMENT = _terms(
     "invoice", "payment", "wire transfer", "bank transfer", "bitcoin", "crypto", "wallet", "gift card", "refund",
     "billing", "credit card", "overdue", "transaction", "claim", "reward", "prize",
 )  # fmt: skip
-_DOMAIN_IN_TEXT = re.compile(r"\b(?:https?://)?((?:[a-z0-9-]+\.)+[a-z]{2,})\b", re.IGNORECASE)
+# Bounded: the unbounded "(?:[a-z0-9-]+\.)+" backtracked badly on input like "a-.a-.a-." (103 s on 50k characters).
+# Link text is also cut to LINK_TEXT_CHARS before searching.
+_DOMAIN_IN_TEXT = re.compile(r"\b(?:https?://)?((?:[a-z0-9-]{1,63}\.){1,16}[a-z]{2,63})\b", re.IGNORECASE)
+LINK_TEXT_CHARS = 300
 
 
 def extract(record: dict, ranks: DomainRanks | None = None) -> dict[str, float]:
@@ -162,7 +165,7 @@ def _link_features(record: dict, ranks: DomainRanks | None) -> dict[str, float]:
     mismatches = 0
     for href, text in summary.links if summary else []:
         href_host = url_host(href) if href.lower().startswith(("http://", "https://")) else ""
-        shown = {registered_domain(d) for d in _DOMAIN_IN_TEXT.findall(text) if looks_like_domain(d)}
+        shown = {registered_domain(d) for d in _DOMAIN_IN_TEXT.findall(text[:LINK_TEXT_CHARS]) if looks_like_domain(d)}
         if href_host and shown and registered_domain(href_host) not in shown:
             mismatches += 1
 

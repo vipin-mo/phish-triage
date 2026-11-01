@@ -39,7 +39,10 @@ SCHEME = "affine32"
 LSH_BANDS = (16, 8)
 
 _URL_RE = re.compile(r"(?:https?://|www\.)\S+", re.IGNORECASE)
-_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
+# Bounded and anchored to the start of a token: the unbounded version backtracked quadratically on input like
+# "a-.a-.a-." (31 s on 50k characters). The bounds are loose on purpose: bounce and tracking addresses in this data
+# have local parts far longer than the 64 characters the standard allows.
+_EMAIL_RE = re.compile(r"(?<![\w.+-])[\w.+-]{1,256}@[\w-]{1,255}(?:\.[\w-]{1,255}){1,16}")
 _NUMBER_RE = re.compile(r"\d+")
 _TOKEN_RE = re.compile(r"\w+")
 
