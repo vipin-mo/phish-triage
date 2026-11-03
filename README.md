@@ -93,9 +93,37 @@ From [reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/in
 - **On 200 ordinary emails** every answer matched the schema, all 100 phishing emails ended as phishing, and 17
   of 100 legitimate ones were raised (16 to "suspicious", 1 to "needs human review"). All 16 had no SPF/DKIM
   results, which is normal for archived mailing-list mail and not for Gmail, so this needs re-measuring on real
-  mail. A live analyst call takes 2.4 s (p50), 3.8 s at p95.
+  mail. In the 25 legitimate emails I rated, 4 of the 5 raised were caused by a masking bug (see Known issues),
+  so missing SPF/DKIM isn't the whole story. A live analyst call takes 2.4 s (p50), 3.8 s at p95.
+- **I rated 50 of the answers myself** (25 phishing, 25 legitimate, 1–3 on the
+  [rubric](docs/ANALYST_RUBRIC.md)), because the automatic checks can't tell whether an explanation is right and
+  helpful. Averages: correct 2.86, grounded 2.98, clear 3.00, useful 2.88; 38 of 50 scored 3 on everything.
+  Phishing answers were close to perfect (2.92, 2.96, 3.00, 3.00). The weak spot is legitimate mail (correct 2.80,
+  useful 2.76): the masking bug caused 4 false alarms, and 5 safe answers said "no action" while the summary added
+  "check the sender if unsure", which gives the user two different messages. 13 rows were re-scored after the first
+  pass: 7 once the sheet showed the recommended action, and 6 to apply the rubric's two scoring rules on every row
+  (1 for the final verdict, 5 for the action and summary agreeing). Prompt version 4, data from before the fixes
+  below; `analyst_eval ratings` recomputes these.
 - **The CI eval gate** checks these numbers on every push ([reports/gate.json](reports/gate.json)) and fails if
   they were measured on an older prompt. All Phase 4 Claude runs cost $0.80 together.
+
+## Known issues (fix in progress)
+
+Found while rating the analyst's answers by hand. Every number above was measured before the fix and will be
+re-measured.
+
+- **Masking rewrites links.** Replacing the Apache list names with `project` runs over the whole body and HTML,
+  including URLs and addresses, which [docs/DATA.md](docs/DATA.md) says it shouldn't. It rewrote a URL or address
+  in 7,978 of the 13,541 legitimate emails the splits use (`tomcat.apache.org` became `project.project.org`,
+  `github.com/apache/...` became `github.com/project/...`); in 807 HTML ones it rewrote link targets, so the
+  classifier's link features are wrong for them. The analyst was shown mismatches the masking created
+  (`apache.org` in the link list, `project.org` in the text) and flagged 4 of the 25 legitimate emails I rated
+  because of them.
+- **De-duplication misses padded copies.** Some phishing wraps the same visible text in about 30,000 characters of
+  different hidden filler, so comparing the full text sees the copies as unrelated. Comparing the visible text
+  finds 485 more copies among the emails the splits use (462 of them phishing). In the `random` split, 62 of the
+  1,420 phishing test emails and 5 of the 1,420 legitimate ones have a near-copy in training or validation (1 in
+  `by_time`), so the `random` results are slightly optimistic.
 
 ## Progress
 

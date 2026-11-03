@@ -14,5 +14,9 @@ Each output gets 1–3 on four criteria; the averages are reported, and I say in
 Rules I follow while rating:
 
 - I read the email before the summary, so the summary doesn't shape what I think the email is.
-- I rate what the user would see: the final verdict, the summary and the indicators that survived grounding.
+- I rate what the user would see: the final verdict, the summary, the recommended action and the indicators that
+  survived grounding. A score is kept when the sheet is rebuilt only if all of these are unchanged.
+- A legitimate email raised one step (to "suspicious" or "needs human review") is correct = 2; called phishing, 1.
+- Useful is 3 when the action and the summary agree. "No action" plus "check the sender if unsure" in the summary
+  is two different messages, so 2.
 - A safe-looking email the analyst correctly calls safe can still score 3 on every criterion.
