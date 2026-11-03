@@ -7,8 +7,8 @@ import time
 import pytest
 
 from phish_triage.data import dedup, mask, parse
-from phish_triage.evaluation import with_inbox
 from phish_triage.features import extract, html
+from phish_triage.models import baselines
 from phish_triage.service import analyst, pii
 
 ATTACKS = ["a-." * 50_000, "a." * 50_000, "a" * 50_000, "a@" * 50_000, "1." * 50_000, ("a" * 60 + ".") * 2_000]
@@ -25,7 +25,7 @@ PATTERNS = {
     "pii email": pii._EMAIL,
     "pii phone": pii._PHONE,
     "pii code": pii._OTP,
-    "date words": with_inbox.DATE_WORDS,
+    "date words": baselines.DATE_WORDS,
 }
 
 

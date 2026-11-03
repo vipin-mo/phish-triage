@@ -15,7 +15,8 @@ The same rules are applied to every source, so masking itself doesn't create a n
   learn the source from it. The sender check uses `auth` as rules, not as a learned feature;
 - for mail delivered through a mailing list, drop what the list software adds: the subject tag, a `Reply-To` that
   points back to the list, and the unsubscribe footer;
-- replace recipient addresses, and the collection inboxes' names and domains, with neutral placeholders;
+- replace recipient addresses, and the collection inboxes' names and domains, with neutral placeholders. In
+  `Reply-To` only the collectors' own are replaced, because a recipient named there is where replies really go;
 - replace the legitimate source's own names (`apache`, `tomcat`, ...) with "project". They are this dataset's
   version of the `enron` that leaked the label in my course project. In the subject and the plain text, which the
   text models read, they are replaced everywhere, URLs and addresses included (`tomcat.apache.org` becomes
@@ -115,6 +116,10 @@ def mask_record(record: dict, *, source_names: bool = True) -> dict:
     is_list_mail = bool({name.lower() for name, _ in raw_headers} & LIST_HEADERS)
     list_names, list_addresses = _list_identity(raw_headers) if is_list_mail else (set(), set())
     replace = _replacer(_recipient_addresses(raw_headers))
+    # A Reply-To that names one of the recipients (a cross-posted advisory asking for replies on another list) is
+    # where replies really go; replacing it with the placeholder made the sender check report "replies go to
+    # example.com". Only the collectors' own addresses, domains and names are masked there.
+    replace_collectors = _replacer(set())
 
     headers: list[tuple[int, str, str]] = []
     for name, value in raw_headers:
@@ -130,7 +135,7 @@ def mask_record(record: dict, *, source_names: bool = True) -> dict:
         elif key == "dkim-signature":
             value = "; ".join(f"{tag}={val}" for tag, val in _DKIM_TAG_RE.findall(value))
         position, canonical = _HEADER_ORDER[key]
-        value = replace(value)
+        value = replace_collectors(value) if key == "reply-to" else replace(value)
         if key == "subject":
             value = names(value)
         headers.append((position, canonical, value))

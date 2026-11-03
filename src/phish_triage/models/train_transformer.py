@@ -212,7 +212,18 @@ def main(argv: list[str] | None = None) -> int:
     config = transformer.TrainConfig(strategy=args.strategy, epochs=args.epochs)
     for name in args.splits or list(SPLITS):
         run_split(name, splits, config, tokenizer, mlflow)
+        _free_memory()  # one process trains every split; without this the GPU ran out of memory on the third
     return 0
+
+
+def _free_memory() -> None:
+    import gc
+
+    import torch
+
+    gc.collect()
+    if torch.backends.mps.is_available():
+        torch.mps.empty_cache()
 
 
 if __name__ == "__main__":

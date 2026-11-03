@@ -136,20 +136,26 @@ with phishing. I counted header presence and recipient addresses per source:
 - for list mail, remove the subject tag, a `Reply-To` that points back to the list, and the unsubscribe footer
   (also when it is quoted in a reply);
 - replace recipient addresses with `user@example.com`, the collection domains (`monkey.org`, `ponee.io`,
-  `taint.org`, ...) with `example.com`, and the collectors' names (`jose`, `yyyy`) with `user`;
+  `taint.org`, ...) with `example.com`, and the collectors' names (`jose`, `yyyy`) with `user`. In `Reply-To` only
+  the collectors' own are replaced: a recipient named there is where replies really go, and until November 2026
+  masking it created a false "replies go to a different domain" in 319 of the 9,338 Apache emails (now 0);
 - replace the Apache lists' own names (`apache`, `tomcat`, `cassandra`, `httpd`) with `project`. These names are
   this dataset's version of the `enron` that leaked the label in my course project. In the subject and the plain
-  text, which the text models read, they are replaced everywhere, URLs and addresses included
-  (`tomcat.apache.org` becomes `project.project.org`), so no text model can read the source from a link. In the
-  HTML, URLs, addresses and domain names keep the real name, and so does the separate URL list, because the link
-  features (where a link goes, what its text shows) need the real domain. The leakage audit checks that this
-  doesn't make `apache.org` a shortcut (below). The analyst step sees the names, as a subscriber would: it isn't
-  trained on this data, so they can't become a learned shortcut.
+  text they are replaced everywhere, URLs and addresses included (`tomcat.apache.org` becomes
+  `project.project.org`), so no text model can read the source from a link. In the HTML, URLs, addresses and
+  domain names keep the real name, and so does the separate URL list, because the link features (where a link
+  goes, what its text shows) need the real domain. The text models read the visible HTML text, so the names are
+  replaced there again, URLs included, before a model sees it. The leakage audit checks that the real domains
+  don't become a shortcut (below). The analyst step sees the names, as a subscriber would: it isn't trained on
+  this data, so they can't become a learned shortcut.
 
   Until November 2026 the replacement also ran over the HTML, so 807 legitimate HTML emails had link targets like
   `project.project.org`, and the link list shown to Claude (real domains from the URL list) didn't match the body
   (`project.org`). I found it while rating the analyst's answers by hand; every number on this page and in the
-  reports was re-measured after the fix.
+  reports was re-measured after the fix. When the text models moved to the visible HTML text, also in November
+  2026, the names in its links and addresses reached them in 753 legitimate emails (5.6%) and no phishing, until
+  that text was masked too. The leakage audit's text test now reads exactly what the models read, so it would show
+  such a leak.
 
 The date is kept on the record, because the splits need it; month matching (below) makes it carry no label
 signal.
@@ -233,7 +239,7 @@ separates the classes. Full results with the strongest features: [reports/leakag
 | `Authentication-Results` | 0.996 | 0.500 (moved to `auth`) |
 | Message-ID domain | 0.919 | 0.500 (dropped) |
 | Date (year, month) | 0.467 | 0.467 |
-| Text (subject and body, TF-IDF) | 1.000 | 0.999 |
+| Text the models read (TF-IDF) | 1.000 | 1.000 |
 
 What this shows:
 
@@ -245,13 +251,14 @@ What this shows:
   signal and partly this dataset, so I won't use header names as model features directly.
 - **The `auth` field on its own scores 0.994.** Which results exist at all depends on the collecting server,
   so it stays out of the learned features, and the sender check uses it as rules instead.
-- **The text still separates the classes almost perfectly (0.999).** After masking, the strongest legitimate
-  words are `project`, `org`, `wrote`, `re`, `hi`, `thanks` and `java`: mailing-list conversation, and the
-  placeholder itself (`project`, `org` from `project.org` links), which is the price of masking the names. The strongest
-  phishing words are `your`, `account`, `click` and `wallet`. With one legitimate source, a random split on
-  this data will score near 100%, so the by-source and by-time splits and the private test inbox matter more
+- **The text still separates the classes almost perfectly (1.000).** This test reads what the text models read:
+  the subject and the visible text, without dates. After masking, the strongest legitimate words are `project`,
+  `org`, `wrote`, `https`, `re`, `hi` and `thanks`: mailing-list conversation, links written out in full, and the
+  placeholder itself (`project`, `org` from `project.org` links), which is the price of masking the names. The
+  strongest phishing words are `your`, `account`, `click` and `wallet`. With one legitimate source, a random split
+  on this data will score near 100%, so the by-source and by-time splits and the private test inbox matter more
   than the random number.
-- **The two phishing sources differ (text AUC 0.978):** crypto-wallet scams in phishing_pot, bank and mailbox
+- **The two phishing sources differ (text AUC 0.979):** crypto-wallet scams in phishing_pot, bank and mailbox
   phishing in Nazario. That makes `by_source` a real test of new phishing.
 - **On the confounded `old_era` split, the date alone scores 1.000:** the trap my course project fell into.
 - **The source's own domain is not a shortcut.** Links keep their real domains, and `apache.org` is in 46.2% of
@@ -263,11 +270,14 @@ What this shows:
 ## Known limits
 
 - **Legitimate mail is mailing-list mail.** It is technical discussion and announcements, not the bank,
-  shop and job notifications that phishing imitates. The text audit (0.999 after masking) measures how easy
-  that makes the task; the private test inbox measures the gap: the models flag 96.4–99.6% of its 1,677
+  shop and job notifications that phishing imitates. The text audit (1.000 after masking) measures how easy
+  that makes the task; the private test inbox measures the gap: the models flag 96.8–99.8% of its 1,677
   legitimate emails ([reports/test_inbox.md](../reports/test_inbox.md)). With part of the inbox in training,
-  split by sender, the cascade flags 3.2% of the emails from 26 unseen senders
+  split by sender, the cascade flags 4.0% of the emails from 26 unseen senders
   ([reports/with_inbox.md](../reports/with_inbox.md)).
+- **My inbox's legitimate mail is all bulk mail from large senders,** so on it the number of links and an
+  own-domain DKIM signature mark legitimate mail (ROC AUC 0.92–0.96 on their own, against 0.51–0.58 on the public
+  test). Phishing sent from its own domain with many links would look legitimate to those features.
 - **List mail is not always legitimate.** Two Apache list posts turned out to be phishing (found as label
   conflicts), so a few spam or phishing posts that got past the lists' filters may still be labelled
   legitimate.

@@ -13,7 +13,16 @@ data for 1% false alarms. Both are measured on:
 
 **Date-word shortcut check.** The inbox is late 2026, so a model could learn "2026" or "November" as legitimate.
 Removing years, month and weekday names from the test text must not change the inbox false-alarm rate or the
-2026 phishing recall of the "after" models by more than 2 percentage points (rule set before the first run).
+2026 phishing recall of the "after" models by more than 2 percentage points (rule set before the first run). The
+first run found the TF-IDF models failing it; since then `email_text` removes date words from every model's input,
+so the check is a guard that should read 0.
+
+**Little-text rule.** `service.triage.too_little_text` sends emails with images or attachments but almost no visible
+words to review; the cascade row with the rule counts review as flagged.
+
+**Feature shortcut check.** Each structured feature on its own (ROC AUC, either direction): a feature that separates
+the inbox's test senders from the 2026 phishing (AUC >= 0.9) but not the public test (< 0.7) only works because of
+how the inbox differs from the training data, and is listed as a suspected shortcut (rule set before the run).
 
 Local models only, never an LLM. Only counts and rates are written (reports/with_inbox.md, .json).
 """
@@ -22,7 +31,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -34,25 +42,17 @@ from phish_triage.evaluation import metrics, predictions
 from phish_triage.evaluation.cascade import run_cascade
 from phish_triage.evaluation.test_inbox import MODELS, fmt_share, share
 from phish_triage.features.domains import default_ranks
-from phish_triage.features.extract import matrix
-from phish_triage.models.baselines import email_text, fit_all
+from phish_triage.features.extract import FEATURE_NAMES, matrix
+from phish_triage.models.baselines import email_text, fit_all, without_dates
+from phish_triage.service.triage import LITTLE_TEXT_WORDS, too_little_text
 
 REPORTS_DIR = Path("reports")
 ARTIFACTS_DIR = Path("artifacts")
 SETUPS = {"before": "random", "after": inbox.SPLIT}
 DISTILBERT = "distilbert_head_int8"
 SHORTCUT_POINTS = 0.02
-# Years, month and weekday names, as whole words. No nested repeats, so it can't backtrack.
-DATE_WORDS = re.compile(
-    r"\b(?:20[0-3]\d|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?"
-    r"|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:rs|rsday)?"
-    r"|fri(?:day)?|sat(?:urday)?|sun(?:day)?)\b",
-    re.IGNORECASE,
-)
-
-
-def without_dates(text: str) -> str:
-    return DATE_WORDS.sub(" ", text)
+SUSPECT_AUC, PUBLIC_MAX_AUC = 0.9, 0.7
+MODEL_NAMES = MODELS | {"cascade_review": "Cascade + little-text rule (review counts as flagged)"}
 
 
 def _distilbert(split: str, val_ids: list[str], eval_ids: list[str], records: dict, texts: dict) -> tuple:
@@ -95,9 +95,12 @@ def evaluate_setup(split: dict, eval_ids: list[str], records: dict, ranks, texts
     thresholds = {m: metrics.threshold_at_fpr(val[2], val_scores[m], 0.01) for m in MODELS if m != "cascade"}
     cascade_val = [(val[2], val_scores["stacked"])]
 
+    review = np.array([too_little_text(records[i]) for i in eval_ids], dtype=int)
+
     def flags_for(s: dict) -> dict[str, np.ndarray]:
         out = {m: (s[m] > thresholds[m]).astype(int) for m in thresholds}
         out["cascade"] = run_cascade(cascade_val, [s["stacked"], s["distilbert"]], thresholds["distilbert"]).decisions
+        out["cascade_review"] = np.maximum(out["cascade"], review)
         return out
 
     return flags_for(scores), flags_for(dateless)
@@ -154,7 +157,7 @@ def to_markdown(r: dict) -> str:
         "sender | 2026 phishing: recall | Spam folder flagged | Precision @ 1 in 100 |",
         "|---|---|---:|---:|---|---:|---|---|---:|",
     ]
-    for model, name in MODELS.items():
+    for model, name in MODEL_NAMES.items():
         for setup in ("before", "after"):
             v = r[setup][model]
             lines.append(
@@ -172,7 +175,7 @@ def to_markdown(r: dict) -> str:
     ]
     cats = sorted(r["after"]["stacked"]["inbox_fpr_by_category"])
     lines += ["| Model | " + " | ".join(cats) + " |", "|---|" + "---|" * len(cats)]
-    for model, name in MODELS.items():
+    for model, name in MODEL_NAMES.items():
         by = r["after"][model]["inbox_fpr_by_category"]
         lines.append(f"| {name} | " + " | ".join(fmt_share(by[k]) for k in cats) + " |")
     lines += [
@@ -180,18 +183,97 @@ def to_markdown(r: dict) -> str:
         "## Date-word shortcut check (after)",
         "",
         "Years, month and weekday names removed from the test text. The rule, set before the first run: a change of "
-        f"more than {SHORTCUT_POINTS:.0%} points in either column means the model leans on dates.",
+        f"more than {SHORTCUT_POINTS:.0%} points in either column means the model leans on dates. Every model's input "
+        "has had date words removed since the first run failed the TF-IDF models, so this now guards against that "
+        "being undone and should read 0.",
         "",
         "| Model | Inbox false alarms: change | 2026 phishing recall: change | Shortcut? |",
         "|---|---:|---:|---|",
     ]
-    for model, name in MODELS.items():
+    for model, name in MODEL_NAMES.items():
         d = r["date_check"][model]
         lines.append(
             f"| {name} | {d['inbox_fpr_change']:+.1%} | {d['phish_2026_recall_change']:+.1%} | "
             f"{'yes' if d['shortcut'] else 'no'} |"
         )
+    lines += [
+        "",
+        "## Little-text rule",
+        "",
+        f"Emails with images or attachments but fewer than {LITTLE_TEXT_WORDS} visible words go to review.",
+        "",
+        "| Test slice | Sent to review |",
+        "|---|---|",
+        *[f"| {name} | {fmt_share(r['little_text'][key])} |" for key, name in SLICE_NAMES.items()],
+        "",
+        "## Feature shortcut check",
+        "",
+        f"Each structured feature on its own (ROC AUC, either direction). Suspected shortcut: AUC >= {SUSPECT_AUC} "
+        f"between the inbox's test senders and the 2026 phishing, but < {PUBLIC_MAX_AUC} on the public test (rule set "
+        "before the run).",
+        "",
+    ]
+    suspects = r["feature_check"]["suspects"]
+    if suspects:
+        lines += ["| Feature | Inbox vs 2026 phishing | Public test |", "|---|---:|---:|"]
+        lines += [f"| `{f}` | {v['inbox']:.3f} | {v['public']:.3f} |" for f, v in suspects.items()]
+    else:
+        lines.append(f"None of the {len(r['feature_check']['auc'])} features is a suspected shortcut.")
+    strongest = sorted(r["feature_check"]["auc"].items(), key=lambda kv: -kv[1]["inbox"])[:5]
+    lines += [
+        "",
+        "Strongest on the inbox: "
+        + ", ".join(f"`{f}` {v['inbox']:.3f} (public {v['public']:.3f})" for f, v in strongest)
+        + ".",
+    ]
     return "\n".join(lines) + "\n"
+
+
+SLICE_NAMES = {
+    "public_legit": "Public test, legitimate",
+    "public_phish": "Public test, phishing",
+    "inbox_test": "Inbox test senders",
+    "phish_2026_test": "2026 phishing",
+}
+
+
+def feature_check(features: dict, records: dict, slices: dict) -> dict:
+    from sklearn.metrics import roc_auc_score
+
+    def auc(legit: list[str], phish: list[str], k: int) -> float:
+        x = np.nan_to_num(np.array([features[i][k] for i in legit + phish], dtype=float), nan=-1.0)
+        y = np.r_[np.zeros(len(legit)), np.ones(len(phish))]
+        if len(np.unique(x)) < 2:
+            return 0.5
+        a = float(roc_auc_score(y, x))
+        return max(a, 1 - a)
+
+    public = slices["public_test"]
+    public_legit = [i for i in public if records[i]["label"] != "phish"]
+    public_phish = [i for i in public if records[i]["label"] == "phish"]
+    out = {
+        name: {
+            "inbox": auc(slices["inbox_test"], slices["phish_2026_test"], k),
+            "public": auc(public_legit, public_phish, k),
+        }
+        for k, name in enumerate(FEATURE_NAMES)
+    }
+    suspects = {f: v for f, v in out.items() if v["inbox"] >= SUSPECT_AUC and v["public"] < PUBLIC_MAX_AUC}
+    return {"auc": out, "suspects": suspects}
+
+
+def little_text(records: dict, slices: dict, n_bootstrap: int) -> dict:
+    public = slices["public_test"]
+    members = {
+        "public_legit": [i for i in public if records[i]["label"] != "phish"],
+        "public_phish": [i for i in public if records[i]["label"] == "phish"],
+        "inbox_test": slices["inbox_test"],
+        "phish_2026_test": slices["phish_2026_test"],
+    }
+    return {
+        k: share(np.array([too_little_text(records[i]) for i in ids], dtype=int), n_bootstrap)
+        for k, ids in members.items()
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -227,7 +309,7 @@ def main(argv: list[str] | None = None) -> int:
         if setup == "after":
             plain = measure(dateless, eval_ids, records, slices, 20)
             result["date_check"] = {}
-            for m in MODELS:
+            for m in MODEL_NAMES:
                 fpr = plain[m]["inbox_fpr"]["share"] - result[setup][m]["inbox_fpr"]["share"]
                 rec = plain[m]["phish_2026_recall"]["share"] - result[setup][m]["phish_2026_recall"]["share"]
                 result["date_check"][m] = {
@@ -236,6 +318,8 @@ def main(argv: list[str] | None = None) -> int:
                     "shortcut": abs(fpr) > SHORTCUT_POINTS or abs(rec) > SHORTCUT_POINTS,
                 }
         print(f"{setup}: done", file=sys.stderr)
+    result["little_text"] = little_text(records, slices, args.bootstrap)
+    result["feature_check"] = feature_check(features, records, slices)
     REPORTS_DIR.mkdir(exist_ok=True)
     (REPORTS_DIR / "with_inbox.json").write_text(json.dumps(result, indent=1) + "\n")
     (REPORTS_DIR / "with_inbox.md").write_text(to_markdown(result))

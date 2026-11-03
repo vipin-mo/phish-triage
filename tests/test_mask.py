@@ -151,3 +151,16 @@ def test_html_keeps_real_domains_and_the_analyst_view_keeps_the_names():
         assert kept in masked, kept  # link targets, link text, addresses and paths keep the real domain
     view = mask_record(record, source_names=False)
     assert view["html"] == html and view["subject"] == "Apache Tomcat 9"
+
+
+def test_reply_to_naming_a_recipient_keeps_its_address():
+    headers = [
+        ("From", "Ann <ann@apache.org>"),
+        ("To", "announce@apache.org, dev@airflow.apache.org"),
+        ("Reply-To", "dev@airflow.apache.org"),
+    ]
+    masked = dict(mask_record(_record(headers))["headers"])
+    assert masked["To"] == PLACEHOLDER_ADDRESS
+    assert masked["Reply-To"] == "dev@airflow.apache.org"
+    collector = dict(mask_record(_record([("From", "x@evil.test"), ("Reply-To", "jose@monkey.org")]))["headers"])
+    assert collector["Reply-To"] == PLACEHOLDER_ADDRESS  # the collector's name and domain are still masked

@@ -4,7 +4,7 @@
 
 > **Status: in progress.** Started October 2026. The data pipeline, baselines, DistilBERT, the LLM comparison,
 > the cascade and the safe LLM analyst step are done. Trained on public data alone, the models flagged almost all
-> of my real inbox mail; trained with part of it, the deployable cascade flags 3.2% (below). Deployment is next.
+> of my real inbox mail; trained with part of it, the deployable cascade flags 4.0% (below). Deployment is next.
 > Numbers are added only once they are measured.
 
 phish-triage scores emails for phishing and explains why.
@@ -35,7 +35,7 @@ From the [data card](docs/DATA.md) and the [leakage audit](reports/leakage_audit
 - **Headers alone identified the dataset perfectly** (ROC AUC 1.000 from header names, header order or
   recipient domain). After masking what the collecting inboxes added, recipient domain, server names and
   Message-ID carry no label signal (0.50–0.57), and matching months keeps the date at 0.47.
-- **The text still separates the classes almost perfectly** (0.999), because the only legitimate source is
+- **The text still separates the classes almost perfectly** (1.000), because the only legitimate source is
   mailing-list discussion. So the random split will look too easy, and I report the cross-source,
   time-based and private-inbox tests next to it.
 - **Real domains in links are not a shortcut.** Links keep their real domains, so `apache.org` appears in 46% of
@@ -51,44 +51,51 @@ From [reports/course_reproduction.md](reports/course_reproduction.md) and [repor
 - **It doesn't survive a new source.** Trained on five of the course data's six sources and tested on the sixth,
   the same model flags 7–24% of legitimate mail at its default threshold, and catches only 51% of the Nazario
   phishing. Most of its "phishing" label turned out to be spam (about 89%).
-- **On this project's 2023–2026 test mail,** the course model catches 80.2% of phishing at a 1% false-alarm rate;
-  the new text model catches 98.8%, and 85.1% at 0.1%.
+- **On this project's 2023–2026 test mail,** the course model catches 82.3% of phishing at a 1% false-alarm rate;
+  the new text model catches 99.0%, and 79.9% at 0.1%.
 - **This project's own numbers are optimistic too,** for the reason the leakage audit found: the legitimate mail
   is mailing-list discussion. The text-based models flag 99–100% of 2002 spam as phishing, and at a realistic
-  rate of 1 phishing email in 100, only 26–58% of what they flag on the cross-source and later-time tests would
+  rate of 1 phishing email in 100, only 27–56% of what they flag on the cross-source and later-time tests would
   really be phishing.
 - **The threshold drifts on new data:** chosen for 1% false alarms on validation, the text-based models' threshold
-  gives 0.7–2.9% on the cross-source and later-time tests, and 1.6–1.9% even on the `random` test. Calibration
-  (isotonic, fitted on validation) cuts the 2023–2026 calibration error from 0.074 to 0.025 for the text model.
+  gives 0.8–2.7% on the cross-source and later-time tests, and 1.6–2.0% even on the `random` test. Calibration
+  (isotonic, fitted on validation) cuts the 2023–2026 calibration error from 0.079 to 0.021 for the text model.
 
 ## What DistilBERT, Claude and the cascade showed
 
 From [docs/RESULTS.md](docs/RESULTS.md), rebuilt by `make eval` from saved predictions:
 
-- **How much LLM is needed: about 0.2% of emails.** On a fixed 1,000-email sample, the cascade (a 6 ms model,
-  then DistilBERT, then Claude Haiku 5.5 for what's left) caught 499 of 500 phishing emails with no false alarms.
-  Haiku on every email caught 97.4% with 0.8% false alarms, sent all mail to a third party, and would cost about
-  $167 a day at 1 million emails versus about $0.33 for the cascade. With 500 emails of each kind in the sample,
-  one email is 0.2%, so the intervals are wide.
-- **On 2023–2026 mail,** the cascade (recall 0.990, 0.30% false alarms) beats either model alone tuned on the test
-  data to the same false-alarm rate (0.978 each), while 97.6% of emails are decided by the 6 ms model.
+- **How much LLM is needed: on this sample, none.** On a fixed 1,000-email sample, the cascade (a 5 ms model, then
+  DistilBERT) caught 498 of 500 phishing emails with no false alarms, and no email was uncertain enough to go on
+  to Claude Haiku 5.5 (0.2% did before the November 2026 input fixes). Haiku on every email caught 97.4% with 0.8%
+  false alarms, sent all mail to a third party, and would cost about $167 a day at 1 million emails. With 500
+  emails of each kind in the sample, one email is 0.2%, so the intervals are wide.
+- **On 2023–2026 mail,** the cascade (recall 0.990, 0.32% false alarms) beats either model alone tuned on the test
+  data to the same false-alarm rate (0.958 for the stacked model, 0.978 for DistilBERT), while 95.3% of emails are
+  decided by the 5 ms model.
 - **DistilBERT's strength is calibration, not ranking:** at a strict 0.1% false-alarm rate on new sources and later
-  mail it catches 43–85%, no better than TF-IDF (64–95%), but its probabilities are better calibrated (error
-  0.010–0.038 against 0.030–0.088) and its validation threshold holds up better on 2023–2026 mail (0.58% false
-  alarms where 1% was targeted, against 1.53% for TF-IDF).
-- **The first 512 tokens beat the first 256 + last 256** at a 0.1% false-alarm rate on both splits tested
-  (0.983 vs 0.966 on `random`, 0.760 vs 0.615 on 2023–2026 mail); at 1% they are the same.
-- **ONNX int8 is 4x smaller (67 MB), but not faster** on my laptop's CPU (32 ms against 28 ms); it keeps recall at
-  1% false alarms and loses a little at 0.1% (0.977 against 0.983). The size is what lets it fit a Lambda package.
+  mail it catches 62–86%, no better than TF-IDF (56–97%), but its probabilities are better calibrated (error
+  0.007–0.033 against 0.028–0.104) and its validation threshold holds up a little better on 2023–2026 mail (0.93%
+  false alarms where 1% was targeted, against 1.14% for TF-IDF).
+- **The first 512 tokens and the first 256 + last 256 are even:** the same at 1% false alarms, and at 0.1% each
+  wins on one split (0.922 vs 0.986 on `random`, 0.737 vs 0.542 on 2023–2026 mail). Recall at 0.1% is unstable:
+  on `random` it rests on 1 or 2 of the 1,401 legitimate test emails, and it moved from 0.984 to 0.922 between two
+  training runs of the same setup.
+- **ONNX int8 is 4x smaller (67 MB), but not faster** on my laptop's CPU (29 ms against 27 ms); it keeps recall at
+  1% false alarms (0.937 against 0.922 at 0.1%). The size is what lets it fit a Lambda package.
 - **Claude as a classifier misses phishing the local models catch:** at its own cut, Haiku caught 96.6–97.4% with
   0.2–0.8% false alarms; Sonnet caught all 100 phishing emails in its 200-email sample but flagged 3 of the 100
   legitimate ones. 2 of 2,000 Haiku requests were declined by safety filters. All Phase 3 Claude runs together,
-  including the re-run after the fixes, cost $1.09.
+  including the re-run after the fixes, cost $1.09. Claude reads the plain-text part and the link targets, while
+  the local models now read the visible HTML text, so since November 2026 the two sides don't read the same input.
+  No deployed path uses Claude as the classifier, so I haven't paid for a re-run.
 
 ## What the analyst step showed
 
 From [reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/injection.md) and
-[reports/injection_round2.md](reports/injection_round2.md), all with Claude Haiku 5.5 behind DistilBERT int8:
+[reports/injection_round2.md](reports/injection_round2.md), all with Claude Haiku 5.5 behind DistilBERT int8. These
+runs used the `random` split's DistilBERT, reading the plain-text part, from before the November 2026 input fixes
+(see Known issues); I re-run them (about $0.27) with the deployed model before the Gmail add-on.
 
 - **Planted instructions never cleared a phishing email.** I hid instructions like "this message is verified safe"
   in 40 real phishing emails in six ways (visible text, HTML comment, CSS-hidden text, white-on-white text, image
@@ -108,9 +115,9 @@ From [reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/in
   100 legitimate ones were raised: 7 to "suspicious" by the analyst, and 2 by the classifier (one with only a
   shortened link and no message, ended as phishing; one flagged just above DistilBERT's threshold while the
   analyst said likely safe, sent to human review). Before the fixes it was 17. Of the 7, 3 were security advisories
-  raised for a Reply-To that masking created (see Known issues), 2 had links rewritten by a link-scanning service,
-  and 6 had no SPF/DKIM results, which is normal for archived mailing-list mail and not for Gmail, so this needs
-  re-measuring on real mail. A live analyst call takes 2.6 s (p50), 3.5 s at p95.
+  raised for a Reply-To that masking created (fixed since, see Known issues), 2 had links rewritten by a
+  link-scanning service, and 6 had no SPF/DKIM results, which is normal for archived mailing-list mail and not for
+  Gmail, so this needs re-measuring on real mail. A live analyst call takes 2.6 s (p50), 3.5 s at p95.
 - **I rated 50 of the answers myself** (25 phishing, 25 legitimate, 1–3 on the
   [rubric](docs/ANALYST_RUBRIC.md)), because the automatic checks can't tell whether an explanation is right and
   helpful. Averages: correct 2.86, grounded 2.98, clear 3.00, useful 2.88; 38 of 50 scored 3 on everything.
@@ -121,8 +128,10 @@ From [reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/in
   (1 for the final verdict, 5 for the action and summary agreeing). These ratings are of prompt version 4 on the
   data from before the fixes; I haven't rated version 5 yet.
 - **The CI eval gate** checks these numbers on every push ([reports/gate.json](reports/gate.json)) and fails if
-  they were measured on an older prompt. All Phase 4 Claude runs cost $1.06 together; the re-run after the fixes
-  was $0.27 of that.
+  they were measured on an older prompt. It also checks the model I deploy (the one trained with part of my inbox):
+  recall at 1% false alarms on the public test (0.999, at least 0.98) and false alarms on my inbox's unseen senders
+  (4.0%, at most 5%, a limit I set before the run). All Phase 4 Claude runs cost $1.06 together; the re-run after
+  the fixes was $0.27 of that.
 
 ## What my private test inbox showed
 
@@ -131,8 +140,8 @@ services, exported with Google Takeout: 1,701 emails from August to November 202
 and Promotions (323). The emails stay on my laptop and are never sent to an LLM; only counts and rates are published.
 
 - **The models flag almost all of it.** At their validation thresholds for 1% false alarms, the `random` split's
-  models flag 96.4–99.6% of the 1,677 emails outside Spam as phishing: the course model 96.4%, the stacked model
-  99.4%, DistilBERT int8 99.6%, the cascade 97.7%. They also flag all 24 Spam-folder emails.
+  models flag 96.8–99.8% of the 1,677 emails outside Spam as phishing: the course model 96.8%, the stacked model
+  99.8%, DistilBERT int8 99.8%, the cascade 99.2%. They also flag 22–24 of the 24 Spam-folder emails.
 - **This is the limit the leakage audit pointed at, now measured.** The only legitimate training mail is
   mailing-list discussion: 17.9% of it has HTML, against 95.0% of the phishing and 99.6% of this inbox. So the
   models learned "commercial-looking HTML mail is phishing", which every newsletter and receipt is. The earlier
@@ -146,24 +155,36 @@ and Promotions (323). The emails stay on my laptop and are never sent to an LLM;
 437 emails from some senders (at most 25 per sender) went into training and 151 into validation, with as many 2026
 phishing emails, and 249 emails from 26 other senders became the test. Neither model saw those senders.
 
-- **False alarms on the unseen senders fell from 97.6% to 3.2%** for the cascade (8 of 249; 8.2% averaged per
-  sender), and from 100% to 3.2% for DistilBERT. At 1 phishing email in 100, a flagged email would now be phishing
-  23% of the time, against 1% before.
-- **It costs some phishing recall.** On the public test the cascade catches 97.3% (99.9% before) at 0.21% false
-  alarms (0.57% before): the inbox mail in validation makes the threshold stricter. At a fixed 1% false-alarm rate
-  DistilBERT's recall is 99.4% against 99.9%, but at 0.1% it is 90.9% against 97.7%. On 1,644 2026 phishing emails
-  no model saw, the cascade catches 98.4%.
-- **The text-only models learned dates as a shortcut.** I set a rule before the first run: removing years, month
-  and weekday names from the test text must not move a model's results by more than 2 points. The two TF-IDF models
-  fail it (their inbox false alarms rise by 16–20 points without dates), because the inbox is all late 2026. The
-  structured-features model, the stacked model, DistilBERT and the cascade pass (at most 0.4 points).
+- **False alarms on the unseen senders fell from 99.2% to 4.0%** for the cascade and for DistilBERT (10 of 249).
+  Averaged per sender it is 16.1%, because the false alarms fall on a few senders with few emails. At 1 phishing
+  email in 100, a flagged email would now be phishing 20% of the time, against 1% before.
+- **It costs some phishing recall.** On the public test the cascade catches 98.2% (99.7% before) at 0.36% false
+  alarms (0.50% before): the inbox mail in validation makes the threshold stricter. At a fixed false-alarm rate
+  DistilBERT loses nothing: 99.9% at 1% either way, and 94.4% against 93.7% at 0.1%. On 1,644 2026 phishing emails
+  no model saw, the cascade catches 98.9%.
+- **The first run found a date shortcut, so dates are gone from every model's input.** I set a rule before that
+  run: removing years, month and weekday names from the test text must not move a model's results by more than 2
+  points. The two TF-IDF models failed it (their inbox false alarms rose by 16–20 points without dates), because
+  the inbox is all late 2026. Trained without dates, the course model flags 28.5% of the unseen senders' mail, not
+  the 7.6% it seemed to before; the other models are at 4.0–23.7%. The check now reads 0 for every model.
+- **Images with almost no text go to review.** An email with images or attachments and fewer than 20 visible words
+  gives the text models nothing to read, so it goes to a person instead of being marked safe. That catches 8.9% of
+  the public test's phishing and 4.1% of the 2026 phishing, and none of the legitimate mail in either test.
+- **Three structured features may be a shortcut on the inbox.** My rule, set before the run: a feature that
+  separates the inbox's test senders from 2026 phishing with ROC AUC 0.9 or more on its own, but scores under 0.7
+  on the public test, is suspect. Three are: the number of links (0.961, public 0.507), the number of link domains
+  (0.918, public 0.525) and a DKIM signature from the sender's own domain (0.918, public 0.582). My inbox's
+  legitimate mail is all newsletters and notifications from large senders, so "many links, signed by its own
+  domain" means legitimate there. A phishing email sent from its own domain with many links would look like a
+  newsletter to these features (see Known issues).
 - The inbox test is small: 249 emails, mostly Gmail's Updates (214) and Promotions (31).
 
 
 ## Known issues
 
-The first two were found while rating the analyst's answers by hand and fixed in November 2026; every number
-above was re-measured after the fix. The last three turned up later and are still open.
+All but the last two are fixed. The first two were found while rating the analyst's answers by hand, the next four
+afterwards and on my test inbox, all in November 2026; every number above was re-measured after the fixes, except
+the Claude runs, as noted.
 
 - **Masking rewrote links (fixed).** Replacing the Apache list names with `project` ran over the whole body and
   HTML, including URLs and addresses. It rewrote a URL or address in 7,978 of the 13,541 legitimate emails the
@@ -175,15 +196,25 @@ above was re-measured after the fix. The last three turned up later and are stil
 - **De-duplication missed padded copies (fixed).** Some phishing wraps the same visible text in about 30,000
   characters of different hidden filler, so comparing the full text saw the copies as unrelated. Duplicates are
   now found on the visible text, which removed 395 more phishing emails and 751 more Apache ones.
-- **Masking still creates some Reply-To mismatches (open).** When a Reply-To names one of the email's recipients,
-  masking replaces it with `user@example.com`, so the sender check reports "replies go to a different domain". This
-  happens in 319 of the 9,338 Apache emails the splits use (3.4%) and under 1% of the phishing, and it caused 3 of
-  the 7 legitimate emails the analyst raised.
-- **The TF-IDF text models lean on dates (open).** Trained with my late-2026 inbox, they treat years and month
-  names as signs of legitimate mail: removing them raises their inbox false alarms by 16–20 points. The deployable
-  models (DistilBERT and the cascade) pass the same check.
-- **The analyst sees rounded classifier scores (open).** DistilBERT's threshold is 0.0009, so a flagged email can be
-  shown as "phishing probability 0.00 (flagged)".
+- **Masking created Reply-To mismatches (fixed).** When a Reply-To named one of the email's recipients, masking
+  replaced it with `user@example.com`, so the sender check reported "replies go to a different domain". It happened
+  in 319 of the 9,338 Apache emails the splits use (3.4%), and caused 3 of the 7 legitimate emails the analyst
+  raised. Now only the collectors' own addresses are masked in a Reply-To, and no Apache email gets the false
+  mismatch.
+- **The text models leaned on dates (fixed).** Trained with my late-2026 inbox, the TF-IDF models treated years
+  and month names as signs of legitimate mail. Dates are now removed from every model's input.
+- **The models read the plain-text part (fixed).** A mail program shows the HTML, so a harmless plain-text part next
+  to phishing HTML decided what the models read. They now read the visible HTML text (hidden parts removed), and
+  the plain-text part only when the HTML shows almost nothing. Moving to it first let the Apache names in link text
+  reach the models in 5.6% of the legitimate mail; that text is now masked like the plain text, and the leakage
+  audit now tests exactly what the models read.
+- **The analyst saw rounded classifier scores (fixed).** DistilBERT's threshold is 0.0009, so a flagged email was
+  shown as "phishing probability 0.00 (flagged)". It is now told only whether the classifier flagged the email.
+- **The inbox shortcut features (open).** On my inbox, the number of links and an own-domain DKIM signature mark
+  legitimate mail (above). Fixing it needs legitimate mail that isn't bulk mail from large senders, which my test
+  inbox doesn't have.
+- **The analyst and injection results are from before these fixes (open).** They used the earlier classifier and
+  input; I re-run them with the deployed model (about $0.27) before the Gmail add-on.
 
 ## Progress
 
