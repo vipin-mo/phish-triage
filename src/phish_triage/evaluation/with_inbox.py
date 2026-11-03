@@ -23,6 +23,12 @@ words to review; the cascade row with the rule counts review as flagged.
 **Feature shortcut check.** Each structured feature on its own (ROC AUC, either direction): a feature that separates
 the inbox's test senders from the 2026 phishing (AUC >= 0.9) but not the public test (< 0.7) only works because of
 how the inbox differs from the training data, and is listed as a suspected shortcut (rule set before the run).
+When there are suspects, the "after" models are refitted without them (set to missing), to show whether they change
+what the cascade decides.
+
+**Phishing that looks like a newsletter.** Phishing in the public and 2026 tests that is DKIM-signed by its own
+domain and has at least `NEWSLETTER_LINKS` links, like the inbox's bulk mail. The feature check found the inbox's
+legitimate mail looks like that, so this is where a model trained with it is most likely to miss phishing.
 
 Local models only, never an LLM. Only counts and rates are written (reports/with_inbox.md, .json).
 """
@@ -31,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -52,6 +59,7 @@ SETUPS = {"before": "random", "after": inbox.SPLIT}
 DISTILBERT = "distilbert_head_int8"
 SHORTCUT_POINTS = 0.02
 SUSPECT_AUC, PUBLIC_MAX_AUC = 0.9, 0.7
+NEWSLETTER_LINKS = 12  # the median number of links in the inbox's test emails
 MODEL_NAMES = MODELS | {"cascade_review": "Cascade + little-text rule (review counts as flagged)"}
 
 
@@ -114,6 +122,7 @@ def measure(flags: dict[str, np.ndarray], eval_ids: list[str], records: dict, sl
 
     public, inbox_test = sub("public_test"), sub("inbox_test")
     phish_2026, spam = sub("phish_2026_test"), sub("spam_folder")
+    newsletter_like = sub("newsletter_like_phish")
     y_public = np.array([int(records[eval_ids[k]]["label"] == "phish") for k in public])
     groups = np.array([slices["sender_group"][eval_ids[k]] for k in inbox_test])
     categories = np.array([slices["category"][eval_ids[k]] for k in inbox_test])
@@ -132,6 +141,7 @@ def measure(flags: dict[str, np.ndarray], eval_ids: list[str], records: dict, sl
                 c: share(f[inbox_test][categories == c], n_bootstrap) for c in np.unique(categories)
             },
             "phish_2026_recall": share(f[phish_2026], n_bootstrap),
+            "newsletter_like_recall": share(f[newsletter_like], n_bootstrap),
             "spam_folder_flagged": share(f[spam], n_bootstrap),
             "precision_at_1_in_100": metrics.precision_at_prevalence(recall, inbox_fpr["share"]),
         }
@@ -217,6 +227,20 @@ def to_markdown(r: dict) -> str:
     if suspects:
         lines += ["| Feature | Inbox vs 2026 phishing | Public test |", "|---|---:|---:|"]
         lines += [f"| `{f}` | {v['inbox']:.3f} | {v['public']:.3f} |" for f, v in suspects.items()]
+        without = r["feature_check"].get("without_suspects")
+        if without:
+            lines += [
+                "",
+                "The cascade refitted without them (set to missing):",
+                "",
+                "| | Inbox: false alarms | 2026 phishing: recall | Phishing that looks like a newsletter: recall |",
+                "|---|---|---|---|",
+            ]
+            for name, v in (("as trained", r["after"]["cascade"]), ("without the suspects", without)):
+                lines.append(
+                    f"| {name} | {fmt_share(v['inbox_fpr'])} | {fmt_share(v['phish_2026_recall'])} | "
+                    f"{fmt_share(v['newsletter_like_recall'])} |"
+                )
     else:
         lines.append(f"None of the {len(r['feature_check']['auc'])} features is a suspected shortcut.")
     strongest = sorted(r["feature_check"]["auc"].items(), key=lambda kv: -kv[1]["inbox"])[:5]
@@ -225,6 +249,20 @@ def to_markdown(r: dict) -> str:
         "Strongest on the inbox: "
         + ", ".join(f"`{f}` {v['inbox']:.3f} (public {v['public']:.3f})" for f, v in strongest)
         + ".",
+        "",
+        "## Phishing that looks like a newsletter",
+        "",
+        f"Phishing in the public and 2026 tests that is DKIM-signed by its own domain and has at least "
+        f"{NEWSLETTER_LINKS} links, like the inbox's bulk mail: {c['newsletter_like_phish']} emails. With so few, the "
+        "intervals are wide.",
+        "",
+        "| Model | Before | After |",
+        "|---|---|---|",
+        *[
+            f"| {name} | {fmt_share(r['before'][m]['newsletter_like_recall'])} | "
+            f"{fmt_share(r['after'][m]['newsletter_like_recall'])} |"
+            for m, name in MODEL_NAMES.items()
+        ],
     ]
     return "\n".join(lines) + "\n"
 
@@ -262,6 +300,13 @@ def feature_check(features: dict, records: dict, slices: dict) -> dict:
     return {"auc": out, "suspects": suspects}
 
 
+def newsletter_like_phish(features: dict, records: dict, slices: dict) -> list[str]:
+    aligned, links = FEATURE_NAMES.index("dkim_aligned"), FEATURE_NAMES.index("n_urls")
+    phish = [i for i in slices["public_test"] if records[i]["label"] == "phish"] + slices["phish_2026_test"]
+    # `n_urls` is log1p of the count
+    return [i for i in phish if features[i][aligned] == 1 and features[i][links] >= math.log1p(NEWSLETTER_LINKS)]
+
+
 def little_text(records: dict, slices: dict, n_bootstrap: int) -> dict:
     public = slices["public_test"]
     members = {
@@ -291,6 +336,7 @@ def main(argv: list[str] | None = None) -> int:
     texts = {i: email_text(r) for i, r in records.items()}
     features = dict(zip(records, matrix(list(records.values()), ranks), strict=True))
     print(f"{len(records)} emails prepared", file=sys.stderr)
+    slices = slices | {"newsletter_like_phish": newsletter_like_phish(features, records, slices)}
 
     result: dict = {
         "counts": {
@@ -301,6 +347,7 @@ def main(argv: list[str] | None = None) -> int:
             "inbox_test_senders": len(set(slices["sender_group"].values())),
             "phish_2026_test": len(slices["phish_2026_test"]),
             "spam_folder": len(slices["spam_folder"]),
+            "newsletter_like_phish": len(slices["newsletter_like_phish"]),
         }
     }
     for setup in ("before", "after"):
@@ -320,6 +367,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{setup}: done", file=sys.stderr)
     result["little_text"] = little_text(records, slices, args.bootstrap)
     result["feature_check"] = feature_check(features, records, slices)
+    if result["feature_check"]["suspects"]:
+        hidden = [FEATURE_NAMES.index(f) for f in result["feature_check"]["suspects"]]
+        masked = {i: np.where(np.isin(np.arange(len(v)), hidden), np.nan, v) for i, v in features.items()}
+        flags, _ = evaluate_setup(splits["after"], eval_ids, records, ranks, texts, masked, "after")
+        without = measure({"cascade": flags["cascade"]}, eval_ids, records, slices, args.bootstrap)["cascade"]
+        result["feature_check"]["without_suspects"] = without
     REPORTS_DIR.mkdir(exist_ok=True)
     (REPORTS_DIR / "with_inbox.json").write_text(json.dumps(result, indent=1) + "\n")
     (REPORTS_DIR / "with_inbox.md").write_text(to_markdown(result))

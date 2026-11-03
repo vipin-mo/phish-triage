@@ -70,4 +70,25 @@ Each structured feature on its own (ROC AUC, either direction). Suspected shortc
 | `n_urls` | 0.961 | 0.507 |
 | `n_link_domains` | 0.918 | 0.525 |
 
+The cascade refitted without them (set to missing):
+
+| | Inbox: false alarms | 2026 phishing: recall | Phishing that looks like a newsletter: recall |
+|---|---|---|---|
+| as trained | 4.0% [1.6%, 6.4%] (10 of 249) | 98.9% [98.4%, 99.4%] (1626 of 1644) | 80.6% [64.5%, 93.5%] (25 of 31) |
+| without the suspects | 4.0% [1.6%, 6.4%] (10 of 249) | 98.9% [98.4%, 99.4%] (1626 of 1644) | 80.6% [64.5%, 93.5%] (25 of 31) |
+
 Strongest on the inbox: `n_urls` 0.961 (public 0.507), `n_images` 0.939 (public 0.757), `dkim_aligned` 0.918 (public 0.582), `n_link_domains` 0.918 (public 0.525), `max_url_length` 0.896 (public 0.632).
+
+## Phishing that looks like a newsletter
+
+Phishing in the public and 2026 tests that is DKIM-signed by its own domain and has at least 12 links, like the inbox's bulk mail: 31 emails. With so few, the intervals are wide.
+
+| Model | Before | After |
+|---|---|---|
+| Course setup (word TF-IDF + LR) | 100.0% [100.0%, 100.0%] (31 of 31) | 87.1% [74.2%, 96.8%] (27 of 31) |
+| TF-IDF words + chars + LR | 100.0% [100.0%, 100.0%] (31 of 31) | 83.9% [71.0%, 96.8%] (26 of 31) |
+| Trees on structured features | 100.0% [100.0%, 100.0%] (31 of 31) | 51.6% [32.3%, 67.7%] (16 of 31) |
+| Trees on features + text score | 100.0% [100.0%, 100.0%] (31 of 31) | 93.5% [83.9%, 100.0%] (29 of 31) |
+| DistilBERT, ONNX int8 | 100.0% [100.0%, 100.0%] (31 of 31) | 80.6% [64.5%, 93.5%] (25 of 31) |
+| Cascade: stacked -> DistilBERT int8 | 100.0% [100.0%, 100.0%] (31 of 31) | 80.6% [64.5%, 93.5%] (25 of 31) |
+| Cascade + little-text rule (review counts as flagged) | 100.0% [100.0%, 100.0%] (31 of 31) | 80.6% [64.5%, 93.5%] (25 of 31) |

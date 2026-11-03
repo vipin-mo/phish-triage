@@ -175,8 +175,12 @@ phishing emails, and 249 emails from 26 other senders became the test. Neither m
   on the public test, is suspect. Three are: the number of links (0.961, public 0.507), the number of link domains
   (0.918, public 0.525) and a DKIM signature from the sender's own domain (0.918, public 0.582). My inbox's
   legitimate mail is all newsletters and notifications from large senders, so "many links, signed by its own
-  domain" means legitimate there. A phishing email sent from its own domain with many links would look like a
-  newsletter to these features (see Known issues).
+  domain" means legitimate there. They don't decide anything in the deployed cascade, though: refitted without
+  them, it flags exactly the same emails, because on this mail DistilBERT, which reads only the text, decides.
+- **The weak spot is phishing that looks like a newsletter.** Of the phishing in the tests that is DKIM-signed by
+  its own domain and has at least 12 links (the inbox's median), the cascade catches 25 of 31 (80.6%), against
+  98.9% of the 2026 phishing overall. Trained on public data only it caught all 31, while flagging 99% of my
+  inbox: this is what training with the inbox costs. With 31 emails the interval is wide (64.5–93.5%).
 - The inbox test is small: 249 emails, mostly Gmail's Updates (214) and Promotions (31).
 
 
@@ -210,9 +214,10 @@ the Claude runs, as noted.
   audit now tests exactly what the models read.
 - **The analyst saw rounded classifier scores (fixed).** DistilBERT's threshold is 0.0009, so a flagged email was
   shown as "phishing probability 0.00 (flagged)". It is now told only whether the classifier flagged the email.
-- **The inbox shortcut features (open).** On my inbox, the number of links and an own-domain DKIM signature mark
-  legitimate mail (above). Fixing it needs legitimate mail that isn't bulk mail from large senders, which my test
-  inbox doesn't have.
+- **Phishing that looks like a newsletter (open).** The deployed cascade catches 25 of 31 such emails (above).
+  It is a data problem: the only bulk-looking legitimate mail it learned from is my inbox, and there are few
+  phishing emails of that kind to learn from. No public dataset I found fills both sides (see
+  [docs/DATA.md](docs/DATA.md)); the report tracks this number for every model I train.
 - **The analyst and injection results are from before these fixes (open).** They used the earlier classifier and
   input; I re-run them with the deployed model (about $0.27) before the Gmail add-on.
 

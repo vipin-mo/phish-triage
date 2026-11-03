@@ -61,8 +61,10 @@ text models nothing to judge, so it goes to human review instead of being marked
 AUC 0.9 or more between the inbox's unseen senders and 2026 phishing, but under 0.7 on the public test, is a
 suspected shortcut (rule set before the run). `n_urls` (0.961), `n_link_domains` (0.918) and `dkim_aligned` (0.918)
 are: the inbox's legitimate mail is newsletters and notifications from large senders, with many links and their
-own DKIM signature. They stay in the model, because they are real signals for that kind of mail, but phishing sent
-from its own domain with many links would look like a newsletter to them.
+own DKIM signature. They stay in the model: refitted without them, the cascade flags exactly the same emails,
+because on this mail DistilBERT (text only) decides. The weak spot is in the text: phishing that is DKIM-signed by
+its own domain and has 12 or more links, like a newsletter, is caught 25 of 31 times
+([reports/with_inbox.md](../reports/with_inbox.md)).
 
 ## The sender check
 

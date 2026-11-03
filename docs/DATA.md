@@ -277,7 +277,12 @@ What this shows:
   ([reports/with_inbox.md](../reports/with_inbox.md)).
 - **My inbox's legitimate mail is all bulk mail from large senders,** so on it the number of links and an
   own-domain DKIM signature mark legitimate mail (ROC AUC 0.92–0.96 on their own, against 0.51–0.58 on the public
-  test). Phishing sent from its own domain with many links would look legitimate to those features.
+  test). The cascade decides the same without them; what it misses more is phishing that reads like a
+  newsletter: 25 of 31 caught. No public dataset fills that gap: the one large corpus of commercial newsletters I
+  found ([PrivacyMail](https://zenodo.org/records/6509751), about 500,000 `.eml` files) is available only on
+  request, collected over two years before 2022 with German over-represented, and legitimate newsletters alone would push the model
+  further toward "looks like a newsletter = legitimate". It would need newsletter-like phishing from the same
+  years to help.
 - **List mail is not always legitimate.** Two Apache list posts turned out to be phishing (found as label
   conflicts), so a few spam or phishing posts that got past the lists' filters may still be labelled
   legitimate.

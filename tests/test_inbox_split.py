@@ -42,3 +42,27 @@ def test_split_keeps_senders_apart_caps_train_and_adds_matching_phishing():
 def test_date_words_are_removed_as_whole_words():
     assert without_dates("Your November 2026 statement, Mon 3 Nov").split() == ["Your", "statement,", "3"]
     assert without_dates("Monetize your mayonnaise") == "Monetize your mayonnaise"
+
+
+def test_newsletter_like_phishing_counts_real_links_not_their_log():
+    import math
+
+    from phish_triage.evaluation.with_inbox import NEWSLETTER_LINKS, newsletter_like_phish
+    from phish_triage.features.extract import FEATURE_NAMES
+
+    def row(aligned: int, links: int) -> list[float]:
+        values = [0.0] * len(FEATURE_NAMES)
+        values[FEATURE_NAMES.index("dkim_aligned")] = aligned
+        values[FEATURE_NAMES.index("n_urls")] = math.log1p(links)  # as features.extract stores it
+        return values
+
+    features = {
+        "a": row(1, NEWSLETTER_LINKS),
+        "b": row(1, NEWSLETTER_LINKS - 1),
+        "c": row(0, 40),
+        "d": row(1, 40),
+        "e": row(1, 40),
+    }
+    records = {i: {"label": "phish"} for i in "abcd"} | {"e": {"label": "legit"}}
+    slices = {"public_test": ["a", "b", "c", "e"], "phish_2026_test": ["d"]}
+    assert newsletter_like_phish(features, records, slices) == ["a", "d"]
