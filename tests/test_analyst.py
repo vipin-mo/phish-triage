@@ -170,7 +170,7 @@ def test_tag_id_is_random_per_request():
 def test_signals_are_numbered_and_cited_by_number():
     record = _record()
     a = analyst.render(record, classifier_score=0.97, classifier_phish=True, sender=check_sender(record))
-    assert "[S1] Classifier: phishing probability 0.97 (flagged)" in a.prompt and a.signals[0].startswith("Classifier")
+    assert "[S1] Classifier: flagged as phishing" in a.prompt and a.signals[0].startswith("Classifier")
     cite = analyst.Indicator(type="sender", source="signal", evidence="S2", why="the sender check failed")
     assert analyst.grounded(cite, a) and analyst.shown_evidence(cite, a) == f"From our checks: {a.signals[1]}"
     for bad in ("S0", f"S{len(a.signals) + 1}", "the sender check failed", a.signals[1]):

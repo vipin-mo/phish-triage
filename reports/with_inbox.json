@@ -11,15 +11,15 @@
  "before": {
   "course": {
    "public_recall": 0.9992862241256245,
-   "public_fpr": 0.01641684511063526,
+   "public_fpr": 0.015703069236259814,
    "inbox_fpr": {
     "emails": 249,
-    "flagged": 233,
-    "share": 0.9357429718875502,
-    "low": 0.9036144578313253,
-    "high": 0.963855421686747
+    "flagged": 237,
+    "share": 0.9518072289156626,
+    "low": 0.9236947791164659,
+    "high": 0.9759036144578314
    },
-   "inbox_fpr_per_sender": 0.9638186813186813,
+   "inbox_fpr_per_sender": 0.970467032967033,
    "inbox_fpr_by_category": {
     "primary": {
      "emails": 1,
@@ -44,10 +44,10 @@
     },
     "updates": {
      "emails": 214,
-     "flagged": 198,
-     "share": 0.9252336448598131,
-     "low": 0.8878504672897196,
-     "high": 0.9579439252336449
+     "flagged": 202,
+     "share": 0.9439252336448598,
+     "low": 0.9112149532710281,
+     "high": 0.9719626168224299
     }
    },
    "phish_2026_recall": {
@@ -59,130 +59,16 @@
    },
    "spam_folder_flagged": {
     "emails": 24,
-    "flagged": 24,
-    "share": 1.0,
-    "low": 1.0,
+    "flagged": 23,
+    "share": 0.9583333333333334,
+    "low": 0.875,
     "high": 1.0
    },
-   "precision_at_1_in_100": 0.01067182048859121
+   "precision_at_1_in_100": 0.010493595429994038
   },
   "text": {
    "public_recall": 1.0,
-   "public_fpr": 0.019271948608137045,
-   "inbox_fpr": {
-    "emails": 249,
-    "flagged": 246,
-    "share": 0.9879518072289156,
-    "low": 0.9718875502008032,
-    "high": 1.0
-   },
-   "inbox_fpr_per_sender": 0.9917582417582417,
-   "inbox_fpr_by_category": {
-    "primary": {
-     "emails": 1,
-     "flagged": 1,
-     "share": 1.0,
-     "low": 1.0,
-     "high": 1.0
-    },
-    "promotions": {
-     "emails": 31,
-     "flagged": 31,
-     "share": 1.0,
-     "low": 1.0,
-     "high": 1.0
-    },
-    "purchases": {
-     "emails": 3,
-     "flagged": 3,
-     "share": 1.0,
-     "low": 1.0,
-     "high": 1.0
-    },
-    "updates": {
-     "emails": 214,
-     "flagged": 211,
-     "share": 0.985981308411215,
-     "low": 0.9672897196261683,
-     "high": 1.0
-    }
-   },
-   "phish_2026_recall": {
-    "emails": 1644,
-    "flagged": 1644,
-    "share": 1.0,
-    "low": 1.0,
-    "high": 1.0
-   },
-   "spam_folder_flagged": {
-    "emails": 24,
-    "flagged": 24,
-    "share": 1.0,
-    "low": 1.0,
-    "high": 1.0
-   },
-   "precision_at_1_in_100": 0.010120716985733448
-  },
-  "features": {
-   "public_recall": 0.9778729478943612,
-   "public_fpr": 0.014989293361884369,
-   "inbox_fpr": {
-    "emails": 249,
-    "flagged": 225,
-    "share": 0.9036144578313253,
-    "low": 0.8634538152610441,
-    "high": 0.9397590361445783
-   },
-   "inbox_fpr_per_sender": 0.9732234432234432,
-   "inbox_fpr_by_category": {
-    "primary": {
-     "emails": 1,
-     "flagged": 1,
-     "share": 1.0,
-     "low": 1.0,
-     "high": 1.0
-    },
-    "promotions": {
-     "emails": 31,
-     "flagged": 30,
-     "share": 0.967741935483871,
-     "low": 0.9032258064516129,
-     "high": 1.0
-    },
-    "purchases": {
-     "emails": 3,
-     "flagged": 1,
-     "share": 0.3333333333333333,
-     "low": 0.0,
-     "high": 1.0
-    },
-    "updates": {
-     "emails": 214,
-     "flagged": 193,
-     "share": 0.9018691588785047,
-     "low": 0.8598130841121495,
-     "high": 0.9346962616822428
-    }
-   },
-   "phish_2026_recall": {
-    "emails": 1644,
-    "flagged": 1624,
-    "share": 0.9878345498783455,
-    "low": 0.982360097323601,
-    "high": 0.9927007299270073
-   },
-   "spam_folder_flagged": {
-    "emails": 24,
-    "flagged": 24,
-    "share": 1.0,
-    "low": 1.0,
-    "high": 1.0
-   },
-   "precision_at_1_in_100": 0.010812907974270014
-  },
-  "stacked": {
-   "public_recall": 1.0,
-   "public_fpr": 0.018558172733761598,
+   "public_fpr": 0.01998572448251249,
    "inbox_fpr": {
     "emails": 249,
     "flagged": 248,
@@ -237,17 +123,131 @@
    },
    "precision_at_1_in_100": 0.010039917745252208
   },
+  "features": {
+   "public_recall": 0.9778729478943612,
+   "public_fpr": 0.017130620985010708,
+   "inbox_fpr": {
+    "emails": 249,
+    "flagged": 226,
+    "share": 0.9076305220883534,
+    "low": 0.8714859437751004,
+    "high": 0.9437751004016064
+   },
+   "inbox_fpr_per_sender": 0.9736080586080587,
+   "inbox_fpr_by_category": {
+    "primary": {
+     "emails": 1,
+     "flagged": 1,
+     "share": 1.0,
+     "low": 1.0,
+     "high": 1.0
+    },
+    "promotions": {
+     "emails": 31,
+     "flagged": 30,
+     "share": 0.967741935483871,
+     "low": 0.9032258064516129,
+     "high": 1.0
+    },
+    "purchases": {
+     "emails": 3,
+     "flagged": 1,
+     "share": 0.3333333333333333,
+     "low": 0.0,
+     "high": 1.0
+    },
+    "updates": {
+     "emails": 214,
+     "flagged": 194,
+     "share": 0.9065420560747663,
+     "low": 0.8644859813084113,
+     "high": 0.9439252336448598
+    }
+   },
+   "phish_2026_recall": {
+    "emails": 1644,
+    "flagged": 1622,
+    "share": 0.98661800486618,
+    "low": 0.9805352798053528,
+    "high": 0.9914841849148418
+   },
+   "spam_folder_flagged": {
+    "emails": 24,
+    "flagged": 22,
+    "share": 0.9166666666666666,
+    "low": 0.7916666666666666,
+    "high": 1.0
+   },
+   "precision_at_1_in_100": 0.010765578324860487
+  },
+  "stacked": {
+   "public_recall": 0.9992862241256245,
+   "public_fpr": 0.019271948608137045,
+   "inbox_fpr": {
+    "emails": 249,
+    "flagged": 248,
+    "share": 0.9959839357429718,
+    "low": 0.9879518072289156,
+    "high": 1.0
+   },
+   "inbox_fpr_per_sender": 0.9972527472527474,
+   "inbox_fpr_by_category": {
+    "primary": {
+     "emails": 1,
+     "flagged": 1,
+     "share": 1.0,
+     "low": 1.0,
+     "high": 1.0
+    },
+    "promotions": {
+     "emails": 31,
+     "flagged": 31,
+     "share": 1.0,
+     "low": 1.0,
+     "high": 1.0
+    },
+    "purchases": {
+     "emails": 3,
+     "flagged": 3,
+     "share": 1.0,
+     "low": 1.0,
+     "high": 1.0
+    },
+    "updates": {
+     "emails": 214,
+     "flagged": 213,
+     "share": 0.9953271028037384,
+     "low": 0.985981308411215,
+     "high": 1.0
+    }
+   },
+   "phish_2026_recall": {
+    "emails": 1644,
+    "flagged": 1644,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "spam_folder_flagged": {
+    "emails": 24,
+    "flagged": 24,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "precision_at_1_in_100": 0.010032823391916273
+  },
   "distilbert": {
-   "public_recall": 0.9985724482512491,
+   "public_recall": 0.9992862241256245,
    "public_fpr": 0.012134189864382585,
    "inbox_fpr": {
     "emails": 249,
-    "flagged": 249,
-    "share": 1.0,
-    "low": 1.0,
+    "flagged": 247,
+    "share": 0.9919678714859438,
+    "low": 0.9799196787148594,
     "high": 1.0
    },
-   "inbox_fpr_per_sender": 1.0,
+   "inbox_fpr_per_sender": 0.9945054945054945,
    "inbox_fpr_by_category": {
     "primary": {
      "emails": 1,
@@ -272,9 +272,9 @@
     },
     "updates": {
      "emails": 214,
-     "flagged": 214,
-     "share": 1.0,
-     "low": 1.0,
+     "flagged": 212,
+     "share": 0.9906542056074766,
+     "low": 0.9766355140186916,
      "high": 1.0
     }
    },
@@ -292,19 +292,19 @@
     "low": 1.0,
     "high": 1.0
    },
-   "precision_at_1_in_100": 0.00998586703593199
+   "precision_at_1_in_100": 0.010073032956415234
   },
   "cascade": {
-   "public_recall": 0.9985724482512491,
-   "public_fpr": 0.005710206995003569,
+   "public_recall": 0.9971448965024983,
+   "public_fpr": 0.004996431120628123,
    "inbox_fpr": {
     "emails": 249,
-    "flagged": 243,
-    "share": 0.9759036144578314,
-    "low": 0.9597389558232932,
-    "high": 0.9919678714859438
+    "flagged": 247,
+    "share": 0.9919678714859438,
+    "low": 0.9799196787148594,
+    "high": 1.0
    },
-   "inbox_fpr_per_sender": 0.9846611721611721,
+   "inbox_fpr_per_sender": 0.9945054945054945,
    "inbox_fpr_by_category": {
     "primary": {
      "emails": 1,
@@ -329,10 +329,10 @@
     },
     "updates": {
      "emails": 214,
-     "flagged": 208,
-     "share": 0.9719626168224299,
-     "low": 0.9485981308411215,
-     "high": 0.9906542056074766
+     "flagged": 212,
+     "share": 0.9906542056074766,
+     "low": 0.9766355140186916,
+     "high": 1.0
     }
    },
    "phish_2026_recall": {
@@ -349,21 +349,78 @@
     "low": 1.0,
     "high": 1.0
    },
-   "precision_at_1_in_100": 0.010229909320417637
+   "precision_at_1_in_100": 0.010051664851690026
+  },
+  "cascade_review": {
+   "public_recall": 0.9971448965024983,
+   "public_fpr": 0.004996431120628123,
+   "inbox_fpr": {
+    "emails": 249,
+    "flagged": 247,
+    "share": 0.9919678714859438,
+    "low": 0.9799196787148594,
+    "high": 1.0
+   },
+   "inbox_fpr_per_sender": 0.9945054945054945,
+   "inbox_fpr_by_category": {
+    "primary": {
+     "emails": 1,
+     "flagged": 1,
+     "share": 1.0,
+     "low": 1.0,
+     "high": 1.0
+    },
+    "promotions": {
+     "emails": 31,
+     "flagged": 31,
+     "share": 1.0,
+     "low": 1.0,
+     "high": 1.0
+    },
+    "purchases": {
+     "emails": 3,
+     "flagged": 3,
+     "share": 1.0,
+     "low": 1.0,
+     "high": 1.0
+    },
+    "updates": {
+     "emails": 214,
+     "flagged": 212,
+     "share": 0.9906542056074766,
+     "low": 0.9766355140186916,
+     "high": 1.0
+    }
+   },
+   "phish_2026_recall": {
+    "emails": 1644,
+    "flagged": 1644,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "spam_folder_flagged": {
+    "emails": 24,
+    "flagged": 24,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "precision_at_1_in_100": 0.010051664851690026
   }
  },
  "after": {
   "course": {
-   "public_recall": 0.9757316202712348,
-   "public_fpr": 0.0035688793718772305,
+   "public_recall": 0.974304068522484,
+   "public_fpr": 0.0028551034975017845,
    "inbox_fpr": {
     "emails": 249,
-    "flagged": 19,
-    "share": 0.07630522088353414,
-    "low": 0.04417670682730924,
-    "high": 0.10853413654618466
+    "flagged": 71,
+    "share": 0.285140562248996,
+    "low": 0.2289156626506024,
+    "high": 0.3453815261044177
    },
-   "inbox_fpr_per_sender": 0.2549358974358974,
+   "inbox_fpr_per_sender": 0.30608974358974356,
    "inbox_fpr_by_category": {
     "primary": {
      "emails": 1,
@@ -374,60 +431,60 @@
     },
     "promotions": {
      "emails": 31,
-     "flagged": 4,
-     "share": 0.12903225806451613,
-     "low": 0.03225806451612903,
-     "high": 0.25806451612903225
+     "flagged": 6,
+     "share": 0.1935483870967742,
+     "low": 0.06451612903225806,
+     "high": 0.3548387096774194
     },
     "purchases": {
      "emails": 3,
-     "flagged": 0,
-     "share": 0.0,
+     "flagged": 2,
+     "share": 0.6666666666666666,
      "low": 0.0,
-     "high": 0.0
+     "high": 1.0
     },
     "updates": {
      "emails": 214,
-     "flagged": 14,
-     "share": 0.06542056074766354,
-     "low": 0.037383177570093455,
-     "high": 0.09813084112149532
+     "flagged": 62,
+     "share": 0.2897196261682243,
+     "low": 0.22897196261682243,
+     "high": 0.35046728971962615
     }
    },
    "phish_2026_recall": {
     "emails": 1644,
-    "flagged": 1621,
-    "share": 0.9860097323600974,
-    "low": 0.9799270072992701,
-    "high": 0.9908759124087592
+    "flagged": 1627,
+    "share": 0.9896593673965937,
+    "low": 0.9847779805352798,
+    "high": 0.9945255474452555
    },
    "spam_folder_flagged": {
     "emails": 24,
-    "flagged": 2,
-    "share": 0.08333333333333333,
-    "low": 0.0,
-    "high": 0.20833333333333334
+    "flagged": 4,
+    "share": 0.16666666666666666,
+    "low": 0.041666666666666664,
+    "high": 0.3333333333333333
    },
-   "precision_at_1_in_100": 0.1143889229429129
+   "precision_at_1_in_100": 0.033362898936875086
   },
   "text": {
-   "public_recall": 0.9892933618843683,
-   "public_fpr": 0.0028551034975017845,
+   "public_recall": 0.9778729478943612,
+   "public_fpr": 0.0,
    "inbox_fpr": {
     "emails": 249,
-    "flagged": 19,
-    "share": 0.07630522088353414,
-    "low": 0.04417670682730924,
-    "high": 0.11244979919678715
+    "flagged": 21,
+    "share": 0.08433734939759036,
+    "low": 0.05220883534136546,
+    "high": 0.11646586345381527
    },
-   "inbox_fpr_per_sender": 0.25,
+   "inbox_fpr_per_sender": 0.251025641025641,
    "inbox_fpr_by_category": {
     "primary": {
      "emails": 1,
-     "flagged": 1,
-     "share": 1.0,
-     "low": 1.0,
-     "high": 1.0
+     "flagged": 0,
+     "share": 0.0,
+     "low": 0.0,
+     "high": 0.0
     },
     "promotions": {
      "emails": 31,
@@ -445,18 +502,18 @@
     },
     "updates": {
      "emails": 214,
-     "flagged": 13,
-     "share": 0.06074766355140187,
-     "low": 0.03271028037383177,
-     "high": 0.09345794392523364
+     "flagged": 16,
+     "share": 0.07476635514018691,
+     "low": 0.04205607476635514,
+     "high": 0.11214953271028037
     }
    },
    "phish_2026_recall": {
     "emails": 1644,
-    "flagged": 1631,
-    "share": 0.9920924574209246,
-    "low": 0.9878345498783455,
-    "high": 0.9963503649635036
+    "flagged": 1624,
+    "share": 0.9878345498783455,
+    "low": 0.9817518248175182,
+    "high": 0.9927007299270073
    },
    "spam_folder_flagged": {
     "emails": 24,
@@ -465,19 +522,19 @@
     "low": 0.0,
     "high": 0.20833333333333334
    },
-   "precision_at_1_in_100": 0.11579471848530146
+   "precision_at_1_in_100": 0.10484020420375015
   },
   "features": {
-   "public_recall": 0.9521770164168452,
-   "public_fpr": 0.007137758743754461,
+   "public_recall": 0.9543183440399714,
+   "public_fpr": 0.007851534618129907,
    "inbox_fpr": {
     "emails": 249,
-    "flagged": 19,
-    "share": 0.07630522088353414,
-    "low": 0.04417670682730924,
-    "high": 0.10843373493975904
+    "flagged": 20,
+    "share": 0.08032128514056225,
+    "low": 0.04819277108433735,
+    "high": 0.11244979919678715
    },
-   "inbox_fpr_per_sender": 0.20807692307692308,
+   "inbox_fpr_per_sender": 0.2128846153846154,
    "inbox_fpr_by_category": {
     "primary": {
      "emails": 1,
@@ -502,18 +559,18 @@
     },
     "updates": {
      "emails": 214,
-     "flagged": 11,
-     "share": 0.0514018691588785,
-     "low": 0.02336448598130841,
-     "high": 0.08411214953271028
+     "flagged": 12,
+     "share": 0.056074766355140186,
+     "low": 0.028037383177570093,
+     "high": 0.08878504672897196
     }
    },
    "phish_2026_recall": {
     "emails": 1644,
-    "flagged": 1606,
-    "share": 0.9768856447688564,
-    "low": 0.9695863746958637,
-    "high": 0.9835918491484186
+    "flagged": 1603,
+    "share": 0.9750608272506083,
+    "low": 0.9671532846715328,
+    "high": 0.982360097323601
    },
    "spam_folder_flagged": {
     "emails": 24,
@@ -522,26 +579,26 @@
     "low": 0.08229166666666672,
     "high": 0.375
    },
-   "precision_at_1_in_100": 0.11193662431039206
+   "precision_at_1_in_100": 0.1071530303747184
   },
   "stacked": {
-   "public_recall": 0.9950035688793719,
-   "public_fpr": 0.0028551034975017845,
+   "public_recall": 0.9878658101356174,
+   "public_fpr": 0.0007137758743754461,
    "inbox_fpr": {
     "emails": 249,
-    "flagged": 64,
-    "share": 0.2570281124497992,
-    "low": 0.20471887550200804,
-    "high": 0.3172690763052209
+    "flagged": 59,
+    "share": 0.23694779116465864,
+    "low": 0.18072289156626506,
+    "high": 0.2931726907630522
    },
-   "inbox_fpr_per_sender": 0.2801098901098901,
+   "inbox_fpr_per_sender": 0.2776923076923076,
    "inbox_fpr_by_category": {
     "primary": {
      "emails": 1,
-     "flagged": 1,
-     "share": 1.0,
-     "low": 1.0,
-     "high": 1.0
+     "flagged": 0,
+     "share": 0.0,
+     "low": 0.0,
+     "high": 0.0
     },
     "promotions": {
      "emails": 31,
@@ -559,53 +616,53 @@
     },
     "updates": {
      "emails": 214,
-     "flagged": 57,
-     "share": 0.26635514018691586,
-     "low": 0.205607476635514,
-     "high": 0.32242990654205606
+     "flagged": 53,
+     "share": 0.24766355140186916,
+     "low": 0.19158878504672897,
+     "high": 0.3037383177570093
     }
    },
    "phish_2026_recall": {
     "emails": 1644,
-    "flagged": 1639,
-    "share": 0.9969586374695864,
-    "low": 0.9939172749391727,
-    "high": 0.9993917274939172
+    "flagged": 1637,
+    "share": 0.995742092457421,
+    "low": 0.9920924574209246,
+    "high": 0.998190389294404
    },
    "spam_folder_flagged": {
     "emails": 24,
-    "flagged": 5,
-    "share": 0.20833333333333334,
-    "low": 0.08333333333333333,
-    "high": 0.375
+    "flagged": 2,
+    "share": 0.08333333333333333,
+    "low": 0.0,
+    "high": 0.20833333333333334
    },
-   "precision_at_1_in_100": 0.03763139047698345
+   "precision_at_1_in_100": 0.040410621331947755
   },
   "distilbert": {
-   "public_recall": 0.9700214132762313,
-   "public_fpr": 0.0028551034975017845,
+   "public_recall": 0.9821556031406139,
+   "public_fpr": 0.0035688793718772305,
    "inbox_fpr": {
     "emails": 249,
-    "flagged": 8,
-    "share": 0.0321285140562249,
-    "low": 0.012048192771084338,
-    "high": 0.05622489959839357
+    "flagged": 10,
+    "share": 0.040160642570281124,
+    "low": 0.01606425702811245,
+    "high": 0.0642570281124498
    },
-   "inbox_fpr_per_sender": 0.0817032967032967,
+   "inbox_fpr_per_sender": 0.16086996336996334,
    "inbox_fpr_by_category": {
     "primary": {
      "emails": 1,
-     "flagged": 1,
-     "share": 1.0,
-     "low": 1.0,
-     "high": 1.0
-    },
-    "promotions": {
-     "emails": 31,
      "flagged": 0,
      "share": 0.0,
      "low": 0.0,
      "high": 0.0
+    },
+    "promotions": {
+     "emails": 31,
+     "flagged": 3,
+     "share": 0.0967741935483871,
+     "low": 0.0,
+     "high": 0.1935483870967742
     },
     "purchases": {
      "emails": 3,
@@ -618,51 +675,51 @@
      "emails": 214,
      "flagged": 7,
      "share": 0.03271028037383177,
-     "low": 0.013901869158878512,
+     "low": 0.014018691588785047,
      "high": 0.056074766355140186
     }
    },
    "phish_2026_recall": {
     "emails": 1644,
-    "flagged": 1614,
-    "share": 0.9817518248175182,
-    "low": 0.9750608272506083,
-    "high": 0.9884428223844283
+    "flagged": 1626,
+    "share": 0.9890510948905109,
+    "low": 0.984169708029197,
+    "high": 0.9939172749391727
    },
    "spam_folder_flagged": {
     "emails": 24,
-    "flagged": 3,
-    "share": 0.125,
+    "flagged": 2,
+    "share": 0.08333333333333333,
     "low": 0.0,
-    "high": 0.2916666666666667
+    "high": 0.20833333333333334
    },
-   "precision_at_1_in_100": 0.2336981856831192
+   "precision_at_1_in_100": 0.19809275364329845
   },
   "cascade": {
-   "public_recall": 0.9728765167737331,
-   "public_fpr": 0.0021413276231263384,
+   "public_recall": 0.9821556031406139,
+   "public_fpr": 0.0035688793718772305,
    "inbox_fpr": {
     "emails": 249,
-    "flagged": 8,
-    "share": 0.0321285140562249,
-    "low": 0.012048192771084338,
-    "high": 0.05622489959839357
+    "flagged": 10,
+    "share": 0.040160642570281124,
+    "low": 0.01606425702811245,
+    "high": 0.0642570281124498
    },
-   "inbox_fpr_per_sender": 0.0817032967032967,
+   "inbox_fpr_per_sender": 0.16086996336996334,
    "inbox_fpr_by_category": {
     "primary": {
      "emails": 1,
-     "flagged": 1,
-     "share": 1.0,
-     "low": 1.0,
-     "high": 1.0
-    },
-    "promotions": {
-     "emails": 31,
      "flagged": 0,
      "share": 0.0,
      "low": 0.0,
      "high": 0.0
+    },
+    "promotions": {
+     "emails": 31,
+     "flagged": 3,
+     "share": 0.0967741935483871,
+     "low": 0.0,
+     "high": 0.1935483870967742
     },
     "purchases": {
      "emails": 3,
@@ -675,37 +732,94 @@
      "emails": 214,
      "flagged": 7,
      "share": 0.03271028037383177,
-     "low": 0.013901869158878512,
+     "low": 0.014018691588785047,
      "high": 0.056074766355140186
     }
    },
    "phish_2026_recall": {
     "emails": 1644,
-    "flagged": 1618,
-    "share": 0.9841849148418491,
-    "low": 0.9781021897810219,
-    "high": 0.9896593673965937
+    "flagged": 1626,
+    "share": 0.9890510948905109,
+    "low": 0.984169708029197,
+    "high": 0.9939172749391727
    },
    "spam_folder_flagged": {
     "emails": 24,
-    "flagged": 3,
-    "share": 0.125,
+    "flagged": 2,
+    "share": 0.08333333333333333,
     "low": 0.0,
-    "high": 0.2916666666666667
+    "high": 0.20833333333333334
    },
-   "precision_at_1_in_100": 0.23422492665525174
+   "precision_at_1_in_100": 0.19809275364329845
+  },
+  "cascade_review": {
+   "public_recall": 0.9850107066381156,
+   "public_fpr": 0.0035688793718772305,
+   "inbox_fpr": {
+    "emails": 249,
+    "flagged": 10,
+    "share": 0.040160642570281124,
+    "low": 0.01606425702811245,
+    "high": 0.0642570281124498
+   },
+   "inbox_fpr_per_sender": 0.16086996336996334,
+   "inbox_fpr_by_category": {
+    "primary": {
+     "emails": 1,
+     "flagged": 0,
+     "share": 0.0,
+     "low": 0.0,
+     "high": 0.0
+    },
+    "promotions": {
+     "emails": 31,
+     "flagged": 3,
+     "share": 0.0967741935483871,
+     "low": 0.0,
+     "high": 0.1935483870967742
+    },
+    "purchases": {
+     "emails": 3,
+     "flagged": 0,
+     "share": 0.0,
+     "low": 0.0,
+     "high": 0.0
+    },
+    "updates": {
+     "emails": 214,
+     "flagged": 7,
+     "share": 0.03271028037383177,
+     "low": 0.014018691588785047,
+     "high": 0.056074766355140186
+    }
+   },
+   "phish_2026_recall": {
+    "emails": 1644,
+    "flagged": 1628,
+    "share": 0.9902676399026764,
+    "low": 0.9854014598540146,
+    "high": 0.9945407542579076
+   },
+   "spam_folder_flagged": {
+    "emails": 24,
+    "flagged": 2,
+    "share": 0.08333333333333333,
+    "low": 0.0,
+    "high": 0.20833333333333334
+   },
+   "precision_at_1_in_100": 0.19855426699256332
   }
  },
  "date_check": {
   "course": {
-   "inbox_fpr_change": 0.20080321285140562,
-   "phish_2026_recall_change": 0.0012165450121653931,
-   "shortcut": true
+   "inbox_fpr_change": 0.0,
+   "phish_2026_recall_change": 0.0,
+   "shortcut": false
   },
   "text": {
-   "inbox_fpr_change": 0.1606425702811245,
-   "phish_2026_recall_change": 0.0012165450121655041,
-   "shortcut": true
+   "inbox_fpr_change": 0.0,
+   "phish_2026_recall_change": 0.0,
+   "shortcut": false
   },
   "features": {
    "inbox_fpr_change": 0.0,
@@ -713,19 +827,240 @@
    "shortcut": false
   },
   "stacked": {
-   "inbox_fpr_change": 0.004016064257028162,
+   "inbox_fpr_change": 0.0,
    "phish_2026_recall_change": 0.0,
    "shortcut": false
   },
   "distilbert": {
-   "inbox_fpr_change": -0.00401606425702811,
-   "phish_2026_recall_change": -0.000608272506082641,
+   "inbox_fpr_change": 0.0,
+   "phish_2026_recall_change": 0.0,
    "shortcut": false
   },
   "cascade": {
-   "inbox_fpr_change": -0.00401606425702811,
+   "inbox_fpr_change": 0.0,
    "phish_2026_recall_change": 0.0,
    "shortcut": false
+  },
+  "cascade_review": {
+   "inbox_fpr_change": 0.0,
+   "phish_2026_recall_change": 0.0,
+   "shortcut": false
+  }
+ },
+ "little_text": {
+  "public_legit": {
+   "emails": 1401,
+   "flagged": 0,
+   "share": 0.0,
+   "low": 0.0,
+   "high": 0.0
+  },
+  "public_phish": {
+   "emails": 1401,
+   "flagged": 124,
+   "share": 0.08850820842255532,
+   "low": 0.07423269093504639,
+   "high": 0.10421127765881513
+  },
+  "inbox_test": {
+   "emails": 249,
+   "flagged": 0,
+   "share": 0.0,
+   "low": 0.0,
+   "high": 0.0
+  },
+  "phish_2026_test": {
+   "emails": 1644,
+   "flagged": 67,
+   "share": 0.04075425790754258,
+   "low": 0.031630170316301706,
+   "high": 0.05048661800486618
+  }
+ },
+ "feature_check": {
+  "auc": {
+   "from_missing": {
+    "inbox": 0.5012165450121655,
+    "public": 0.5396145610278373
+   },
+   "from_free_mail": {
+    "inbox": 0.5072992700729927,
+    "public": 0.5817273376159886
+   },
+   "from_log_rank": {
+    "inbox": 0.7925277753349163,
+    "public": 0.6956655310446652
+   },
+   "from_lookalike": {
+    "inbox": 0.5013997596224313,
+    "public": 0.5014275517487509
+   },
+   "display_name_brand_mismatch": {
+    "inbox": 0.5015866385249026,
+    "public": 0.5538900785153462
+   },
+   "display_name_has_other_address": {
+    "inbox": 0.5018248175182481,
+    "public": 0.5060670949321913
+   },
+   "reply_to_differs": {
+    "inbox": 0.5205969864860903,
+    "public": 0.550321199143469
+   },
+   "reply_to_free_mail_differs": {
+    "inbox": 0.5040783572245185,
+    "public": 0.5114204139900071
+   },
+   "to_missing": {
+    "inbox": 0.5179440389294404,
+    "public": 0.5488936473947181
+   },
+   "dkim_signed": {
+    "inbox": 0.6152676399026764,
+    "public": 0.5074946466809421
+   },
+   "dkim_aligned": {
+    "inbox": 0.9181873479318735,
+    "public": 0.5817273376159886
+   },
+   "n_urls": {
+    "inbox": 0.960567330147842,
+    "public": 0.5072602877214756
+   },
+   "n_link_domains": {
+    "inbox": 0.9179870332913161,
+    "public": 0.5249396143572375
+   },
+   "ip_url": {
+    "inbox": 0.5,
+    "public": 0.5021413276231264
+   },
+   "punycode_url": {
+    "inbox": 0.5,
+    "public": 0.5010706638115632
+   },
+   "confusable_url": {
+    "inbox": 0.5,
+    "public": 0.5010706638115632
+   },
+   "lookalike_url": {
+    "inbox": 0.5068155835018907,
+    "public": 0.5099928622412562
+   },
+   "shortener_url": {
+    "inbox": 0.5076034063260341,
+    "public": 0.5389007851534618
+   },
+   "url_with_credentials": {
+    "inbox": 0.5054744525547445,
+    "public": 0.5021413276231264
+   },
+   "http_share": {
+    "inbox": 0.5862659885283226,
+    "public": 0.5871344063916821
+   },
+   "max_url_length": {
+    "inbox": 0.8962443447756965,
+    "public": 0.6322001058691126
+   },
+   "max_subdomain_depth": {
+    "inbox": 0.810036984922659,
+    "public": 0.5203100059557745
+   },
+   "link_text_mismatch": {
+    "inbox": 0.5355705058677532,
+    "public": 0.5349691588704102
+   },
+   "brand_mentioned_not_linked": {
+    "inbox": 0.6263301380705304,
+    "public": 0.5189150606709494
+   },
+   "max_link_log_rank": {
+    "inbox": 0.7728688476533873,
+    "public": 0.6665815841748604
+   },
+   "unranked_link_share": {
+    "inbox": 0.5147512189878737,
+    "public": 0.6734513585432248
+   },
+   "has_html": {
+    "inbox": 0.5039537712895377,
+    "public": 0.8922198429693077
+   },
+   "html_form": {
+    "inbox": 0.5012165450121655,
+    "public": 0.5028551034975017
+   },
+   "password_input": {
+    "inbox": 0.5,
+    "public": 0.5
+   },
+   "html_script": {
+    "inbox": 0.5010333304018996,
+    "public": 0.5071377587437544
+   },
+   "n_images": {
+    "inbox": 0.9388283059244277,
+    "public": 0.7572127790845837
+   },
+   "n_attachments": {
+    "inbox": 0.5054439167863669,
+    "public": 0.5457119697819596
+   },
+   "risky_attachment": {
+    "inbox": 0.5006082725060828,
+    "public": 0.5124910778015702
+   },
+   "html_attachment": {
+    "inbox": 0.5,
+    "public": 0.5110635260528194
+   },
+   "archive_attachment": {
+    "inbox": 0.5,
+    "public": 0.5010706638115632
+   },
+   "macro_attachment": {
+    "inbox": 0.5,
+    "public": 0.5
+   },
+   "log_words": {
+    "inbox": 0.6778610793539119,
+    "public": 0.7441796188202472
+   },
+   "urgency_terms": {
+    "inbox": 0.5175995954621404,
+    "public": 0.5639720990563996
+   },
+   "credential_terms": {
+    "inbox": 0.6939632007348127,
+    "public": 0.5541226543088168
+   },
+   "payment_terms": {
+    "inbox": 0.5322921857747293,
+    "public": 0.6109009522615895
+   },
+   "exclamations": {
+    "inbox": 0.5089591944420016,
+    "public": 0.5935866651789967
+   },
+   "recipient_address_in_body": {
+    "inbox": 0.5049980945680531,
+    "public": 0.5792291220556746
+   }
+  },
+  "suspects": {
+   "dkim_aligned": {
+    "inbox": 0.9181873479318735,
+    "public": 0.5817273376159886
+   },
+   "n_urls": {
+    "inbox": 0.960567330147842,
+    "public": 0.5072602877214756
+   },
+   "n_link_domains": {
+    "inbox": 0.9179870332913161,
+    "public": 0.5249396143572375
+   }
   }
  }
 }

@@ -6,18 +6,20 @@ Tested on the public `random` test (2,802 emails), 249 inbox emails from 26 send
 
 | Model | | Public test: recall | Public test: false alarms | Inbox: false alarms | Inbox, averaged per sender | 2026 phishing: recall | Spam folder flagged | Precision @ 1 in 100 |
 |---|---|---:|---:|---|---:|---|---|---:|
-| Course setup (word TF-IDF + LR) | before | 0.999 | 1.64% | 93.6% [90.4%, 96.4%] (233 of 249) | 96.4% | 99.9% [99.8%, 100.0%] (1643 of 1644) | 100.0% [100.0%, 100.0%] (24 of 24) | 0.011 |
-|  | after | 0.976 | 0.36% | 7.6% [4.4%, 10.9%] (19 of 249) | 25.5% | 98.6% [98.0%, 99.1%] (1621 of 1644) | 8.3% [0.0%, 20.8%] (2 of 24) | 0.114 |
-| TF-IDF words + chars + LR | before | 1.000 | 1.93% | 98.8% [97.2%, 100.0%] (246 of 249) | 99.2% | 100.0% [100.0%, 100.0%] (1644 of 1644) | 100.0% [100.0%, 100.0%] (24 of 24) | 0.010 |
-|  | after | 0.989 | 0.29% | 7.6% [4.4%, 11.2%] (19 of 249) | 25.0% | 99.2% [98.8%, 99.6%] (1631 of 1644) | 8.3% [0.0%, 20.8%] (2 of 24) | 0.116 |
-| Trees on structured features | before | 0.978 | 1.50% | 90.4% [86.3%, 94.0%] (225 of 249) | 97.3% | 98.8% [98.2%, 99.3%] (1624 of 1644) | 100.0% [100.0%, 100.0%] (24 of 24) | 0.011 |
-|  | after | 0.952 | 0.71% | 7.6% [4.4%, 10.8%] (19 of 249) | 20.8% | 97.7% [97.0%, 98.4%] (1606 of 1644) | 20.8% [8.2%, 37.5%] (5 of 24) | 0.112 |
-| Trees on features + text score | before | 1.000 | 1.86% | 99.6% [98.8%, 100.0%] (248 of 249) | 99.7% | 100.0% [100.0%, 100.0%] (1644 of 1644) | 100.0% [100.0%, 100.0%] (24 of 24) | 0.010 |
-|  | after | 0.995 | 0.29% | 25.7% [20.5%, 31.7%] (64 of 249) | 28.0% | 99.7% [99.4%, 99.9%] (1639 of 1644) | 20.8% [8.3%, 37.5%] (5 of 24) | 0.038 |
-| DistilBERT, ONNX int8 | before | 0.999 | 1.21% | 100.0% [100.0%, 100.0%] (249 of 249) | 100.0% | 100.0% [100.0%, 100.0%] (1644 of 1644) | 100.0% [100.0%, 100.0%] (24 of 24) | 0.010 |
-|  | after | 0.970 | 0.29% | 3.2% [1.2%, 5.6%] (8 of 249) | 8.2% | 98.2% [97.5%, 98.8%] (1614 of 1644) | 12.5% [0.0%, 29.2%] (3 of 24) | 0.234 |
-| Cascade: stacked -> DistilBERT int8 | before | 0.999 | 0.57% | 97.6% [96.0%, 99.2%] (243 of 249) | 98.5% | 100.0% [100.0%, 100.0%] (1644 of 1644) | 100.0% [100.0%, 100.0%] (24 of 24) | 0.010 |
-|  | after | 0.973 | 0.21% | 3.2% [1.2%, 5.6%] (8 of 249) | 8.2% | 98.4% [97.8%, 99.0%] (1618 of 1644) | 12.5% [0.0%, 29.2%] (3 of 24) | 0.234 |
+| Course setup (word TF-IDF + LR) | before | 0.999 | 1.57% | 95.2% [92.4%, 97.6%] (237 of 249) | 97.0% | 99.9% [99.8%, 100.0%] (1643 of 1644) | 95.8% [87.5%, 100.0%] (23 of 24) | 0.010 |
+|  | after | 0.974 | 0.29% | 28.5% [22.9%, 34.5%] (71 of 249) | 30.6% | 99.0% [98.5%, 99.5%] (1627 of 1644) | 16.7% [4.2%, 33.3%] (4 of 24) | 0.033 |
+| TF-IDF words + chars + LR | before | 1.000 | 2.00% | 99.6% [98.8%, 100.0%] (248 of 249) | 99.7% | 100.0% [100.0%, 100.0%] (1644 of 1644) | 100.0% [100.0%, 100.0%] (24 of 24) | 0.010 |
+|  | after | 0.978 | 0.00% | 8.4% [5.2%, 11.6%] (21 of 249) | 25.1% | 98.8% [98.2%, 99.3%] (1624 of 1644) | 8.3% [0.0%, 20.8%] (2 of 24) | 0.105 |
+| Trees on structured features | before | 0.978 | 1.71% | 90.8% [87.1%, 94.4%] (226 of 249) | 97.4% | 98.7% [98.1%, 99.1%] (1622 of 1644) | 91.7% [79.2%, 100.0%] (22 of 24) | 0.011 |
+|  | after | 0.954 | 0.79% | 8.0% [4.8%, 11.2%] (20 of 249) | 21.3% | 97.5% [96.7%, 98.2%] (1603 of 1644) | 20.8% [8.2%, 37.5%] (5 of 24) | 0.107 |
+| Trees on features + text score | before | 0.999 | 1.93% | 99.6% [98.8%, 100.0%] (248 of 249) | 99.7% | 100.0% [100.0%, 100.0%] (1644 of 1644) | 100.0% [100.0%, 100.0%] (24 of 24) | 0.010 |
+|  | after | 0.988 | 0.07% | 23.7% [18.1%, 29.3%] (59 of 249) | 27.8% | 99.6% [99.2%, 99.8%] (1637 of 1644) | 8.3% [0.0%, 20.8%] (2 of 24) | 0.040 |
+| DistilBERT, ONNX int8 | before | 0.999 | 1.21% | 99.2% [98.0%, 100.0%] (247 of 249) | 99.5% | 100.0% [100.0%, 100.0%] (1644 of 1644) | 100.0% [100.0%, 100.0%] (24 of 24) | 0.010 |
+|  | after | 0.982 | 0.36% | 4.0% [1.6%, 6.4%] (10 of 249) | 16.1% | 98.9% [98.4%, 99.4%] (1626 of 1644) | 8.3% [0.0%, 20.8%] (2 of 24) | 0.198 |
+| Cascade: stacked -> DistilBERT int8 | before | 0.997 | 0.50% | 99.2% [98.0%, 100.0%] (247 of 249) | 99.5% | 100.0% [100.0%, 100.0%] (1644 of 1644) | 100.0% [100.0%, 100.0%] (24 of 24) | 0.010 |
+|  | after | 0.982 | 0.36% | 4.0% [1.6%, 6.4%] (10 of 249) | 16.1% | 98.9% [98.4%, 99.4%] (1626 of 1644) | 8.3% [0.0%, 20.8%] (2 of 24) | 0.198 |
+| Cascade + little-text rule (review counts as flagged) | before | 0.997 | 0.50% | 99.2% [98.0%, 100.0%] (247 of 249) | 99.5% | 100.0% [100.0%, 100.0%] (1644 of 1644) | 100.0% [100.0%, 100.0%] (24 of 24) | 0.010 |
+|  | after | 0.985 | 0.36% | 4.0% [1.6%, 6.4%] (10 of 249) | 16.1% | 99.0% [98.5%, 99.5%] (1628 of 1644) | 8.3% [0.0%, 20.8%] (2 of 24) | 0.199 |
 
 Precision @ 1 in 100: recall as on the public test, false alarms as on the inbox test senders.
 
@@ -25,22 +27,47 @@ Precision @ 1 in 100: recall as on the public test, false alarms as on the inbox
 
 | Model | primary | promotions | purchases | updates |
 |---|---|---|---|---|
-| Course setup (word TF-IDF + LR) | 100.0% [100.0%, 100.0%] (1 of 1) | 12.9% [3.2%, 25.8%] (4 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 6.5% [3.7%, 9.8%] (14 of 214) |
-| TF-IDF words + chars + LR | 100.0% [100.0%, 100.0%] (1 of 1) | 16.1% [3.2%, 29.0%] (5 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 6.1% [3.3%, 9.3%] (13 of 214) |
-| Trees on structured features | 100.0% [100.0%, 100.0%] (1 of 1) | 22.6% [9.7%, 38.7%] (7 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 5.1% [2.3%, 8.4%] (11 of 214) |
-| Trees on features + text score | 100.0% [100.0%, 100.0%] (1 of 1) | 19.4% [6.5%, 35.5%] (6 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 26.6% [20.6%, 32.2%] (57 of 214) |
-| DistilBERT, ONNX int8 | 100.0% [100.0%, 100.0%] (1 of 1) | 0.0% [0.0%, 0.0%] (0 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 3.3% [1.4%, 5.6%] (7 of 214) |
-| Cascade: stacked -> DistilBERT int8 | 100.0% [100.0%, 100.0%] (1 of 1) | 0.0% [0.0%, 0.0%] (0 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 3.3% [1.4%, 5.6%] (7 of 214) |
+| Course setup (word TF-IDF + LR) | 100.0% [100.0%, 100.0%] (1 of 1) | 19.4% [6.5%, 35.5%] (6 of 31) | 66.7% [0.0%, 100.0%] (2 of 3) | 29.0% [22.9%, 35.0%] (62 of 214) |
+| TF-IDF words + chars + LR | 0.0% [0.0%, 0.0%] (0 of 1) | 16.1% [3.2%, 29.0%] (5 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 7.5% [4.2%, 11.2%] (16 of 214) |
+| Trees on structured features | 100.0% [100.0%, 100.0%] (1 of 1) | 22.6% [9.7%, 38.7%] (7 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 5.6% [2.8%, 8.9%] (12 of 214) |
+| Trees on features + text score | 0.0% [0.0%, 0.0%] (0 of 1) | 19.4% [6.5%, 35.5%] (6 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 24.8% [19.2%, 30.4%] (53 of 214) |
+| DistilBERT, ONNX int8 | 0.0% [0.0%, 0.0%] (0 of 1) | 9.7% [0.0%, 19.4%] (3 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 3.3% [1.4%, 5.6%] (7 of 214) |
+| Cascade: stacked -> DistilBERT int8 | 0.0% [0.0%, 0.0%] (0 of 1) | 9.7% [0.0%, 19.4%] (3 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 3.3% [1.4%, 5.6%] (7 of 214) |
+| Cascade + little-text rule (review counts as flagged) | 0.0% [0.0%, 0.0%] (0 of 1) | 9.7% [0.0%, 19.4%] (3 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 3.3% [1.4%, 5.6%] (7 of 214) |
 
 ## Date-word shortcut check (after)
 
-Years, month and weekday names removed from the test text. The rule, set before the first run: a change of more than 2% points in either column means the model leans on dates.
+Years, month and weekday names removed from the test text. The rule, set before the first run: a change of more than 2% points in either column means the model leans on dates. Every model's input has had date words removed since the first run failed the TF-IDF models, so this now guards against that being undone and should read 0.
 
 | Model | Inbox false alarms: change | 2026 phishing recall: change | Shortcut? |
 |---|---:|---:|---|
-| Course setup (word TF-IDF + LR) | +20.1% | +0.1% | yes |
-| TF-IDF words + chars + LR | +16.1% | +0.1% | yes |
+| Course setup (word TF-IDF + LR) | +0.0% | +0.0% | no |
+| TF-IDF words + chars + LR | +0.0% | +0.0% | no |
 | Trees on structured features | +0.0% | +0.0% | no |
-| Trees on features + text score | +0.4% | +0.0% | no |
-| DistilBERT, ONNX int8 | -0.4% | -0.1% | no |
-| Cascade: stacked -> DistilBERT int8 | -0.4% | +0.0% | no |
+| Trees on features + text score | +0.0% | +0.0% | no |
+| DistilBERT, ONNX int8 | +0.0% | +0.0% | no |
+| Cascade: stacked -> DistilBERT int8 | +0.0% | +0.0% | no |
+| Cascade + little-text rule (review counts as flagged) | +0.0% | +0.0% | no |
+
+## Little-text rule
+
+Emails with images or attachments but fewer than 20 visible words go to review.
+
+| Test slice | Sent to review |
+|---|---|
+| Public test, legitimate | 0.0% [0.0%, 0.0%] (0 of 1401) |
+| Public test, phishing | 8.9% [7.4%, 10.4%] (124 of 1401) |
+| Inbox test senders | 0.0% [0.0%, 0.0%] (0 of 249) |
+| 2026 phishing | 4.1% [3.2%, 5.0%] (67 of 1644) |
+
+## Feature shortcut check
+
+Each structured feature on its own (ROC AUC, either direction). Suspected shortcut: AUC >= 0.9 between the inbox's test senders and the 2026 phishing, but < 0.7 on the public test (rule set before the run).
+
+| Feature | Inbox vs 2026 phishing | Public test |
+|---|---:|---:|
+| `dkim_aligned` | 0.918 | 0.582 |
+| `n_urls` | 0.961 | 0.507 |
+| `n_link_domains` | 0.918 | 0.525 |
+
+Strongest on the inbox: `n_urls` 0.961 (public 0.507), `n_images` 0.939 (public 0.757), `dkim_aligned` 0.918 (public 0.582), `n_link_domains` 0.918 (public 0.525), `max_url_length` 0.896 (public 0.632).

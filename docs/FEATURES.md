@@ -39,6 +39,31 @@ missing (NaN), never 0. The trees handle missing values natively.
 | From vs `Return-Path` mismatch | Mailing lists rewrite `Return-Path`, so every list email would "mismatch" |
 | Header names and order | Identify the mail program and the collector (AUC 0.78–0.80 after masking) |
 
+## What the text models read
+
+The TF-IDF models and DistilBERT read `baselines.email_text`: the subject and the body a reader sees.
+
+- **The visible HTML text** when there is HTML, with hidden parts removed (`html.visible_html`). Mail programs show
+  the HTML, so a harmless plain-text part next to phishing HTML would otherwise decide what the model reads. When
+  the HTML shows fewer than 5 words (an image-only email), the plain-text part is read. Until November 2026 the
+  models read the plain-text part.
+- **No dates.** Years, month and weekday names are removed. My test inbox is all late 2026, and trained with it,
+  the TF-IDF models learned those words as signs of legitimate mail (removing them raised their inbox false alarms
+  by 16–20 points).
+- **No source names,** masked as in the plain text, links included ([DATA.md](DATA.md)).
+
+**Too little text goes to review** (`service/triage.py`). An email with images or attachments and fewer than 20
+visible words in the body (an image-only or QR-code email, or one whose content is all in an attachment) gives the
+text models nothing to judge, so it goes to human review instead of being marked safe. On the public test that is
+8.9% of the phishing and none of the legitimate mail ([reports/with_inbox.md](../reports/with_inbox.md)).
+
+**Features that only work on my inbox.** Each feature is also scored on its own on my test inbox: a feature with ROC
+AUC 0.9 or more between the inbox's unseen senders and 2026 phishing, but under 0.7 on the public test, is a
+suspected shortcut (rule set before the run). `n_urls` (0.961), `n_link_domains` (0.918) and `dkim_aligned` (0.918)
+are: the inbox's legitimate mail is newsletters and notifications from large senders, with many links and their
+own DKIM signature. They stay in the model, because they are real signals for that kind of mail, but phishing sent
+from its own domain with many links would look like a newsletter to them.
+
 ## The sender check
 
 It reads SPF, DKIM and DMARC only from the receiving provider's own `Authentication-Results` header: the topmost

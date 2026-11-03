@@ -7,7 +7,7 @@ to data/private/test_inbox/test_inbox.mbox. Everything derived from it stays in 
 the masked records and the split. Only counts are printed. It is never sent to an LLM (the analyst and the Claude
 classifier refuse `test_inbox` records in code).
 
-**Why a split with it.** Trained only on public data, the models flag 96–99.6% of this inbox as phishing
+**Why a split with it.** Trained only on public data, the models flag 96.8–99.8% of this inbox as phishing
 (reports/test_inbox.md): the only legitimate training mail is plain-text mailing-list discussion. `with_inbox`
 adds part of the inbox to the `random` split:
 

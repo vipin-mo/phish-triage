@@ -7,6 +7,10 @@ Measuring needs the local data (predictions and the saved Claude answers), which
 measured locally and committed as reports/gate.json; CI re-checks every committed number against the thresholds
 below and fails the build if one is out. A live LLM run happens only by hand (`... run --confirm`).
 
+The deployable classifier is the `with_inbox` model (trained with part of my private test inbox) once it exists;
+its recall is measured on the public `random` test, and the cascade's false alarms on the inbox's unseen senders
+come from reports/with_inbox.json (aggregates only).
+
 **Stale numbers fail too.** The gate records the analyst prompt version every report was measured with; if the code's
 `PROMPT_VERSION` differs (the prompt changed since the last measured run), the gate fails until the evaluations are
 run again.
@@ -27,7 +31,8 @@ from phish_triage.service.analyst import PROMPT_VERSION
 GATE_PATH = Path("reports/gate.json")
 THRESHOLDS = {
     # name: (direction, limit)
-    "recall_at_1pct_fpr": ("min", 0.98),  # the deployable classifier (DistilBERT int8) on the random test split
+    "recall_at_1pct_fpr": ("min", 0.98),  # the deployable classifier (DistilBERT int8) on the public `random` test
+    "inbox_false_alarm_rate": ("max", 0.05),  # the deployable cascade on my test inbox's unseen senders
     "schema_valid_rate": ("min", 1.00),
     "grounding_failure_rate": ("max", 0.02),  # share of indicators dropped because their quote wasn't in the email
     "ungrounded_indicators_shown": ("max", 0),  # after the check: must always be zero
@@ -38,9 +43,21 @@ THRESHOLDS = {
 
 def measure() -> dict:
     index = {e["id"]: int(e["label"] == "phish") for e in json.loads(Path("data/interim/index.json").read_text())}
-    p = predictions.load("random", "distilbert_head_int8")
-    y_test = np.array([index[i] for i in p.test_ids])
-    values = {"recall_at_1pct_fpr": metrics.recall_at_fpr(y_test, p.test_scores, 0.01)}
+    deployable = "with_inbox" if "with_inbox" in predictions.available() else "random"
+    p = predictions.load(deployable, "distilbert_head_int8")
+    scores = dict(zip(p.test_ids, p.test_scores, strict=True))
+    public = [i for i in p.test_ids if i in index]  # `with_inbox` also tests inbox and 2026 phishing emails
+    if deployable == "with_inbox":
+        public = json.loads(Path("data/private/test_inbox/split.json").read_text())["slices"]["public_test"]
+    y_test = np.array([index[i] for i in public])
+    values: dict = {
+        "deployable_model": f"{deployable}/distilbert_head_int8",
+        "recall_at_1pct_fpr": metrics.recall_at_fpr(y_test, np.array([scores[i] for i in public]), 0.01),
+    }
+    inbox_report = Path("reports/with_inbox.json")
+    if inbox_report.exists():
+        cascade = json.loads(inbox_report.read_text())["after"]["cascade"]
+        values["inbox_false_alarm_rate"] = cascade["inbox_fpr"]["share"]
 
     analyst_report = json.loads(Path("reports/analyst.json").read_text())
     versions = {"analyst": analyst_report.get("prompt_version")}

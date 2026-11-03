@@ -225,11 +225,9 @@ def render(
 
     notes = list(signals or [])
     if classifier_score is not None:
-        notes.insert(
-            0,
-            f"Classifier: phishing probability {classifier_score:.2f}"
-            + (" (flagged)" if classifier_phish else " (not flagged)"),
-        )
+        # The decision only: DistilBERT's threshold is far below 0.5 (0.0009 on `random`), so a score shown as a
+        # probability read "phishing probability 0.00 (flagged)".
+        notes.insert(0, "Classifier: flagged as phishing" if classifier_phish else "Classifier: not flagged")
     if sender is not None:
         results = " ".join(
             f"{k}={v}" for k, v in (("spf", sender.spf), ("dkim", sender.dkim), ("dmarc", sender.dmarc)) if v

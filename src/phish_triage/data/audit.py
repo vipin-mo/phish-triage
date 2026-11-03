@@ -8,8 +8,8 @@ part, once on the raw records and once on the masked ones. An AUC near 0.5 means
 signal; near 1.0 means it alone separates the classes, so a model could score well by recognising the dataset.
 
 The normalized `auth` field (kept out of the masked headers) is tested separately, to show why it stays out.
-It also reports a text baseline (TF-IDF on subject + body) with its strongest words, a "which phishing source?"
-classifier, and the date baseline on the deliberately confounded `old_era` split.
+It also reports a text baseline (TF-IDF on the text the models read) with its strongest words, a "which phishing
+source?" classifier, and the date baseline on the deliberately confounded `old_era` split.
 
 Domains and links keep their real names (the link features need them), so the legitimate source's own domain
 (`apache.org`) is in many legitimate emails. Two checks show whether that became a shortcut: which link domains
@@ -46,7 +46,6 @@ from phish_triage.features.domains import default_ranks, registered_domain, url_
 from phish_triage.features.html import summarize_html
 
 REPORTS_DIR = Path("reports")
-TEXT_CHARS = 20_000
 TOP_FEATURES = 10
 _WORD_RE = re.compile(r"[a-z0-9][a-z0-9.-]*[a-z0-9]|[a-z0-9]")
 TEXT_WORDS = r"(?u)\b[a-zA-Z][a-zA-Z]+\b"  # words of 2+ letters; numbers carry dates and ids
@@ -114,7 +113,11 @@ def without_source_domains(r: dict) -> dict:
 
 
 def text(r: dict) -> str:
-    return f"{r['subject']}\n{r['text'][:TEXT_CHARS]}"
+    """What the text models read. Until November 2026 this was the plain-text part, so it missed the source's names
+    that the models' visible HTML text still had."""
+    from phish_triage.models.baselines import email_text
+
+    return email_text(r)
 
 
 def fit(

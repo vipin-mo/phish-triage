@@ -341,43 +341,43 @@
    ],
    "top_legit": [
     "apache",
+    "project",
     "tomcat",
-    "cassandra",
     "org",
     "the",
+    "https",
     "users",
-    "httpd",
     "wrote",
     "hi",
-    "community"
+    "httpd"
    ]
   },
   {
    "view": "masked",
-   "auc": 0.999,
+   "auc": 1.0,
    "top_phish": [
     "your",
     "account",
     "click",
     "you",
     "email",
-    "free",
-    "de",
     "example",
-    "bonus",
+    "de",
+    "free",
+    "our",
     "wallet"
    ],
    "top_legit": [
     "project",
     "org",
-    "wrote",
     "the",
+    "wrote",
+    "https",
     "re",
     "on",
     "hi",
     "thanks",
-    "java",
-    "but"
+    "java"
    ]
   }
  ],
@@ -412,30 +412,30 @@
   },
   {
    "features": "text",
-   "auc": 0.978,
+   "auc": 0.979,
    "top_phishing_pot": [
-    "unsubscribe",
     "wallet",
     "hotmail",
+    "unsubscribe",
     "bonus",
     "claim",
-    "ledger",
+    "proton",
     "sie",
-    "free",
-    "subscription",
-    "proton"
+    "rodrigo",
+    "cloud",
+    "ledger"
    ],
    "top_nazario": [
     "account",
-    "user",
     "usaa",
-    "notification",
+    "user",
     "dear",
     "mail",
-    "mailbox",
-    "example",
+    "notification",
     "view",
-    "com"
+    "email",
+    "password",
+    "alert"
    ]
   }
  ],

@@ -10,12 +10,21 @@
   logistic regression is refitted per fold.
 - Calibrated versions (isotonic regression) are fitted on the validation split only.
 
+Every text model, DistilBERT included, reads `email_text`: the subject and the body a reader sees. With HTML that is
+the visible HTML text (hidden elements removed), because mail programs show the HTML part: a harmless plain-text
+part next to phishing HTML, or hidden filler, would otherwise decide what the model reads. When the HTML shows
+almost no words (an image-only email), the plain-text part is used. The source's names are masked in it as in the
+plain text, URLs and addresses included (`data/mask.py` keeps them in the HTML for the link features). Years, month
+and weekday names are removed, because the private test inbox is all late 2026 and the text models learned dates as
+a sign of legitimate mail.
+
 scikit-learn's HistGradientBoostingClassifier is used instead of LightGBM: the same histogram-based algorithm,
 with native missing-value handling, and no extra native library to ship to Lambda.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 import numpy as np
@@ -28,13 +37,46 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold, cross_val_predict
 from sklearn.pipeline import FunctionTransformer, Pipeline, make_union
 
+from phish_triage.data.mask import mask_source_names
+from phish_triage.features.html import visible_html
+
 TEXT_CHARS = 20_000  # words: the first 20k characters of the body
 CHAR_NGRAM_CHARS = 3_000  # character n-grams: the first 3k (enough, and much faster)
 SEED = 20261029
 
 
+MIN_VISIBLE_WORDS = 5  # fewer visible HTML words than this: read the plain-text part instead
+_MONTH_OR_DAY = r"jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec|mon|tue|wed|thu|fri|sat|sun"
+# Years; full month and weekday names (except "May", a common word); and abbreviations next to a number ("3 Nov",
+# "Mon, 3", "Wed, Oct 7", "May 2026"). No nested repeats, so crafted input can't make it backtrack.
+DATE_WORDS = re.compile(
+    r"\b(?:19[89]\d|20[0-4]\d)\b"
+    r"|\b(?:january|february|march|april|june|july|august|september|october|november|december"
+    r"|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b"
+    rf"|\b(?:{_MONTH_OR_DAY})\.?(?=,?\s?(?:\d|(?:{_MONTH_OR_DAY})\b))"
+    rf"|(?<=\d )(?:{_MONTH_OR_DAY})\b|(?<=\d)(?:{_MONTH_OR_DAY})\b",
+    re.IGNORECASE,
+)
+
+
+def without_dates(text: str) -> str:
+    return DATE_WORDS.sub(" ", text)
+
+
+def body_text(record: dict) -> str:
+    """The body a reader sees: the visible HTML text, or the plain-text part when the HTML shows almost nothing."""
+    html = record.get("html") or ""
+    if html:
+        visible = visible_html(html).text
+        if len(visible.split()) >= MIN_VISIBLE_WORDS:
+            # The HTML keeps the source's names in URLs and addresses for the link features; masked here as in the
+            # plain-text part, or 5.6% of the legitimate mail would show `apache` to the text models.
+            return mask_source_names(visible)
+    return record.get("text") or ""
+
+
 def email_text(record: dict) -> str:
-    return f"{record.get('subject') or ''}\n{(record.get('text') or '')[:TEXT_CHARS]}"
+    return without_dates(f"{record.get('subject') or ''}\n{body_text(record)[:TEXT_CHARS]}")
 
 
 def _first_chars(texts):

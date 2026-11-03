@@ -33,3 +33,41 @@ def test_calibrated_ties_are_broken_by_the_raw_score():
 
     out = _break_ties(np.array([1.0, 1.0, 0.5]), np.array([0.9, 0.99, 0.6]))
     assert out[1] > out[0] and abs(out - [1.0, 1.0, 0.5]).max() < 1e-6 and out.max() <= 1.0
+
+
+def test_models_read_the_visible_html_text_without_dates():
+    from phish_triage.models.baselines import email_text
+
+    record = {
+        "subject": "Your November 2026 statement",
+        "text": "Nothing to see here.",
+        "html": '<p>Verify your account now with the link below</p><div style="display:none">filler words</div>',
+    }
+    assert email_text(record).split() == [
+        "Your",
+        "statement",
+        "Verify",
+        "your",
+        "account",
+        "now",
+        "with",
+        "the",
+        "link",
+        "below",
+    ]
+    image_only = {"subject": "Hi", "text": "plain text part", "html": '<img src="cid:x">'}
+    assert email_text(image_only) == "Hi\nplain text part"  # the HTML shows nothing, so the plain part is read
+
+    # The masked HTML keeps the source's names in links for the link features; the text models must not see them.
+    listed = {"subject": "Release", "text": "", "html": "<p>Docs are at https://tomcat.apache.org/ for everyone</p>"}
+    assert "apache" not in email_text(listed) and "tomcat" not in email_text(listed)
+
+
+def test_emails_with_images_but_almost_no_text_go_to_review():
+    from phish_triage.service.triage import too_little_text
+
+    assert too_little_text({"text": "", "html": '<a href="https://x.test"><img src="cid:qr"></a>', "attachments": []})
+    assert too_little_text({"text": "see attached", "html": "", "attachments": [{"filename": "invoice.pdf"}]})
+    assert not too_little_text({"text": "short note", "html": "", "attachments": []})
+    long = " ".join(["word"] * 30)
+    assert not too_little_text({"text": "", "html": f"<p>{long}</p><img src=x>", "attachments": []})
