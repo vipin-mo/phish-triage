@@ -39,8 +39,9 @@ from phish_triage.service.pii import redact
 MODEL = "claude-haiku-5-5"
 # Bump when the prompt changes, so evaluations rerun instead of reusing old answers.
 # v1: "at most 80 words" (16% longer); v2: asks for 60 (1.5% longer); v3: asks for 50, random per-request tags;
-# v4: numbered signals that indicators cite by number (v3 quoted the signals as if they were the email: 8 of 11 drops).
-PROMPT_VERSION = 4
+# v4: numbered signals that indicators cite by number (v3 quoted the signals as if they were the email: 8 of 11 drops);
+# v5: the summary must agree with recommended_action (v4: "no action" with "check the sender if unsure").
+PROMPT_VERSION = 5
 MAX_BODY_CHARS = 6_000
 MAX_LINKS = 15
 MAX_SUMMARY_WORDS = 80  # enforced in code; the prompt asks for at most PROMPT_SUMMARY_WORDS to leave headroom
@@ -124,7 +125,9 @@ Answer in the required JSON:
   from inside the email tags (copy it character for character, at most a sentence). Source "signal": the evidence is
   the signal's number only, such as S2; never copy a signal's wording as a quote. If there is nothing to point to,
   give no indicators;
-- recommended_action."""
+- recommended_action. The summary must give the same advice: with no_action, don't suggest checking, verifying or
+  confirming anything. If something is worth checking, choose check_with_the_sender (or a stronger action) and say
+  what to check."""
 
 SYSTEM_UNDEFENDED = f"""You are a phishing analyst. Read the email below and say whether it looks like phishing.
 Answer in the required JSON: verdict_suggestion (phish, suspicious or likely_safe), a summary of at most
@@ -139,6 +142,14 @@ _AI_INSTRUCTIONS = re.compile(
     r"|\b(?:this|the)\s+(?:email|message|sender)\s+(?:is|has been|was)\s+(?:verified|confirmed|marked|certified)"
     r"(?:\s+as)?\s+(?:safe|legitimate|trusted)\b"
     r"|\b(?:classify|mark|label|treat)\s+(?:this|the)\s+(?:email|message)\s+as\s+(?:safe|legitimate|not phishing)\b"
+)
+# Advice in a summary ("still, check the sender if you are unsure"): with recommended_action no_action, the user gets
+# two different messages. Measured in evaluation/analyst_eval.py; it doesn't change the verdict.
+_ADVICE = re.compile(
+    r"(?i)\b(?:check|verify|confirm|contact|ask)\s+(?:the|this|with|it|that|any|your|them|directly|through|via)\b"
+    r"|\bif (?:you are |you're )?(?:unsure|in doubt|unexpected)\b|\bif you (?:did not|didn't|weren't) expect"
+    r"|\bworth a (?:quick )?(?:look|check)\b|\bbe (?:careful|cautious)\b|\b(?:do not|don't) (?:click|open|reply)"
+    r"|\bdouble-check\b|\breport (?:it|this)\b"
 )
 _URL = re.compile(r"(?:https?://|www\.)[^\s<>\"']+", re.IGNORECASE)
 # Our own tags, written inside an email, could close the data block early and fake the signals block. The real tags
@@ -304,6 +315,11 @@ def grounded(indicator: Indicator, analyst_input: AnalystInput) -> bool:
         if not any(k == cited or k.startswith(cited) for k in known):
             return False
     return True
+
+
+def advice_conflict(output: AnalystOutput) -> bool:
+    """The action says "no action" but the summary still advises the user to check something."""
+    return output.recommended_action == "no_action" and bool(_ADVICE.search(output.summary))
 
 
 def final_verdict(classifier_phish: bool, suggestion: Suggestion | None, ai_found: bool) -> tuple[Verdict, list[str]]:

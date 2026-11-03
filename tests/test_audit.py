@@ -36,3 +36,15 @@ def test_read_selects_records_by_id_prefix(tmp_path):
     with gzip.open(path, "wt") as out:
         out.write(json.dumps(RECORD) + "\n" + json.dumps(other) + "\n")
     assert list(read_records(path, {RECORD["id"]})) == [RECORD["id"]]
+
+
+def test_links_to_the_source_domain_can_be_removed_for_the_shortcut_check():
+    record = {
+        **RECORD,
+        "urls": ["https://tomcat.apache.org/a", "http://198.51.100.7/login"],
+        "html": '<a href="https://tomcat.apache.org/a">docs</a> <a href="http://198.51.100.7/login">log in</a>',
+    }
+    assert audit.link_domains(record) == ["198.51.100.7", "apache.org"]
+    stripped = audit.without_source_domains(record)
+    assert stripped["urls"] == ["http://198.51.100.7/login"] and 'href=""' in stripped["html"]
+    assert audit.link_domains(stripped) == ["198.51.100.7"]

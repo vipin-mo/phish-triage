@@ -119,7 +119,7 @@ def test_headers_use_one_fixed_order_and_auth_is_kept_aside():
     assert mask_record(_record([("From", "a@evil.test")]))["auth"] is None
 
 
-def test_source_names_are_replaced_in_text_but_not_in_addresses_or_urls():
+def test_source_names_are_replaced_everywhere_in_the_text_models_read():
     masked = mask_record(
         _record(
             [("From", "Mark <markt@apache.org>"), ("Subject", "Apache Tomcat 9")],
@@ -132,3 +132,22 @@ def test_source_names_are_replaced_in_text_but_not_in_addresses_or_urls():
     assert masked["subject"] == dict(masked["headers"])["Subject"] == "project project 9"
     assert dict(masked["headers"])["From"] == "Mark <markt@apache.org>"
     assert masked["urls"] == ["https://tomcat.apache.org/"]
+
+
+def test_html_keeps_real_domains_and_the_analyst_view_keeps_the_names():
+    html = (
+        '<p>Apache Tomcat 9: <a href="https://tomcat.apache.org/x">tomcat.apache.org</a>, '
+        "users@tomcat.apache.org, github.com/apache/tomcat</p>"
+    )
+    record = _record([("Subject", "Apache Tomcat 9")], subject="Apache Tomcat 9", html=html)
+    masked = mask_record(record)["html"]
+    assert masked.startswith("<p>project project 9: ")  # words are masked
+    for kept in (
+        'href="https://tomcat.apache.org/x"',
+        ">tomcat.apache.org<",
+        "users@tomcat.apache.org",
+        "github.com/apache/tomcat",
+    ):
+        assert kept in masked, kept  # link targets, link text, addresses and paths keep the real domain
+    view = mask_record(record, source_names=False)
+    assert view["html"] == html and view["subject"] == "Apache Tomcat 9"

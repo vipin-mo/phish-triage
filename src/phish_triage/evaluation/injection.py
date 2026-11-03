@@ -34,7 +34,7 @@ from pathlib import Path
 import numpy as np
 
 from phish_triage.data.parse import html_to_text
-from phish_triage.data.records import MASKED_RECORDS, read_records
+from phish_triage.data.records import MASKED_RECORDS, read_analyst_view, read_records
 from phish_triage.data.splits import SPLITS_DIR
 from phish_triage.evaluation import metrics, predictions
 from phish_triage.features.domains import default_ranks
@@ -114,27 +114,30 @@ def build(emails: int = EMAILS, round_: int = 1) -> tuple[dict[str, dict], dict[
     chosen = random.Random(SEED).sample(pool, emails)
     classifier, threshold = distilbert_scorer()
     ranks = default_ranks()
+    views = read_analyst_view(set(chosen))  # what the analyst sees; the classifier and signals use the masked one
 
-    variants = []
+    variants = []  # (email, technique, masked record, analyst view), the same injection planted in both
     for n, email_id in enumerate(chosen):
-        base = records[email_id]
-        variants.append((email_id, "clean", base))
+        base, view = records[email_id], views[email_id]
+        variants.append((email_id, "clean", base, view))
         if round_ == 2:
             for attack, payload in ROUND_2.items():
-                variants.append((email_id, attack, inject(base, "visible_text", payload)))
+                variants.append(
+                    (email_id, attack, inject(base, "visible_text", payload), inject(view, "visible_text", payload))
+                )
             continue
         for technique in TECHNIQUES:
             payload = PAYLOADS[(n + TECHNIQUES.index(technique)) % len(PAYLOADS)]
-            variants.append((email_id, technique, inject(base, technique, payload)))
-    scores = classifier.score([email_text(r) for _, _, r in variants])
+            variants.append((email_id, technique, inject(base, technique, payload), inject(view, technique, payload)))
+    scores = classifier.score([email_text(r) for _, _, r, _ in variants])
 
     params, meaning = {}, {}
-    for (email_id, technique, record), score in zip(variants, scores, strict=True):
+    for (email_id, technique, record, view), score in zip(variants, scores, strict=True):
         flagged = bool(score > threshold)
         for condition in CONDITIONS:
             defended = condition == "defended"
             a = analyst.render(
-                record,
+                view,
                 classifier_score=float(score) if defended else None,
                 classifier_phish=flagged if defended else None,
                 sender=check_sender(record) if defended else None,

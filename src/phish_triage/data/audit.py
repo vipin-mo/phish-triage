@@ -11,6 +11,12 @@ The normalized `auth` field (kept out of the masked headers) is tested separatel
 It also reports a text baseline (TF-IDF on subject + body) with its strongest words, a "which phishing source?"
 classifier, and the date baseline on the deliberately confounded `old_era` split.
 
+Domains and links keep their real names (the link features need them), so the legitimate source's own domain
+(`apache.org`) is in many legitimate emails. Two checks show whether that became a shortcut: which link domains
+predict the label on their own, and whether the link features the models use (`features.extract.LINK_FEATURES`)
+lose signal when every link to the source's own domain is removed. More than `SHORTCUT_AUC_DROP` lost means they
+lean on it.
+
 Writes reports/leakage_audit.json and reports/leakage_audit.md. Only aggregate numbers and feature names are
 written, never email content.
 """
@@ -26,19 +32,26 @@ from email.utils import getaddresses
 from pathlib import Path
 
 import numpy as np
+from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import roc_auc_score
 
 from phish_triage.data.build import INTERIM_DIR
+from phish_triage.data.mask import SOURCE_DOMAINS
 from phish_triage.data.records import MASKED_RECORDS, RAW_RECORDS, read_records
 from phish_triage.data.splits import SPLITS_DIR
+from phish_triage.features import extract as features
+from phish_triage.features.domains import default_ranks, registered_domain, url_host
+from phish_triage.features.html import summarize_html
 
 REPORTS_DIR = Path("reports")
 TEXT_CHARS = 20_000
 TOP_FEATURES = 10
 _WORD_RE = re.compile(r"[a-z0-9][a-z0-9.-]*[a-z0-9]|[a-z0-9]")
 TEXT_WORDS = r"(?u)\b[a-zA-Z][a-zA-Z]+\b"  # words of 2+ letters; numbers carry dates and ids
+SHORTCUT_AUC_DROP = 0.01  # set before the first run: more than this lost without the source's domain = a shortcut
+_HREF_RE = re.compile(r"""(href\s*=\s*)(["'])([^"']{0,2048})\2""", re.IGNORECASE)
 
 
 def header_names(r: dict) -> list[str]:
@@ -80,6 +93,24 @@ GROUPS: dict[str, Callable[[dict], list[str]]] = {
     "Message-ID domain": message_id_domain,
     "date": date,
 }
+
+
+def link_domains(r: dict) -> list[str]:
+    """Registered domains the email links to: its URLs and, for HTML mail, the link targets."""
+    hrefs = [h for h, _ in summarize_html(r["html"]).links] if r.get("html") else []
+    return sorted({registered_domain(url_host(u)) for u in [*(r.get("urls") or []), *hrefs]} - {""}) or ["none"]
+
+
+def _is_source_domain(url: str) -> bool:
+    return registered_domain(url_host(url)) in SOURCE_DOMAINS
+
+
+def without_source_domains(r: dict) -> dict:
+    """The record with every link to the legitimate source's own domain removed (URL list and link targets)."""
+    html = _HREF_RE.sub(
+        lambda m: m.group(0) if not _is_source_domain(m.group(3)) else f'{m.group(1)}""', r["html"] or ""
+    )
+    return {**r, "urls": [u for u in r.get("urls") or [] if not _is_source_domain(u)], "html": html}
 
 
 def text(r: dict) -> str:
@@ -173,8 +204,48 @@ def audit(interim: Path = INTERIM_DIR, splits_dir: Path = SPLITS_DIR) -> dict:
         auc, _, _ = fit([extract(r) for r in train], y_train, [extract(r) for r in test], y_test, tokens=tokens)
         results["old_era"].append({"features": name, "auc": round(auc, 3)})
 
+    results["domains"] = domain_checks(masked, main, is_phish)
     results["sizes"] = {"random_train": len(main["train"]), "random_test": len(main["test"])}
     return results
+
+
+def domain_checks(masked: dict, main: dict, is_phish) -> dict:
+    """Is the legitimate source's own domain a shortcut? See the module docstring."""
+    train = [masked[i] for i in main["train"]]
+    test = [masked[i] for i in main["test"]]
+    y_train = np.array([is_phish(r) for r in train], dtype=int)
+    y_test = np.array([is_phish(r) for r in test], dtype=int)
+    auc, top_phish, top_legit = fit(
+        [link_domains(r) for r in train], y_train, [link_domains(r) for r in test], y_test, tokens=True
+    )
+    linked = {
+        label: float(
+            np.mean([any(d in SOURCE_DOMAINS for d in link_domains(r)) for r in train + test if r["label"] == label])
+        )
+        for label in ("phish", "legit")
+    }
+    ranks = default_ranks()
+
+    def link_auc(transform) -> float:
+        def matrix(records):
+            return np.array(
+                [[features.extract(transform(r), ranks)[name] for name in features.LINK_FEATURES] for r in records],
+                float,
+            )
+
+        model = HistGradientBoostingClassifier(random_state=0).fit(matrix(train), y_train)
+        return float(roc_auc_score(y_test, model.predict_proba(matrix(test))[:, 1]))
+
+    with_source, without = link_auc(lambda r: r), link_auc(without_source_domains)
+    print(f"link features: {with_source:.4f} with, {without:.4f} without the source's domain", file=sys.stderr)
+    return {
+        "source_domains": list(SOURCE_DOMAINS),
+        "link_domains": {"auc": round(auc, 3), "top_phish": top_phish, "top_legit": top_legit},
+        "share_linking_to_source_domain": {k: round(v, 3) for k, v in linked.items()},
+        "link_features_auc": {"with": round(with_source, 4), "without_source_domain": round(without, 4)},
+        "shortcut": with_source - without > SHORTCUT_AUC_DROP,
+        "shortcut_rule": f"AUC lost without the source's domain > {SHORTCUT_AUC_DROP}",
+    }
 
 
 def to_markdown(results: dict) -> str:
@@ -231,6 +302,27 @@ def to_markdown(results: dict) -> str:
         "| Features | AUC |",
     ]
     lines += ["|---|---:|"] + [f"| {row['features']} | {row['auc']:.3f} |" for row in results["old_era"]]
+    d = results["domains"]
+    source = ", ".join(f"`{x}`" for x in d["source_domains"])
+    lines += [
+        "",
+        "## Domains and links (masked)",
+        "",
+        f"Links keep their real domains, so the legitimate source's own domain ({source}) appears in "
+        f"{d['share_linking_to_source_domain']['legit']:.1%} of the legitimate emails and "
+        f"{d['share_linking_to_source_domain']['phish']:.1%} of the phishing ones.",
+        "",
+        "| Check | AUC | Strongest features (phishing / legitimate) |",
+        "|---|---:|---|",
+        f"| Link domains, as tokens (no model uses them this way) | {d['link_domains']['auc']:.3f} | "
+        f"{_codes(d['link_domains']['top_phish'][:4])} / {_codes(d['link_domains']['top_legit'][:4])} |",
+        f"| Link features the models use | {d['link_features_auc']['with']:.4f} | |",
+        "| Same, every link to the source's domain removed | "
+        f"{d['link_features_auc']['without_source_domain']:.4f} | |",
+        "",
+        f"Shortcut rule ({d['shortcut_rule']}): "
+        + ("**the link features lean on the source's domain.**" if d["shortcut"] else "not a shortcut."),
+    ]
     return "\n".join(lines) + "\n"
 
 

@@ -137,9 +137,19 @@ with phishing. I counted header presence and recipient addresses per source:
   (also when it is quoted in a reply);
 - replace recipient addresses with `user@example.com`, the collection domains (`monkey.org`, `ponee.io`,
   `taint.org`, ...) with `example.com`, and the collectors' names (`jose`, `yyyy`) with `user`;
-- in the subject and body only, replace the Apache lists' own names (`apache`, `tomcat`, `cassandra`, `httpd`)
-  with `project`. These names are this dataset's version of the `enron` that leaked the label in my course
-  project. Addresses and links keep the real domain, because the domain features (popularity, look-alikes) need it.
+- replace the Apache lists' own names (`apache`, `tomcat`, `cassandra`, `httpd`) with `project`. These names are
+  this dataset's version of the `enron` that leaked the label in my course project. In the subject and the plain
+  text, which the text models read, they are replaced everywhere, URLs and addresses included
+  (`tomcat.apache.org` becomes `project.project.org`), so no text model can read the source from a link. In the
+  HTML, URLs, addresses and domain names keep the real name, and so does the separate URL list, because the link
+  features (where a link goes, what its text shows) need the real domain. The leakage audit checks that this
+  doesn't make `apache.org` a shortcut (below). The analyst step sees the names, as a subscriber would: it isn't
+  trained on this data, so they can't become a learned shortcut.
+
+  Until November 2026 the replacement also ran over the HTML, so 807 legitimate HTML emails had link targets like
+  `project.project.org`, and the link list shown to Claude (real domains from the URL list) didn't match the body
+  (`project.org`). I found it while rating the analyst's answers by hand; every number on this page and in the
+  reports was re-measured after the fix.
 
 The date is kept on the record, because the splits need it; month matching (below) makes it carry no label
 signal.
@@ -147,18 +157,23 @@ signal.
 ## Duplicates removed
 
 Duplicates are found on the masked text, so an announcement cross-posted to two Apache lists counts as one
-email. Exact copies match after lowercasing and replacing numbers, links and addresses; near copies are found
+email. For HTML mail the compared text is what a reader sees (the visible text of the HTML part), because some
+phishing pads every copy with about 30,000 characters of different hidden filler so the full texts look
+unrelated. Exact copies match after lowercasing and replacing numbers, links and addresses; near copies are found
 with MinHash LSH (128 permutations, word 5-grams, estimated Jaccard similarity of 0.9 or more). Each group keeps
 its earliest email.
 
+Until November 2026 the full text was compared. Comparing the visible text removed 395 more phishing emails (233
+Nazario, 162 phishing_pot) and 751 more Apache emails, mostly HTML notifications from one template.
+
 | Source | Class | Before | Exact copies | Near copies | Label conflicts | Empty | Kept | Removed |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| Apache | legitimate | 95,990 | 2,310 | 9,077 | 2 | 8 | 84,593 | 11.9% |
-| Nazario | phishing | 12,010 | 2,191 | 2,300 | 7 | 45 | 7,467 | 37.8% |
-| phishing_pot | phishing | 12,864 | 2,411 | 1,437 | 0 | 6 | 9,010 | 30.0% |
-| SpamAssassin | legitimate | 6,951 | 2,814 | 65 | 0 | 0 | 4,072 | 41.4% |
-| SpamAssassin | spam | 3,794 | 1,956 | 331 | 0 | 0 | 1,507 | 60.3% |
-| **Total** | | **131,609** | | | **9** | **59** | **106,649** | **19.0%** |
+| Apache | legitimate | 95,990 | 2,306 | 9,832 | 2 | 8 | 83,842 | 12.7% |
+| Nazario | phishing | 12,010 | 2,240 | 2,484 | 7 | 45 | 7,234 | 39.8% |
+| phishing_pot | phishing | 12,864 | 2,591 | 1,419 | 0 | 6 | 8,848 | 31.2% |
+| SpamAssassin | legitimate | 6,951 | 2,801 | 75 | 0 | 0 | 4,075 | 41.4% |
+| SpamAssassin | spam | 3,794 | 1,958 | 327 | 0 | 0 | 1,509 | 60.2% |
+| **Total** | | **131,609** | | | **9** | **59** | **105,508** | **19.8%** |
 
 - About a third of the phishing is copies of other phishing: campaigns resend one message with a different
   link or name. Left in, the same campaign would sit in both training and test data.
@@ -175,32 +190,32 @@ its earliest email.
 Built by `splits.py` with seed `20261029`; re-running it gives byte-identical files.
 
 **Main pool (month-matched):** every month from 2015-01 to 2026-09 has the same number of phishing and
-legitimate emails, so the date alone says nothing about the label. That gives 9,469 phishing (2,817 Nazario,
-6,652 phishing_pot) and 9,469 legitimate emails. Left out:
+legitimate emails, so the date alone says nothing about the label. That gives 9,338 phishing (2,786 Nazario,
+6,552 phishing_pot) and 9,338 legitimate emails. Left out:
 
-- 75,115 Apache emails from months with more legitimate mail than phishing;
-- 2,008 phishing emails from months with less legitimate mail, mostly 2026 (1,933 from phishing_pot);
-- 355 phishing_pot emails from October 2026, after the last Apache month I downloaded, and 5 undated ones.
+- 74,495 Apache emails from months with more legitimate mail than phishing;
+- 1,942 phishing emails from months with less legitimate mail, mostly 2026 (1,878 from phishing_pot);
+- 354 phishing_pot emails from October 2026, after the last Apache month I downloaded, and 5 undated ones.
 
 | Split | Question it answers | Train | Val | Test |
 |---|---|---:|---:|---:|
-| `random` | The "normal" number | 13,258 | 2,840 | 2,840 |
-| `by_source/nazario_to_phishing_pot` | Does it catch phishing from a source it never saw? | 4,788 | 846 | 13,304 |
-| `by_source/phishing_pot_to_nazario` | The same, the other way round | 11,308 | 1,996 | 5,634 |
-| `by_time` | Train on 2015–2022, test on 2023–2026: does it age? | 3,242 | 572 | 15,124 |
-| `by_time_nazario` | Train on 2015–2020, test on 2021–2025, Nazario only | 2,464 | 434 | 2,736 |
-| `old_era` | Nazario 2004–2014 vs SpamAssassin 2002, confounded on purpose | 6,096 | 1,306 | 1,307 |
-| `spam` | Spam as a hard negative (test only) | | | 1,507 |
+| `random` | The "normal" number | 13,072 | 2,802 | 2,802 |
+| `by_source/nazario_to_phishing_pot` | Does it catch phishing from a source it never saw? | 4,736 | 836 | 13,104 |
+| `by_source/phishing_pot_to_nazario` | The same, the other way round | 11,138 | 1,966 | 5,572 |
+| `by_time` | Train on 2015–2022, test on 2023–2026: does it age? | 3,218 | 568 | 14,890 |
+| `by_time_nazario` | Train on 2015–2020, test on 2021–2025, Nazario only | 2,454 | 434 | 2,684 |
+| `old_era` | Nazario 2004–2014 vs SpamAssassin 2002, confounded on purpose | 5,961 | 1,277 | 1,277 |
+| `spam` | Spam as a hard negative (test only) | | | 1,509 |
 
 Every main-pool split is half phishing and half legitimate. In Phase 2 I compute precision at a realistic base
 rate from the measured rates, instead of changing the split.
 
 - In `by_source`, each legitimate email goes with the phishing email it was matched to, so both sides stay
   month-matched. There is only one legitimate source, so this tests new phishing only.
-- In `by_time`, the training phishing is mostly Nazario (1,465 of 1,621) and the test phishing mostly
-  phishing_pot (6,462 of 7,562), so time and source are mixed. `by_time_nazario` keeps one source, so the
+- In `by_time`, the training phishing is mostly Nazario (1,446 of 1,609) and the test phishing mostly
+  phishing_pot (6,362 of 7,445), so time and source are mixed. `by_time_nazario` keeps one source, so the
   difference between the two is the effect of the source.
-- `old_era` has 4,637 phishing and 4,072 legitimate emails from different years. It reproduces the course
+- `old_era` has 4,440 phishing and 4,075 legitimate emails from different years. It reproduces the course
   project's setup, to show how inflated such a score is.
 
 ## Leakage audit
@@ -211,12 +226,12 @@ separates the classes. Full results with the strongest features: [reports/leakag
 
 | Feature group | Raw records | Masked records |
 |---|---:|---:|
-| Header names | 1.000 | 0.776 |
-| Header order | 1.000 | 0.787 |
-| Recipient domain | 1.000 | 0.571 |
+| Header names | 1.000 | 0.782 |
+| Header order | 1.000 | 0.799 |
+| Recipient domain | 1.000 | 0.573 |
 | `Authentication-Results` | 0.996 | 0.500 (moved to `auth`) |
-| Message-ID domain | 0.922 | 0.500 (dropped) |
-| Date (year, month) | 0.470 | 0.470 |
+| Message-ID domain | 0.919 | 0.500 (dropped) |
+| Date (year, month) | 0.467 | 0.467 |
 | Text (subject and body, TF-IDF) | 1.000 | 0.999 |
 
 What this shows:
@@ -224,19 +239,25 @@ What this shows:
 - **On raw records, the headers alone identify the dataset perfectly.** A model trained on them would learn
   which inbox collected the email.
 - **After masking, recipients, server names and dates carry no label signal.** The remaining header signal
-  (about 0.78) is which mail program wrote the email: `User-Agent` and `Content-Language` from people's mail
+  (about 0.78–0.80) is which mail program wrote the email: `User-Agent` and `Content-Language` from people's mail
   clients on the lists, `X-Priority` and `Importance` from bulk-mail tools in phishing. That is partly a real
   signal and partly this dataset, so I won't use header names as model features directly.
-- **The `auth` field on its own scores 0.993.** Which results exist at all depends on the collecting server,
+- **The `auth` field on its own scores 0.994.** Which results exist at all depends on the collecting server,
   so it stays out of the learned features, and the sender check uses it as rules instead.
 - **The text still separates the classes almost perfectly (0.999).** After masking, the strongest legitimate
-  words are `project`, `wrote`, `hi`, `thanks`, `re` and `java`: mailing-list conversation. The strongest
+  words are `project`, `org`, `wrote`, `re`, `hi`, `thanks` and `java`: mailing-list conversation, and the
+  placeholder itself (`project`, `org` from `project.org` links), which is the price of masking the names. The strongest
   phishing words are `your`, `account`, `click` and `wallet`. With one legitimate source, a random split on
   this data will score near 100%, so the by-source and by-time splits and the private test inbox matter more
   than the random number.
-- **The two phishing sources differ (text AUC 0.982):** crypto-wallet scams in phishing_pot, bank and mailbox
+- **The two phishing sources differ (text AUC 0.978):** crypto-wallet scams in phishing_pot, bank and mailbox
   phishing in Nazario. That makes `by_source` a real test of new phishing.
 - **On the confounded `old_era` split, the date alone scores 1.000:** the trap my course project fell into.
+- **The source's own domain is not a shortcut.** Links keep their real domains, and `apache.org` is in 46.2% of
+  the legitimate emails and none of the phishing. Link domains as tokens would separate the classes well (0.942,
+  `apache.org` and `github.com` on the legitimate side), but no model uses them that way. The link features the
+  models do use score 0.9732 on their own and 0.9673 with every link to `apache.org` removed. The rule, set before
+  the first run, was that losing more than 0.01 makes it a shortcut; it loses 0.006.
 
 ## Known limits
 

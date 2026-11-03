@@ -21,3 +21,11 @@ def read_records(path: Path, ids: set[str]) -> dict[str, dict]:
                 record = json.loads(line)
                 found[record["id"]] = record
     return found
+
+
+def read_analyst_view(ids: set[str]) -> dict[str, dict]:
+    """The analyst step's view: masked like the training data, except that the legitimate source's names are kept
+    (see `mask.py`). Built from the raw records, so it always matches the current masking code."""
+    from phish_triage.data.mask import mask_record
+
+    return {i: mask_record(r, source_names=False) for i, r in read_records(RAW_RECORDS, ids).items()}

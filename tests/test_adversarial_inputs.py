@@ -19,6 +19,8 @@ PATTERNS = {
     "analyst url": analyst._URL,
     "ai instructions": analyst._AI_INSTRUCTIONS,
     "our tags": analyst._OUR_TAGS,
+    "summary advice": analyst._ADVICE,
+    "mask keep domains": mask._DOMAIN_LIKE_RE,
     "pii email": pii._EMAIL,
     "pii phone": pii._PHONE,
     "pii code": pii._OTP,

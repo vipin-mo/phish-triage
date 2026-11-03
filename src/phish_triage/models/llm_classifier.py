@@ -32,6 +32,7 @@ from pathlib import Path
 import numpy as np
 
 from phish_triage.config import load_env, max_llm_spend_usd
+from phish_triage.data.mask import mask_source_names
 from phish_triage.data.records import MASKED_RECORDS, read_records
 from phish_triage.data.splits import SPLITS_DIR
 from phish_triage.evaluation import predictions
@@ -103,6 +104,9 @@ def render_email(record: dict) -> str:
         lines.append(f"Subject: {record.get('subject') or ''}")
     html = record.get("html") or ""
     targets = [href for href, _ in summarize_html(html).links] if html else list(record.get("urls") or [])
+    # link targets keep the real domain for the link features; masked here like the body, so Claude sees the
+    # same names as the text models it is compared with
+    targets = [mask_source_names(t) for t in targets]
     if targets:
         lines.append("Links (targets): " + " ".join(dict.fromkeys(targets[:MAX_LINKS])))
     if record.get("attachments"):

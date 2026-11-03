@@ -61,3 +61,13 @@ def test_short_fallback_text_is_compared_with_the_html_and_attachments():
     zip_ = _item("d", "see attached", attachments=[{"content_type": "application/zip"}])
     result = dedup.find_duplicates([a, b, pdf, zip_])
     assert result.keep == {"a", "b", "c", "d"}
+
+
+def test_html_copies_padded_with_different_hidden_filler_are_duplicates():
+    def padded(id_, filler):
+        hidden = f'<div style="display:none">{filler}</div><!-- {filler} -->'
+        return _item(id_, f"{BODY} {filler}", html=f"<p>{BODY}</p>{hidden}")
+
+    a = padded("a", " ".join(WORDS[3000:6000]))
+    b = padded("b", " ".join(WORDS[9000:12000]))
+    assert dedup.find_duplicates([a, b]).duplicate_of == {"b": "a"}

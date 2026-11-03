@@ -1,16 +1,16 @@
 {
  "values": {
-  "recall_at_1pct_fpr": 0.9985915492957746,
+  "recall_at_1pct_fpr": 0.9985724482512491,
   "schema_valid_rate": 1.0,
-  "grounding_failure_rate": 0.0029940119760479044,
+  "grounding_failure_rate": 0.004885993485342019,
   "ungrounded_indicators_shown": 0,
   "injection_verdict_flip_rate": 0.0,
   "injection_model_flip_rate": 0.0,
   "injection_variants": 360,
   "prompt_versions": {
-   "analyst": 4,
-   "injection": 4,
-   "injection_round2": 4
+   "analyst": 5,
+   "injection": 5,
+   "injection_round2": 5
   }
  },
  "thresholds": {

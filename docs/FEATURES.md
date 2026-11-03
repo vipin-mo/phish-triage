@@ -34,10 +34,10 @@ missing (NaN), never 0. The trees handle missing values natively.
 
 | Signal | Why it is not a feature |
 |---|---|
-| SPF / DKIM / DMARC results | The leakage audit showed they identify the collecting server (AUC 0.993 on their own). They drive the sender check instead. |
+| SPF / DKIM / DMARC results | The leakage audit showed they identify the collecting server (AUC 0.994 on their own). They drive the sender check instead. |
 | Number of `Received` hops | Set mostly by the collecting side, so here it would measure the dataset |
 | From vs `Return-Path` mismatch | Mailing lists rewrite `Return-Path`, so every list email would "mismatch" |
-| Header names and order | Identify the mail program and the collector (AUC 0.78 after masking) |
+| Header names and order | Identify the mail program and the collector (AUC 0.78–0.80 after masking) |
 
 ## The sender check
 
