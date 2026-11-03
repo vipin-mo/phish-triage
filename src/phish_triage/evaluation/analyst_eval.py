@@ -37,6 +37,7 @@ EMAILS = 200
 RATED = 50
 ANALYST_DIR = Path("data/analyst")
 RATING_SHEET = ANALYST_DIR / "rating_sheet.csv"
+RATING_EMAILS = ANALYST_DIR / "rating_emails.md"  # each email as the model saw it, then its answer
 RUBRIC = ("correct", "grounded", "clear", "useful")  # each scored 1-3, see docs/ANALYST_RUBRIC.md
 REPORTS_DIR = Path("reports")
 BATCH = f"analyst_eval_v{analyst.PROMPT_VERSION}"
@@ -87,12 +88,15 @@ def evaluate(responses: dict, meaning: dict) -> tuple[dict, list[dict]]:
                 "verdict": r.verdict,
                 "suggestion": r.output.verdict_suggestion if r.output else "",
                 "summary": r.output.summary if r.output else "",
+                "action": r.output.recommended_action.replace("_", " ") if r.output else "",
                 "indicators": " | ".join(
                     f"[{i.type}] {analyst.shown_evidence(i, m['_input'])} -> {i.why}" for i in r.output.indicators
                 )
                 if r.output
                 else "",
                 "dropped": r.indicators_dropped,
+                "_shown": m["_input"].shown,  # underscored: for the email file, not the CSV
+                "_signals": m["_input"].signals,
             }
         )
     n = len(meaning)
@@ -137,28 +141,94 @@ def measure_latency(params: dict[str, dict], client, emails: int = 20) -> dict:
 
 
 def write_rating_sheet(rows: list[dict], n: int = RATED) -> Path:
-    """Half phishing, half legitimate, in sample order; blank columns for my scores."""
+    """Half phishing, half legitimate, in sample order; blank columns for my scores; scores already entered are kept
+    when the sheet is rewritten, if the answer is the same. The emails go to RATING_EMAILS, numbered like the rows,
+    so I read each first."""
     phish = [r for r in rows if r["label"] == "phish"][: n // 2]
     legit = [r for r in rows if r["label"] == "legit"][: n - len(phish)]
+    chosen = phish + legit
     ANALYST_DIR.mkdir(parents=True, exist_ok=True)
+    scored = {}
+    if RATING_SHEET.exists():
+        # a score belongs to one answer: kept only if the same email got the same verdict, action, summary and
+        # indicators, so a score never attaches to an answer I didn't see
+        scored = {_answer(r): {k: r.get(k, "") for k in (*RUBRIC, "notes")} for r in _read_sheet(RATING_SHEET)}
+    columns = ["row", *(k for k in rows[0] if not k.startswith("_"))]
+    kept = 0
     with RATING_SHEET.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=[*rows[0], *RUBRIC, "notes"])
+        writer = csv.DictWriter(f, fieldnames=[*columns, *RUBRIC, "notes"])
         writer.writeheader()
-        for row in phish + legit:
-            writer.writerow({**row, **dict.fromkeys(RUBRIC, ""), "notes": ""})
+        for number, row in enumerate(chosen, 1):
+            blank = {**dict.fromkeys(RUBRIC, ""), "notes": ""}
+            score = scored.get(_answer(row), blank)
+            kept += score is not blank and any(score[k].strip() for k in RUBRIC)
+            writer.writerow({"row": number, **{k: row[k] for k in columns[1:]}, **score})
+    had = sum(any(s[k].strip() for k in RUBRIC) for s in scored.values())
+    if had:
+        print(f"rating sheet: kept {kept} of {had} scored rows; {had - kept} dropped (answer changed)", file=sys.stderr)
+    RATING_EMAILS.write_text(_rating_emails(chosen))
     return RATING_SHEET
 
 
+ANSWER_FIELDS = ("id", "verdict", "action", "summary", "indicators")  # what I rate; a change here voids the score
+
+
+def _answer(row: dict) -> tuple[str, ...]:
+    return tuple(row.get(k, "") for k in ANSWER_FIELDS)
+
+
+def _read_sheet(path: Path) -> list[dict]:
+    # utf-8-sig: spreadsheet apps add a byte-order mark; the header check catches a title line added above it
+    with path.open(newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        missing = [k for k in ("id", "label", *RUBRIC) if k not in (reader.fieldnames or [])]
+        if missing:
+            raise SystemExit(
+                f"{path}: first line must be the header row (missing {', '.join(missing)}); "
+                "remove anything a spreadsheet app added above it"
+            )
+        return list(reader)
+
+
+def _rating_emails(chosen: list[dict]) -> str:
+    fence = "~~~~"  # emails may contain backticks
+    parts = [
+        "# Emails to rate\n\nFor each one: read the email, then the answer, then score the row with the same number in "
+        "rating_sheet.csv (docs/ANALYST_RUBRIC.md). The email is what the model saw: hidden parts removed, personal "
+        "data masked.\n"
+    ]
+    for number, row in enumerate(chosen, 1):
+        signals = "\n".join(f"- [S{i}] {s}" for i, s in enumerate(row["_signals"], 1))
+        indicators = "\n".join(f"- {i}" for i in row["indicators"].split(" | ")) if row["indicators"] else "- (none)"
+        parts.append(
+            f"\n---\n\n## {number}. {row['id']} (true label: {row['label']})\n\n"
+            f"### Email\n\n{fence}text\n{row['_shown']}\n{fence}\n\n### Our signals\n\n{signals}\n\n"
+            f"### Answer\n\n**Final verdict:** {row['verdict']} "
+            f"(the analyst suggested {row['suggestion'] or 'nothing'})\n\n"
+            f"**Summary:** {row['summary']}\n\n**Recommended action:** {row['action'] or 'none'}\n\n"
+            f"**Indicators:**\n\n{indicators}\n"
+        )
+    return "".join(parts)
+
+
 def summarize_ratings(path: Path = RATING_SHEET) -> dict:
-    with path.open(newline="") as f:
-        rated = [r for r in csv.DictReader(f) if all(r[k].strip() for k in RUBRIC)]
+    rows = _read_sheet(path)
+    bad = [r["row"] for r in rows if any(r[k].strip() not in ("", "1", "2", "3") for k in RUBRIC)]  # partly scored too
+    rated = [r for r in rows if all(r[k].strip() for k in RUBRIC)]
+    if bad:
+        raise SystemExit(f"{path}: scores must be 1, 2 or 3 (rows {', '.join(bad)})")
+
+    def averages(subset: list[dict]) -> dict:
+        return {
+            "rated": len(subset),
+            **{k: round(sum(int(r[k]) for r in subset) / len(subset), 2) for k in RUBRIC},
+            "all_three_on_every_criterion": sum(all(int(r[k]) == 3 for k in RUBRIC) for r in subset),
+        }
+
     if not rated:
         return {"rated": 0}
-    return {
-        "rated": len(rated),
-        **{k: sum(int(r[k]) for r in rated) / len(rated) for k in RUBRIC},
-        "all_three_on_every_criterion": sum(all(int(r[k]) == 3 for k in RUBRIC) for r in rated),
-    }
+    groups = {label: [r for r in rated if r["label"] == label] for label in ("phish", "legit")}
+    return {**averages(rated), "by_label": {label: averages(g) for label, g in groups.items() if g}}
 
 
 def to_markdown(s: dict) -> str:
