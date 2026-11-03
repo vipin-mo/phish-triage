@@ -3,8 +3,9 @@
 [![CI](https://github.com/vipin-mo/phish-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/vipin-mo/phish-triage/actions/workflows/ci.yml)
 
 > **Status: in progress.** Started October 2026. The data pipeline, baselines, DistilBERT, the LLM comparison,
-> the cascade and the safe LLM analyst step are done; deployment is next. Numbers are added only once they are
-> measured.
+> the cascade and the safe LLM analyst step are done. Trained on public data alone, the models flagged almost all
+> of my real inbox mail; trained with part of it, the deployable cascade flags 3.2% (below). Deployment is next.
+> Numbers are added only once they are measured.
 
 phish-triage scores emails for phishing and explains why.
 
@@ -123,10 +124,46 @@ From [reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/in
   they were measured on an older prompt. All Phase 4 Claude runs cost $1.06 together; the re-run after the fixes
   was $0.27 of that.
 
+## What my private test inbox showed
+
+From [reports/test_inbox.md](reports/test_inbox.md). A fresh Gmail account I subscribed to newsletters, shops and
+services, exported with Google Takeout: 1,701 emails from August to November 2026, mostly Gmail's Updates (1,281)
+and Promotions (323). The emails stay on my laptop and are never sent to an LLM; only counts and rates are published.
+
+- **The models flag almost all of it.** At their validation thresholds for 1% false alarms, the `random` split's
+  models flag 96.4–99.6% of the 1,677 emails outside Spam as phishing: the course model 96.4%, the stacked model
+  99.4%, DistilBERT int8 99.6%, the cascade 97.7%. They also flag all 24 Spam-folder emails.
+- **This is the limit the leakage audit pointed at, now measured.** The only legitimate training mail is
+  mailing-list discussion: 17.9% of it has HTML, against 95.0% of the phishing and 99.6% of this inbox. So the
+  models learned "commercial-looking HTML mail is phishing", which every newsletter and receipt is. The earlier
+  sign was 99–100% of 2002 spam flagged.
+- **Gmail's own sender checks pass on 99.4–100%** of the mail outside Spam, so the sender check has real results
+  to work with here, unlike in the public data.
+- Every number above the inbox section is still true for the public test sets; it just doesn't carry over to a
+  real inbox.
+
+**Trained with part of the inbox** ([reports/with_inbox.md](reports/with_inbox.md)). I split the inbox by sender:
+437 emails from some senders (at most 25 per sender) went into training and 151 into validation, with as many 2026
+phishing emails, and 249 emails from 26 other senders became the test. Neither model saw those senders.
+
+- **False alarms on the unseen senders fell from 97.6% to 3.2%** for the cascade (8 of 249; 8.2% averaged per
+  sender), and from 100% to 3.2% for DistilBERT. At 1 phishing email in 100, a flagged email would now be phishing
+  23% of the time, against 1% before.
+- **It costs some phishing recall.** On the public test the cascade catches 97.3% (99.9% before) at 0.21% false
+  alarms (0.57% before): the inbox mail in validation makes the threshold stricter. At a fixed 1% false-alarm rate
+  DistilBERT's recall is 99.4% against 99.9%, but at 0.1% it is 90.9% against 97.7%. On 1,644 2026 phishing emails
+  no model saw, the cascade catches 98.4%.
+- **The text-only models learned dates as a shortcut.** I set a rule before the first run: removing years, month
+  and weekday names from the test text must not move a model's results by more than 2 points. The two TF-IDF models
+  fail it (their inbox false alarms rise by 16–20 points without dates), because the inbox is all late 2026. The
+  structured-features model, the stacked model, DistilBERT and the cascade pass (at most 0.4 points).
+- The inbox test is small: 249 emails, mostly Gmail's Updates (214) and Promotions (31).
+
+
 ## Known issues
 
 The first two were found while rating the analyst's answers by hand and fixed in November 2026; every number
-above was re-measured after the fix. The last two turned up in that re-measure and are still open.
+above was re-measured after the fix. The last three turned up later and are still open.
 
 - **Masking rewrote links (fixed).** Replacing the Apache list names with `project` ran over the whole body and
   HTML, including URLs and addresses. It rewrote a URL or address in 7,978 of the 13,541 legitimate emails the
@@ -142,6 +179,9 @@ above was re-measured after the fix. The last two turned up in that re-measure a
   masking replaces it with `user@example.com`, so the sender check reports "replies go to a different domain". This
   happens in 319 of the 9,338 Apache emails the splits use (3.4%) and under 1% of the phishing, and it caused 3 of
   the 7 legitimate emails the analyst raised.
+- **The TF-IDF text models lean on dates (open).** Trained with my late-2026 inbox, they treat years and month
+  names as signs of legitimate mail: removing them raises their inbox false alarms by 16–20 points. The deployable
+  models (DistilBERT and the cascade) pass the same check.
 - **The analyst sees rounded classifier scores (open).** DistilBERT's threshold is 0.0009, so a flagged email can be
   shown as "phishing probability 0.00 (flagged)".
 

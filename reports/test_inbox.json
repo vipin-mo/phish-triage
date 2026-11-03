@@ -1,0 +1,504 @@
+{
+ "emails": 1701,
+ "by_category": {
+  "primary": 12,
+  "updates": 1281,
+  "promotions": 323,
+  "purchases": 57,
+  "social": 2,
+  "forums": 2,
+  "spam": 24
+ },
+ "sender_check": {
+  "primary": {
+   "pass": 1.0,
+   "partial": 0.0,
+   "fail": 0.0,
+   "none": 0.0
+  },
+  "updates": {
+   "pass": 0.9976580796252927,
+   "partial": 0.0,
+   "fail": 0.00234192037470726,
+   "none": 0.0
+  },
+  "promotions": {
+   "pass": 0.9938080495356038,
+   "partial": 0.0,
+   "fail": 0.006191950464396285,
+   "none": 0.0
+  },
+  "purchases": {
+   "pass": 1.0,
+   "partial": 0.0,
+   "fail": 0.0,
+   "none": 0.0
+  },
+  "social": {
+   "pass": 1.0,
+   "partial": 0.0,
+   "fail": 0.0,
+   "none": 0.0
+  },
+  "forums": {
+   "pass": 1.0,
+   "partial": 0.0,
+   "fail": 0.0,
+   "none": 0.0
+  },
+  "spam": {
+   "pass": 0.9166666666666666,
+   "partial": 0.0,
+   "fail": 0.08333333333333333,
+   "none": 0.0
+  }
+ },
+ "sender_warnings": {
+  "primary": {
+   "unranked sender domain": 4
+  },
+  "updates": {
+   "Reply-To elsewhere": 41,
+   "display-name brand mismatch": 6,
+   "look-alike domain": 3,
+   "unranked sender domain": 32
+  },
+  "promotions": {
+   "Reply-To elsewhere": 16,
+   "display-name brand mismatch": 4,
+   "look-alike domain": 2,
+   "unranked sender domain": 13
+  },
+  "purchases": {},
+  "social": {},
+  "forums": {},
+  "spam": {
+   "Reply-To elsewhere": 3,
+   "unranked sender domain": 9
+  }
+ },
+ "false_alarms": {
+  "course": {
+   "all": {
+    "emails": 1677,
+    "flagged": 1616,
+    "share": 0.9636255217650567,
+    "low": 0.9552772808586762,
+    "high": 0.9719737626714371
+   },
+   "primary": {
+    "emails": 12,
+    "flagged": 12,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "updates": {
+    "emails": 1281,
+    "flagged": 1226,
+    "share": 0.9570647931303669,
+    "low": 0.9453551912568307,
+    "high": 0.9679937548790007
+   },
+   "promotions": {
+    "emails": 323,
+    "flagged": 317,
+    "share": 0.9814241486068112,
+    "low": 0.9659442724458205,
+    "high": 0.9938080495356038
+   },
+   "purchases": {
+    "emails": 57,
+    "flagged": 57,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "social": {
+    "emails": 2,
+    "flagged": 2,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "forums": {
+    "emails": 2,
+    "flagged": 2,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   }
+  },
+  "text": {
+   "all": {
+    "emails": 1677,
+    "flagged": 1662,
+    "share": 0.9910554561717353,
+    "low": 0.9862850327966607,
+    "high": 0.9952295766249255
+   },
+   "primary": {
+    "emails": 12,
+    "flagged": 12,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "updates": {
+    "emails": 1281,
+    "flagged": 1267,
+    "share": 0.9890710382513661,
+    "low": 0.9828259172521467,
+    "high": 0.994535519125683
+   },
+   "promotions": {
+    "emails": 323,
+    "flagged": 322,
+    "share": 0.9969040247678018,
+    "low": 0.9907120743034056,
+    "high": 1.0
+   },
+   "purchases": {
+    "emails": 57,
+    "flagged": 57,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "social": {
+    "emails": 2,
+    "flagged": 2,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "forums": {
+    "emails": 2,
+    "flagged": 2,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   }
+  },
+  "features": {
+   "all": {
+    "emails": 1677,
+    "flagged": 1639,
+    "share": 0.977340488968396,
+    "low": 0.9701848539057841,
+    "high": 0.9838998211091234
+   },
+   "primary": {
+    "emails": 12,
+    "flagged": 11,
+    "share": 0.9166666666666666,
+    "low": 0.75,
+    "high": 1.0
+   },
+   "updates": {
+    "emails": 1281,
+    "flagged": 1252,
+    "share": 0.9773614363778298,
+    "low": 0.9695550351288056,
+    "high": 0.985167837626854
+   },
+   "promotions": {
+    "emails": 323,
+    "flagged": 318,
+    "share": 0.9845201238390093,
+    "low": 0.9690402476780186,
+    "high": 0.9969040247678018
+   },
+   "purchases": {
+    "emails": 57,
+    "flagged": 55,
+    "share": 0.9649122807017544,
+    "low": 0.9122807017543859,
+    "high": 1.0
+   },
+   "social": {
+    "emails": 2,
+    "flagged": 2,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "forums": {
+    "emails": 2,
+    "flagged": 1,
+    "share": 0.5,
+    "low": 0.0,
+    "high": 1.0
+   }
+  },
+  "stacked": {
+   "all": {
+    "emails": 1677,
+    "flagged": 1667,
+    "share": 0.9940369707811568,
+    "low": 0.9904591532498509,
+    "high": 0.9976147883124628
+   },
+   "primary": {
+    "emails": 12,
+    "flagged": 12,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "updates": {
+    "emails": 1281,
+    "flagged": 1272,
+    "share": 0.9929742388758782,
+    "low": 0.9875097580015613,
+    "high": 0.9976580796252927
+   },
+   "promotions": {
+    "emails": 323,
+    "flagged": 322,
+    "share": 0.9969040247678018,
+    "low": 0.9907120743034056,
+    "high": 1.0
+   },
+   "purchases": {
+    "emails": 57,
+    "flagged": 57,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "social": {
+    "emails": 2,
+    "flagged": 2,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "forums": {
+    "emails": 2,
+    "flagged": 2,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   }
+  },
+  "distilbert": {
+   "all": {
+    "emails": 1677,
+    "flagged": 1671,
+    "share": 0.9964221824686941,
+    "low": 0.9934406678592725,
+    "high": 0.9988073941562313
+   },
+   "primary": {
+    "emails": 12,
+    "flagged": 12,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "updates": {
+    "emails": 1281,
+    "flagged": 1276,
+    "share": 0.9960967993754879,
+    "low": 0.9921935987509758,
+    "high": 0.9992193598750976
+   },
+   "promotions": {
+    "emails": 323,
+    "flagged": 322,
+    "share": 0.9969040247678018,
+    "low": 0.9907120743034056,
+    "high": 1.0
+   },
+   "purchases": {
+    "emails": 57,
+    "flagged": 57,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "social": {
+    "emails": 2,
+    "flagged": 2,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "forums": {
+    "emails": 2,
+    "flagged": 2,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   }
+  },
+  "cascade": {
+   "all": {
+    "emails": 1677,
+    "flagged": 1638,
+    "share": 0.9767441860465116,
+    "low": 0.9689922480620154,
+    "high": 0.9838998211091234
+   },
+   "primary": {
+    "emails": 12,
+    "flagged": 12,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "updates": {
+    "emails": 1281,
+    "flagged": 1250,
+    "share": 0.975800156128025,
+    "low": 0.9672131147540983,
+    "high": 0.9843871975019516
+   },
+   "promotions": {
+    "emails": 323,
+    "flagged": 315,
+    "share": 0.9752321981424149,
+    "low": 0.9566563467492261,
+    "high": 0.9907120743034056
+   },
+   "purchases": {
+    "emails": 57,
+    "flagged": 57,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "social": {
+    "emails": 2,
+    "flagged": 2,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   },
+   "forums": {
+    "emails": 2,
+    "flagged": 2,
+    "share": 1.0,
+    "low": 1.0,
+    "high": 1.0
+   }
+  }
+ },
+ "spam_folder_flagged": {
+  "course": {
+   "emails": 24,
+   "flagged": 24,
+   "share": 1.0,
+   "low": 1.0,
+   "high": 1.0
+  },
+  "text": {
+   "emails": 24,
+   "flagged": 24,
+   "share": 1.0,
+   "low": 1.0,
+   "high": 1.0
+  },
+  "features": {
+   "emails": 24,
+   "flagged": 24,
+   "share": 1.0,
+   "low": 1.0,
+   "high": 1.0
+  },
+  "stacked": {
+   "emails": 24,
+   "flagged": 24,
+   "share": 1.0,
+   "low": 1.0,
+   "high": 1.0
+  },
+  "distilbert": {
+   "emails": 24,
+   "flagged": 24,
+   "share": 1.0,
+   "low": 1.0,
+   "high": 1.0
+  },
+  "cascade": {
+   "emails": 24,
+   "flagged": 24,
+   "share": 1.0,
+   "low": 1.0,
+   "high": 1.0
+  }
+ },
+ "precision_at_1_in_100": {
+  "course": 0.010366231844788713,
+  "text": 0.010089342117137443,
+  "features": 0.010005393529387379,
+  "stacked": 0.010059384560014395,
+  "distilbert": 0.01002136360696048,
+  "cascade": 0.010221195596307206
+ },
+ "review": {
+  "marked": {},
+  "removed_from_legitimate": 0,
+  "false_alarms": {
+   "course": {
+    "emails": 1677,
+    "flagged": 1616,
+    "share": 0.9636255217650567,
+    "low": 0.9552772808586762,
+    "high": 0.9719737626714371
+   },
+   "text": {
+    "emails": 1677,
+    "flagged": 1662,
+    "share": 0.9910554561717353,
+    "low": 0.9862850327966607,
+    "high": 0.9952295766249255
+   },
+   "features": {
+    "emails": 1677,
+    "flagged": 1639,
+    "share": 0.977340488968396,
+    "low": 0.9701848539057841,
+    "high": 0.9838998211091234
+   },
+   "stacked": {
+    "emails": 1677,
+    "flagged": 1667,
+    "share": 0.9940369707811568,
+    "low": 0.9904591532498509,
+    "high": 0.9976147883124628
+   },
+   "distilbert": {
+    "emails": 1677,
+    "flagged": 1671,
+    "share": 0.9964221824686941,
+    "low": 0.9934406678592725,
+    "high": 0.9988073941562313
+   },
+   "cascade": {
+    "emails": 1677,
+    "flagged": 1638,
+    "share": 0.9767441860465116,
+    "low": 0.9689922480620154,
+    "high": 0.9838998211091234
+   }
+  }
+ },
+ "skipped": 1,
+ "first_month": "2026-08",
+ "last_month": "2026-11",
+ "cascade_shares": [
+  0.9494415049970606,
+  0.05055849500293945
+ ],
+ "flagged_for_review": 1677,
+ "recall_on_random_test": {
+  "course": 0.9992862241256245,
+  "text": 1.0,
+  "features": 0.9778729478943612,
+  "stacked": 1.0,
+  "distilbert": 0.9985724482512491,
+  "cascade": 0.9985724482512491
+ }
+}
