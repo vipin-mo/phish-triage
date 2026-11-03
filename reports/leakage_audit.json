@@ -9,12 +9,12 @@
      "x-he-tag",
      "x-uid",
      "status",
-     "x-status",
      "x-keywords",
+     "x-status",
      "x-spam-summary",
      "x-filterd-recvd-size",
-     "x-pm-transfer-encryption",
-     "x-pm-content-encryption"
+     "arc-authentication-results",
+     "arc-seal"
     ],
     "top_legit": [
      "mailing-list",
@@ -25,17 +25,17 @@
      "list-unsubscribe",
      "x-original-to",
      "reply-to",
-     "x-spam-score",
-     "x-spam-flag"
+     "x-spam-flag",
+     "x-spam-score"
     ]
    },
    "masked": {
-    "auc": 0.776,
+    "auc": 0.782,
     "top_phish": [
      "mime-version",
      "from",
-     "importance",
      "x-priority",
+     "importance",
      "reply-to",
      "x-msmail-priority",
      "content-type",
@@ -46,10 +46,10 @@
     "top_legit": [
      "to",
      "user-agent",
-     "date",
      "content-language",
-     "cc",
+     "date",
      "subject",
+     "cc",
      "content-transfer-encoding",
      "dkim-signature",
      "x-mailer",
@@ -62,16 +62,16 @@
    "raw": {
     "auc": 1.0,
     "top_phish": [
-     "return-path > delivered-to",
      "delivered-to > x-fda",
-     "x-keywords > x-uid",
      "status > x-status",
+     "x-keywords > x-uid",
      "x-status > x-keywords",
+     "return-path > delivered-to",
      "authentication-results > authentication-results",
-     "mime-version > content-type",
+     "x-pm-origin > x-pm-transfer-encryption",
+     "x-pm-content-encryption > x-pm-spamscore",
      "x-pm-spamscore > x-pm-spam-action",
-     "x-pm-transfer-encryption > x-pm-content-encryption",
-     "x-pm-content-encryption > x-pm-spamscore"
+     "x-pm-transfer-encryption > x-pm-content-encryption"
     ],
     "top_legit": [
      "list-unsubscribe > list-post",
@@ -80,25 +80,25 @@
      "precedence > list-help",
      "list-post > list-id",
      "mailing-list > precedence",
-     "return-path > x-original-to",
      "x-original-to > delivered-to",
+     "return-path > x-original-to",
      "list-post > delivered-to",
      "list-id > precedence"
     ]
    },
    "masked": {
-    "auc": 0.787,
+    "auc": 0.799,
     "top_phish": [
      "content-transfer-encoding > x-priority",
      "x-priority > importance",
      "from > subject",
-     "subject > mime-version",
      "x-priority > x-msmail-priority",
-     "dkim-signature > dkim-signature",
      "content-type > x-priority",
-     "user-agent > x-priority",
-     "mime-version > content-type",
-     "content-type > content-type"
+     "subject > mime-version",
+     "dkim-signature > dkim-signature",
+     "from > cc",
+     "date > mime-version",
+     "user-agent > x-priority"
     ],
     "top_legit": [
      "content-transfer-encoding > user-agent",
@@ -109,8 +109,8 @@
      "to > subject",
      "content-type > user-agent",
      "content-type > content-language",
-     "cc > cc",
-     "date > content-type"
+     "date > content-type",
+     "subject > date"
     ]
    }
   },
@@ -125,26 +125,26 @@
      "to:monkey.org",
      "to:aol.com",
      "cc:aol.com",
-     "to:hotmail.com",
      "delivered-to:gmail.com",
+     "to:hotmail.com",
      "to:gmail.com",
      "cc:pot"
     ],
     "top_legit": [
      "delivered-to:cust-asf.ponee.io",
      "x-original-to:cust-asf.ponee.io",
-     "x-original-to:www.apache.org",
      "delivered-to:www.apache.org",
+     "x-original-to:www.apache.org",
      "delivered-to:community.apache.org",
-     "to:community.apache.org",
      "delivered-to:tomcat.apache.org",
      "to:tomcat.apache.org",
+     "to:community.apache.org",
      "delivered-to:cassandra.apache.org",
      "to:cassandra.apache.org"
     ]
    },
    "masked": {
-    "auc": 0.571,
+    "auc": 0.573,
     "top_phish": [
      "none",
      "cc:example.com",
@@ -165,25 +165,25 @@
      "smtp.auth",
      "reason",
      "dmarc",
-     "dkim-adsp",
-     "header.i",
      "spf",
+     "header.i",
+     "signature",
+     "dkim-adsp",
      "header.from",
      "good",
-     "no",
-     "login"
+     "assumed"
     ],
     "top_legit": [
      "apache.org",
      "amavisd-new",
+     "cassandra.apache.org",
      "tomcat.apache.org",
-     "key",
+     "kreuser.name",
+     "logo",
+     "mx2f0b",
      "auth",
-     "none",
-     "bad",
-     "1024-bit",
-     "sqs.com",
-     "195.227.92.58"
+     "key",
+     "none"
     ]
    },
    "masked": {
@@ -199,18 +199,18 @@
   {
    "group": "Message-ID domain",
    "raw": {
-    "auc": 0.922,
+    "auc": 0.919,
     "top_phish": [
      "google.com",
      "email.amazonses.com",
      "localhost.localdomain",
      "sa0pr04mb7370.namprd04.prod.outlook.com",
+     "none",
      "mx.google.com",
      "stayfriends.de",
-     "correios",
-     "none",
      "monkey.org",
-     "bradesco.com.br"
+     "bradesco.com.br",
+     "telekom.com"
     ],
     "top_legit": [
      "apache.org",
@@ -219,10 +219,10 @@
      "atlassian.jira",
      "rcbowen.com",
      "touchtonecorp.com",
-     "bso.ng",
      "community.apache.org",
-     "f1-outsourcing.eu",
-     "speed4trade.com"
+     "speed4trade.com",
+     "bso.ng",
+     "app.fastmail.com"
     ]
    },
    "masked": {
@@ -238,57 +238,57 @@
   {
    "group": "date",
    "raw": {
-    "auc": 0.47,
+    "auc": 0.467,
     "top_phish": [
+     "year:2020",
+     "month:04",
+     "year:2018",
+     "year:2015",
      "year:2017",
-     "month:01",
-     "year:2021",
-     "month:11",
-     "year:2023",
-     "year:2024",
      "month:08",
-     "month:10",
-     "year:2016",
-     "month:03"
+     "month:05",
+     "month:12",
+     "month:01",
+     "month:07"
     ],
     "top_legit": [
-     "month:12",
-     "year:2015",
-     "year:2020",
+     "month:06",
+     "year:2016",
      "year:2019",
-     "year:2026",
-     "month:09",
+     "year:2024",
+     "month:03",
+     "month:11",
      "year:2022",
-     "month:02",
-     "year:2018",
-     "year:2025"
+     "year:2026",
+     "year:2021",
+     "month:02"
     ]
    },
    "masked": {
-    "auc": 0.47,
+    "auc": 0.467,
     "top_phish": [
+     "year:2020",
+     "month:04",
+     "year:2018",
+     "year:2015",
      "year:2017",
-     "month:01",
-     "year:2021",
-     "month:11",
-     "year:2023",
-     "year:2024",
      "month:08",
-     "month:10",
-     "year:2016",
-     "month:03"
+     "month:05",
+     "month:12",
+     "month:01",
+     "month:07"
     ],
     "top_legit": [
-     "month:12",
-     "year:2015",
-     "year:2020",
+     "month:06",
+     "year:2016",
      "year:2019",
-     "year:2026",
-     "month:09",
+     "year:2024",
+     "month:03",
+     "month:11",
      "year:2022",
-     "month:02",
-     "year:2018",
-     "year:2025"
+     "year:2026",
+     "year:2021",
+     "month:02"
     ]
    }
   }
@@ -296,30 +296,30 @@
  "kept_aside": [
   {
    "field": "auth",
-   "auc": 0.993,
+   "auc": 0.994,
    "top_phish": [
     "spf=pass",
-    "dmarc=none",
     "dmarc=pass",
     "spf=fail",
+    "dmarc=none",
     "dkim=none",
+    "spf=none",
     "dmarc=fail",
     "dmarc=permerror",
-    "spf=none",
     "spf=softfail",
     "dmarc=bestguesspass"
    ],
    "top_legit": [
     "none",
     "dkim=pass",
-    "dkim=permerror",
     "dkim=neutral",
     "dkim=timeout",
+    "dkim=temperror",
+    "spf=permerror",
     "spf=neutral",
     "dkim=fail",
-    "spf=permerror",
-    "absent",
-    "dmarc=temperror"
+    "dkim=permerror",
+    "absent"
    ]
   }
  ],
@@ -332,8 +332,8 @@
     "monkey",
     "account",
     "click",
-    "you",
     "jose",
+    "you",
     "email",
     "de",
     "free",
@@ -342,8 +342,8 @@
    "top_legit": [
     "apache",
     "tomcat",
-    "org",
     "cassandra",
+    "org",
     "the",
     "users",
     "httpd",
@@ -361,41 +361,41 @@
     "click",
     "you",
     "email",
+    "free",
     "de",
     "example",
-    "unsubscribe",
-    "free",
+    "bonus",
     "wallet"
    ],
    "top_legit": [
     "project",
     "org",
-    "the",
     "wrote",
-    "hi",
-    "on",
-    "thanks",
+    "the",
     "re",
-    "but",
-    "java"
+    "on",
+    "hi",
+    "thanks",
+    "java",
+    "but"
    ]
   }
  ],
  "phishing_source": [
   {
    "features": "header names",
-   "auc": 0.754,
+   "auc": 0.732,
    "top_phishing_pot": [
-    "date",
     "cc",
+    "date",
     "importance",
     "to",
-    "mime-version",
     "x-mailer",
     "dkim-signature",
+    "mime-version",
     "content-type",
     "reply-to",
-    "content-transfer-encoding"
+    "user-agent"
    ],
    "top_nazario": [
     "x-msmail-priority",
@@ -403,39 +403,39 @@
     "subject",
     "from",
     "content-language",
-    "user-agent",
     "content-transfer-encoding",
+    "user-agent",
     "reply-to",
     "content-type",
-    "dkim-signature"
+    "mime-version"
    ]
   },
   {
    "features": "text",
-   "auc": 0.982,
+   "auc": 0.978,
    "top_phishing_pot": [
+    "unsubscribe",
     "wallet",
     "hotmail",
-    "unsubscribe",
+    "bonus",
     "claim",
     "ledger",
-    "free",
     "sie",
-    "wish",
-    "payout",
-    "bonus"
+    "free",
+    "subscription",
+    "proton"
    ],
    "top_nazario": [
     "account",
     "user",
     "usaa",
-    "dear",
     "notification",
-    "com",
+    "dear",
     "mail",
-    "attached",
     "mailbox",
-    "monkey"
+    "example",
+    "view",
+    "com"
    ]
   }
  ],
@@ -446,11 +446,53 @@
   },
   {
    "features": "text",
-   "auc": 0.999
+   "auc": 0.998
   }
  ],
+ "domains": {
+  "source_domains": [
+   "apache.org"
+  ],
+  "link_domains": {
+   "auc": 0.942,
+   "top_phish": [
+    "t.co",
+    "googleapis.com",
+    "run.app",
+    "sendgrid.net",
+    "r2.dev",
+    "ytimg.com",
+    "ipfs.io",
+    "instagram.com",
+    "share.google",
+    "eu.com"
+   ],
+   "top_legit": [
+    "apache.org",
+    "github.com",
+    "localhost",
+    "stackoverflow.com",
+    "datastax.com",
+    "urldefense.com",
+    "enigmail.net",
+    "gpgtools.org",
+    "fosdem.org",
+    "communityovercode.org"
+   ]
+  },
+  "share_linking_to_source_domain": {
+   "phish": 0.0,
+   "legit": 0.462
+  },
+  "link_features_auc": {
+   "with": 0.9732,
+   "without_source_domain": 0.9673
+  },
+  "shortcut": false,
+  "shortcut_rule": "AUC lost without the source's domain > 0.01"
+ },
  "sizes": {
-  "random_train": 13258,
-  "random_test": 2840
+  "random_train": 13072,
+  "random_test": 2802
  }
 }
