@@ -263,7 +263,8 @@ What this shows:
 
 - **Legitimate mail is mailing-list mail.** It is technical discussion and announcements, not the bank,
   shop and job notifications that phishing imitates. The text audit (0.999 after masking) measures how easy
-  that makes the task; the private test inbox exists to measure the gap.
+  that makes the task; the private test inbox measures the gap: the models flag 96.4–99.6% of its 1,677
+  legitimate emails ([reports/test_inbox.md](../reports/test_inbox.md)).
 - **List mail is not always legitimate.** Two Apache list posts turned out to be phishing (found as label
   conflicts), so a few spam or phishing posts that got past the lists' filters may still be labelled
   legitimate.

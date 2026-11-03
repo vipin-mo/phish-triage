@@ -3,7 +3,8 @@
 [![CI](https://github.com/vipin-mo/phish-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/vipin-mo/phish-triage/actions/workflows/ci.yml)
 
 > **Status: in progress.** Started October 2026. The data pipeline, baselines, DistilBERT, the LLM comparison,
-> the cascade and the safe LLM analyst step are done; deployment is next. Numbers are added only once they are
+> the cascade and the safe LLM analyst step are done. On real inbox mail the models flag almost everything (below),
+> so retraining with realistic legitimate mail comes before deployment. Numbers are added only once they are
 > measured.
 
 phish-triage scores emails for phishing and explains why.
@@ -122,6 +123,25 @@ From [reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/in
 - **The CI eval gate** checks these numbers on every push ([reports/gate.json](reports/gate.json)) and fails if
   they were measured on an older prompt. All Phase 4 Claude runs cost $1.06 together; the re-run after the fixes
   was $0.27 of that.
+
+## What my private test inbox showed
+
+From [reports/test_inbox.md](reports/test_inbox.md). A fresh Gmail account I subscribed to newsletters, shops and
+services, exported with Google Takeout: 1,701 emails from August to November 2026, mostly Gmail's Updates (1,281)
+and Promotions (323). The emails stay on my laptop and are never sent to an LLM; only counts and rates are published.
+
+- **The models flag almost all of it.** At their validation thresholds for 1% false alarms, the `random` split's
+  models flag 96.4–99.6% of the 1,677 emails outside Spam as phishing: the course model 96.4%, the stacked model
+  99.4%, DistilBERT int8 99.6%, the cascade 97.7%. They also flag all 24 Spam-folder emails.
+- **This is the limit the leakage audit pointed at, now measured.** The only legitimate training mail is
+  mailing-list discussion: 17.9% of it has HTML, against 95.0% of the phishing and 99.6% of this inbox. So the
+  models learned "commercial-looking HTML mail is phishing", which every newsletter and receipt is. The earlier
+  sign was 99–100% of 2002 spam flagged.
+- **Gmail's own sender checks pass on 99.4–100%** of the mail outside Spam, so the sender check has real results
+  to work with here, unlike in the public data.
+- Every number above the inbox section is still true for the public test sets; it just doesn't carry over to a
+  real inbox. Next: train with part of this inbox (split by sender, so the test senders are new to the model) and
+  re-measure.
 
 ## Known issues
 
