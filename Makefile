@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox gate
+.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox gate
 
 help:  ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -63,6 +63,15 @@ eval-analyst:  ## analyst step on 200 emails + my rating sheet (Claude, costs mo
 eval-injection:  ## prompt-injection rounds 1 and 2 (Claude, costs money: CONFIRM=--confirm)
 	uv run --group train python -m phish_triage.evaluation.injection $(if $(CONFIRM),run $(CONFIRM),plan)
 	uv run --group train python -m phish_triage.evaluation.injection $(if $(CONFIRM),run $(CONFIRM),plan) --round 2
+
+data-inbox:  ## mask my private test inbox and build the `with_inbox` split (stays in data/private/)
+	uv run python -m phish_triage.data.inbox
+
+train-with-inbox:  ## fine-tune DistilBERT on the private `with_inbox` split and export it (~30 min on an M5)
+	uv run --group train python -m phish_triage.models.train_transformer with_inbox
+
+eval-with-inbox:  ## before/after: models trained without and with part of my inbox (local only, aggregates only)
+	uv run --group train python -m phish_triage.evaluation.with_inbox
 
 eval-test-inbox:  ## false alarms on my private test inbox (local models only, aggregates only; never sent to an LLM)
 	uv run --group train python -m phish_triage.evaluation.test_inbox

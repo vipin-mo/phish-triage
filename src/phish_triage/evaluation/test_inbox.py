@@ -30,9 +30,8 @@ from pathlib import Path
 
 import numpy as np
 
-from phish_triage.data.loaders import _iter_mbox
+from phish_triage.data.inbox import MBOX, PRIVATE_DIR, gmail_category, load_inbox  # noqa: F401 (re-exported)
 from phish_triage.data.mask import mask_record
-from phish_triage.data.parse import parse_email
 from phish_triage.data.records import MASKED_RECORDS, read_records
 from phish_triage.data.splits import SPLITS_DIR
 from phish_triage.evaluation import metrics, predictions
@@ -42,25 +41,11 @@ from phish_triage.features.extract import matrix
 from phish_triage.features.sender import check_sender, identity
 from phish_triage.models.baselines import email_text, fit_all
 
-PRIVATE_DIR = Path("data/private/test_inbox")
-MBOX = PRIVATE_DIR / "test_inbox.mbox"
 REVIEW_SHEET = PRIVATE_DIR / "review.csv"
 REPORTS_DIR = Path("reports")
-SOURCE = "test_inbox"
 SPLIT = "random"  # the deployable models
 DISTILBERT = "distilbert_head_int8"
 
-# Most specific first. "Category Personal" is Gmail's Primary tab; an email in the inbox with no category is too.
-CATEGORIES = (
-    ("Spam", "spam"),
-    ("Category Purchases", "purchases"),
-    ("Category Promotions", "promotions"),
-    ("Category Social", "social"),
-    ("Category Forums", "forums"),
-    ("Category Updates", "updates"),
-    ("Category Personal", "primary"),
-)
-SKIPPED_LABELS = {"Sent", "Drafts", "Chat"}  # my own messages, not mail I received
 CATEGORY_ORDER = ("primary", "updates", "promotions", "purchases", "social", "forums", "other")
 MODELS = {
     "course": "Course setup (word TF-IDF + LR)",
@@ -81,46 +66,11 @@ WARNING_TYPES = (  # sender-check warnings by kind; the text itself names domain
 )
 
 
-def gmail_category(labels_header: str | None) -> str | None:
-    """One category per email from Takeout's X-Gmail-Labels header; None for messages I sent."""
-    labels = {label.strip() for label in (labels_header or "").split(",") if label.strip()}
-    if labels & SKIPPED_LABELS:
-        return None
-    for label, category in CATEGORIES:
-        if label in labels:
-            return category
-    return "primary" if "Inbox" in labels else "other"
-
-
-def load_inbox(path: Path = MBOX) -> tuple[list[dict], list[str], int]:
-    """(parsed records, their categories, messages skipped). Nothing is printed or written here."""
-    records, categories, skipped = [], [], 0
-    for raw, origin in _iter_mbox(path, "mbox"):
-        header_end = raw.find(b"\n\n")
-        head = raw[: header_end if header_end >= 0 else len(raw)]
-        labels = next(
-            (
-                line.split(b":", 1)[1].decode("utf-8", "replace")
-                for line in head.splitlines()
-                if line.lower().startswith(b"x-gmail-labels:")
-            ),
-            None,
-        )
-        category = gmail_category(labels)
-        if category is None:
-            skipped += 1
-            continue
-        label = "spam" if category == "spam" else "legit"
-        records.append(parse_email(raw, source=SOURCE, label=label, origin=f"test_inbox.mbox{origin}").to_dict())
-        categories.append(category)
-    return records, categories, skipped
-
-
 def warning_type(text: str) -> str:
     return next((kind for prefix, kind in WARNING_TYPES if prefix in text), "other")
 
 
-def _share(flags: np.ndarray, n_bootstrap: int) -> dict:
+def share(flags: np.ndarray, n_bootstrap: int) -> dict:
     flags = np.asarray(flags, dtype=float)
     if not len(flags):
         return {"emails": 0}
@@ -172,10 +122,10 @@ def aggregate(
         out["sender_warnings"][c] = dict(sorted(kinds.items()))
     for model, f in flags.items():
         f = np.asarray(f)
-        out["false_alarms"][model] = {"all": _share(f[legit], n_bootstrap)} | {
-            c: _share(f[cats == c], n_bootstrap) for c in present
+        out["false_alarms"][model] = {"all": share(f[legit], n_bootstrap)} | {
+            c: share(f[cats == c], n_bootstrap) for c in present
         }
-        out["spam_folder_flagged"][model] = _share(f[cats == "spam"], n_bootstrap)
+        out["spam_folder_flagged"][model] = share(f[cats == "spam"], n_bootstrap)
         fpr = out["false_alarms"][model]["all"].get("share")
         if model in recall_on_random and fpr is not None:
             out["precision_at_1_in_100"][model] = metrics.precision_at_prevalence(recall_on_random[model], fpr)
@@ -186,7 +136,7 @@ def aggregate(
         out["review"] = {
             "marked": dict(sorted(Counter(marked.values()).items())),
             "removed_from_legitimate": int((legit & not_legit).sum()),
-            "false_alarms": {m: _share(np.asarray(f)[kept], n_bootstrap) for m, f in flags.items()},
+            "false_alarms": {m: share(np.asarray(f)[kept], n_bootstrap) for m, f in flags.items()},
         }
     return out
 
@@ -279,7 +229,7 @@ def score_inbox(masked: list[dict], fitted, ranks, thresholds, cascade_val) -> t
     return flags, cascade.shares(2)
 
 
-def _pct(s: dict) -> str:
+def fmt_share(s: dict) -> str:
     if not s.get("emails"):
         return ""
     return f"{s['share']:.1%} [{s['low']:.1%}, {s['high']:.1%}] ({s['flagged']} of {s['emails']})"
@@ -311,8 +261,8 @@ def to_markdown(r: dict) -> str:
     for m, name in MODELS.items():
         fa = r["false_alarms"][m]
         precision = r["precision_at_1_in_100"].get(m)
-        cells = " | ".join(_pct(fa.get(c, {})) for c in cats)
-        lines.append(f"| {name} | {_pct(fa['all'])} | {cells} | {precision:.3f} |")
+        cells = " | ".join(fmt_share(fa.get(c, {})) for c in cats)
+        lines.append(f"| {name} | {fmt_share(fa['all'])} | {cells} | {precision:.3f} |")
     lines += [
         "",
         "Precision @ 1 in 100: of the emails flagged, the share that would be phishing if 1 email in 100 were, "
@@ -331,7 +281,7 @@ def to_markdown(r: dict) -> str:
             "",
             "| Model | Flagged |",
             "|---|---|",
-            *[f"| {name} | {_pct(r['spam_folder_flagged'][m])} |" for m, name in MODELS.items()],
+            *[f"| {name} | {fmt_share(r['spam_folder_flagged'][m])} |" for m, name in MODELS.items()],
             "",
         ]
     lines += [
@@ -355,7 +305,7 @@ def to_markdown(r: dict) -> str:
             "",
             "| Model | False alarms after my review |",
             "|---|---|",
-            *[f"| {name} | {_pct(review['false_alarms'][m])} |" for m, name in MODELS.items()],
+            *[f"| {name} | {fmt_share(review['false_alarms'][m])} |" for m, name in MODELS.items()],
         ]
     lines += [
         "",

@@ -37,7 +37,7 @@ The Apache lists are `announce@apache.org`, `users@httpd`, `users@tomcat`, `user
 |---|---|---|
 | [Greco et al., Kaggle](https://www.kaggle.com/datasets/francescogreco97/human-llm-generated-phishing-legitimate-emails) | LLM-written phishing, robustness test only | CC BY-NC-SA 4.0 |
 | A second legitimate source (e.g. another public mailing-list archive) | Cross-source test for the legitimate class | to be checked |
-| A private test inbox (a new Gmail account subscribed to newsletters, shops and job sites) | Realistic notification-style legitimate mail; test only, never committed, only counts and metrics published | private |
+| A private test inbox (a new Gmail account subscribed to newsletters, shops and job sites) | Realistic notification-style legitimate mail. Never committed or sent to an LLM; only counts and metrics are published. Part of it, split by sender, is in the `with_inbox` training split (`data/inbox.py`) | private |
 
 **Reference data (not emails):**
 
@@ -206,6 +206,7 @@ legitimate emails, so the date alone says nothing about the label. That gives 9,
 | `by_time_nazario` | Train on 2015–2020, test on 2021–2025, Nazario only | 2,454 | 434 | 2,684 |
 | `old_era` | Nazario 2004–2014 vs SpamAssassin 2002, confounded on purpose | 5,961 | 1,277 | 1,277 |
 | `spam` | Spam as a hard negative (test only) | | | 1,509 |
+| `with_inbox` (private) | `random` plus part of my test inbox, split by sender, and as many 2026 phishing emails | 13,946 | 3,104 | 4,695 |
 
 Every main-pool split is half phishing and half legitimate. In Phase 2 I compute precision at a realistic base
 rate from the measured rates, instead of changing the split.
@@ -264,7 +265,9 @@ What this shows:
 - **Legitimate mail is mailing-list mail.** It is technical discussion and announcements, not the bank,
   shop and job notifications that phishing imitates. The text audit (0.999 after masking) measures how easy
   that makes the task; the private test inbox measures the gap: the models flag 96.4–99.6% of its 1,677
-  legitimate emails ([reports/test_inbox.md](../reports/test_inbox.md)).
+  legitimate emails ([reports/test_inbox.md](../reports/test_inbox.md)). With part of the inbox in training,
+  split by sender, the cascade flags 3.2% of the emails from 26 unseen senders
+  ([reports/with_inbox.md](../reports/with_inbox.md)).
 - **List mail is not always legitimate.** Two Apache list posts turned out to be phishing (found as label
   conflicts), so a few spam or phishing posts that got past the lists' filters may still be labelled
   legitimate.
