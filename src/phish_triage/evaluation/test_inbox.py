@@ -6,7 +6,7 @@ The inbox is a fresh Gmail account I subscribed to newsletters, shops and servic
 to data/private/test_inbox/test_inbox.mbox (ignored by git, never committed). The rules for it:
 
 - **Never sent to an LLM.** This module scores with the local models only (the `random` split's models and
-  DistilBERT int8); the analyst and the Claude classifier refuse `test_inbox` records in code as well.
+  DistilBERT); the analyst and the Claude classifier refuse `test_inbox` records in code as well.
 - **Aggregates only.** The report (reports/test_inbox.md, .json) and everything printed are counts and rates.
   No subject, sender or body leaves the private folder.
 - **Labels:** Gmail's folder is not proof. Every email outside Spam counts as legitimate; the Spam folder is only
@@ -44,7 +44,7 @@ from phish_triage.models.baselines import email_text, fit_all
 REVIEW_SHEET = PRIVATE_DIR / "review.csv"
 REPORTS_DIR = Path("reports")
 SPLIT = "random"  # the deployable models
-DISTILBERT = "distilbert_head_int8"
+DISTILBERT = "distilbert_head"  # served as ONNX fp32: int8 scores depend on the batch
 
 CATEGORY_ORDER = ("primary", "updates", "promotions", "purchases", "social", "forums", "other")
 MODELS = {
@@ -52,8 +52,8 @@ MODELS = {
     "text": "TF-IDF words + chars + LR",
     "features": "Trees on structured features",
     "stacked": "Trees on features + text score",
-    "distilbert": "DistilBERT, ONNX int8",
-    "cascade": "Cascade: stacked -> DistilBERT int8",
+    "distilbert": "DistilBERT, ONNX fp32",
+    "cascade": "Cascade: stacked -> DistilBERT",
 }
 REVIEW_LABELS = {"", "legit", "phish", "spam"}
 REVIEW_FIELDS = ("id", "category", "sender_domain", "subject", "flagged_by", "my_label", "my_note")
@@ -222,7 +222,7 @@ def score_inbox(masked: list[dict], fitted, ranks, thresholds, cascade_val) -> t
 
     texts = [email_text(r) for r in masked]
     scores = fitted.scores(texts, matrix(masked, ranks))
-    scores["distilbert"] = OnnxClassifier(ARTIFACTS_DIR / "distilbert" / "model.int8.onnx", threads=4).score(texts)
+    scores["distilbert"] = OnnxClassifier(ARTIFACTS_DIR / "distilbert" / "model.onnx", threads=4).score(texts)
     flags = {m: (scores[m] > thresholds[m]).astype(int) for m in MODELS if m != "cascade"}
     cascade = run_cascade([cascade_val], [scores["stacked"], scores["distilbert"]], thresholds["distilbert"])
     flags["cascade"] = cascade.decisions.astype(int)

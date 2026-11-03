@@ -82,7 +82,8 @@ From [docs/RESULTS.md](docs/RESULTS.md), rebuilt by `make eval` from saved predi
   on `random` it rests on 1 or 2 of the 1,401 legitimate test emails, and it moved from 0.984 to 0.922 between two
   training runs of the same setup.
 - **ONNX int8 is 4x smaller (67 MB), but not faster** on my laptop's CPU (29 ms against 27 ms); it keeps recall at
-  1% false alarms (0.937 against 0.922 at 0.1%). The size is what lets it fit a Lambda package.
+  1% false alarms (0.937 against 0.922 at 0.1%). Its size was meant to fit a Lambda zip package, but I don't deploy
+  it: its scores depend on the batch (below), and the service runs as a container image, which has room for fp32.
 - **Claude as a classifier misses phishing the local models catch:** at its own cut, Haiku caught 96.6–97.4% with
   0.2–0.8% false alarms; Sonnet caught all 100 phishing emails in its 200-email sample but flagged 3 of the 100
   legitimate ones. 2 of 2,000 Haiku requests were declined by safety filters. All Phase 3 Claude runs together,
@@ -129,7 +130,7 @@ runs used the `random` split's DistilBERT, reading the plain-text part, from bef
   data from before the fixes; I haven't rated version 5 yet.
 - **The CI eval gate** checks these numbers on every push ([reports/gate.json](reports/gate.json)) and fails if
   they were measured on an older prompt. It also checks the model I deploy (the one trained with part of my inbox):
-  recall at 1% false alarms on the public test (0.999, at least 0.98) and false alarms on my inbox's unseen senders
+  recall at 1% false alarms on the public test (0.998, at least 0.98) and false alarms on my inbox's unseen senders
   (4.0%, at most 5%, a limit I set before the run). All Phase 4 Claude runs cost $1.06 together; the re-run after
   the fixes was $0.27 of that.
 
@@ -140,8 +141,8 @@ services, exported with Google Takeout: 1,701 emails from August to November 202
 and Promotions (323). The emails stay on my laptop and are never sent to an LLM; only counts and rates are published.
 
 - **The models flag almost all of it.** At their validation thresholds for 1% false alarms, the `random` split's
-  models flag 96.8–99.8% of the 1,677 emails outside Spam as phishing: the course model 96.8%, the stacked model
-  99.8%, DistilBERT int8 99.8%, the cascade 99.2%. They also flag 22–24 of the 24 Spam-folder emails.
+  models flag 96.8–99.9% of the 1,677 emails outside Spam as phishing: the course model 96.8%, the stacked model
+  99.8%, DistilBERT 99.9%, the cascade 99.2%. They also flag 22–24 of the 24 Spam-folder emails.
 - **This is the limit the leakage audit pointed at, now measured.** The only legitimate training mail is
   mailing-list discussion: 17.9% of it has HTML, against 95.0% of the phishing and 99.6% of this inbox. So the
   models learned "commercial-looking HTML mail is phishing", which every newsletter and receipt is. The earlier
@@ -158,10 +159,10 @@ phishing emails, and 249 emails from 26 other senders became the test. Neither m
 - **False alarms on the unseen senders fell from 99.2% to 4.0%** for the cascade and for DistilBERT (10 of 249).
   Averaged per sender it is 16.1%, because the false alarms fall on a few senders with few emails. At 1 phishing
   email in 100, a flagged email would now be phishing 20% of the time, against 1% before.
-- **It costs some phishing recall.** On the public test the cascade catches 98.2% (99.7% before) at 0.36% false
+- **It costs some phishing recall.** On the public test the cascade catches 98.4% (99.7% before) at 0.36% false
   alarms (0.50% before): the inbox mail in validation makes the threshold stricter. At a fixed false-alarm rate
-  DistilBERT loses nothing: 99.9% at 1% either way, and 94.4% against 93.7% at 0.1%. On 1,644 2026 phishing emails
-  no model saw, the cascade catches 98.9%.
+  DistilBERT loses little: 99.8% against 99.9% at 1%, and at 0.1% it does better, 94.9% against 92.2%. On 1,644
+  2026 phishing emails no model saw, the cascade catches 99.0%.
 - **The first run found a date shortcut, so dates are gone from every model's input.** I set a rule before that
   run: removing years, month and weekday names from the test text must not move a model's results by more than 2
   points. The two TF-IDF models failed it (their inbox false alarms rose by 16–20 points without dates), because
@@ -179,15 +180,15 @@ phishing emails, and 249 emails from 26 other senders became the test. Neither m
   them, it flags exactly the same emails, because on this mail DistilBERT, which reads only the text, decides.
 - **The weak spot is phishing that looks like a newsletter.** Of the phishing in the tests that is DKIM-signed by
   its own domain and has at least 12 links (the inbox's median), the cascade catches 25 of 31 (80.6%), against
-  98.9% of the 2026 phishing overall. Trained on public data only it caught all 31, while flagging 99% of my
+  99.0% of the 2026 phishing overall. Trained on public data only it caught all 31, while flagging 99% of my
   inbox: this is what training with the inbox costs. With 31 emails the interval is wide (64.5–93.5%).
 - The inbox test is small: 249 emails, mostly Gmail's Updates (214) and Promotions (31).
 
 
 ## Known issues
 
-All but the last two are fixed. The first two were found while rating the analyst's answers by hand, the next four
-afterwards and on my test inbox, all in November 2026; every number above was re-measured after the fixes, except
+All but the last two are fixed. The first two were found while rating the analyst's answers by hand, the next five
+afterwards, on my test inbox and while packaging the model, all in November 2026; every number above was re-measured after the fixes, except
 the Claude runs, as noted.
 
 - **Masking rewrote links (fixed).** Replacing the Apache list names with `project` ran over the whole body and
@@ -214,6 +215,12 @@ the Claude runs, as noted.
   audit now tests exactly what the models read.
 - **The analyst saw rounded classifier scores (fixed).** DistilBERT's threshold is 0.0009, so a flagged email was
   shown as "phishing probability 0.00 (flagged)". It is now told only whether the classifier flagged the email.
+- **The int8 model's scores depended on the batch (fixed).** Its dynamic quantization picks its scales from the
+  whole batch, so an email scored alone got a different score than in the batch of 32 the evaluation used: up to
+  0.074 apart on my inbox's test emails, enough to flip 1 of the 249. The packaged model would have disagreed
+  with its own report. The service now runs DistilBERT as ONNX fp32 (under 0.000001 apart), the reports for the
+  deployed model use fp32 scores, and packaging stops unless the package reproduces the report
+  ([reports/bundle.md](reports/bundle.md)). The `random` split's comparison tables still show int8 as measured.
 - **Phishing that looks like a newsletter (open).** The deployed cascade catches 25 of 31 such emails (above).
   It is a data problem: the only bulk-looking legitimate mail it learned from is my inbox, and there are few
   phishing emails of that kind to learn from. No public dataset I found fills both sides (see
