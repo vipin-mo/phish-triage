@@ -14,12 +14,12 @@ Tested on the public `random` test (2,802 emails), 249 inbox emails from 26 send
 |  | after | 0.954 | 0.79% | 8.0% [4.8%, 11.2%] (20 of 249) | 21.3% | 97.5% [96.7%, 98.2%] (1603 of 1644) | 20.8% [8.2%, 37.5%] (5 of 24) | 0.107 |
 | Trees on features + text score | before | 0.999 | 1.93% | 99.6% [98.8%, 100.0%] (248 of 249) | 99.7% | 100.0% [100.0%, 100.0%] (1644 of 1644) | 100.0% [100.0%, 100.0%] (24 of 24) | 0.010 |
 |  | after | 0.988 | 0.07% | 23.7% [18.1%, 29.3%] (59 of 249) | 27.8% | 99.6% [99.2%, 99.8%] (1637 of 1644) | 8.3% [0.0%, 20.8%] (2 of 24) | 0.040 |
-| DistilBERT, ONNX int8 | before | 0.999 | 1.21% | 99.2% [98.0%, 100.0%] (247 of 249) | 99.5% | 100.0% [100.0%, 100.0%] (1644 of 1644) | 100.0% [100.0%, 100.0%] (24 of 24) | 0.010 |
-|  | after | 0.982 | 0.36% | 4.0% [1.6%, 6.4%] (10 of 249) | 16.1% | 98.9% [98.4%, 99.4%] (1626 of 1644) | 8.3% [0.0%, 20.8%] (2 of 24) | 0.198 |
-| Cascade: stacked -> DistilBERT int8 | before | 0.997 | 0.50% | 99.2% [98.0%, 100.0%] (247 of 249) | 99.5% | 100.0% [100.0%, 100.0%] (1644 of 1644) | 100.0% [100.0%, 100.0%] (24 of 24) | 0.010 |
-|  | after | 0.982 | 0.36% | 4.0% [1.6%, 6.4%] (10 of 249) | 16.1% | 98.9% [98.4%, 99.4%] (1626 of 1644) | 8.3% [0.0%, 20.8%] (2 of 24) | 0.198 |
+| DistilBERT, ONNX fp32 | before | 0.999 | 1.07% | 99.2% [98.0%, 100.0%] (247 of 249) | 99.5% | 100.0% [100.0%, 100.0%] (1644 of 1644) | 100.0% [100.0%, 100.0%] (24 of 24) | 0.010 |
+|  | after | 0.984 | 0.36% | 4.0% [1.6%, 6.4%] (10 of 249) | 16.1% | 99.0% [98.5%, 99.5%] (1627 of 1644) | 8.3% [0.0%, 20.8%] (2 of 24) | 0.198 |
+| Cascade: stacked -> DistilBERT | before | 0.997 | 0.50% | 99.2% [98.0%, 100.0%] (247 of 249) | 99.5% | 100.0% [100.0%, 100.0%] (1644 of 1644) | 100.0% [100.0%, 100.0%] (24 of 24) | 0.010 |
+|  | after | 0.984 | 0.36% | 4.0% [1.6%, 6.4%] (10 of 249) | 16.1% | 99.0% [98.5%, 99.5%] (1627 of 1644) | 8.3% [0.0%, 20.8%] (2 of 24) | 0.198 |
 | Cascade + little-text rule (review counts as flagged) | before | 0.997 | 0.50% | 99.2% [98.0%, 100.0%] (247 of 249) | 99.5% | 100.0% [100.0%, 100.0%] (1644 of 1644) | 100.0% [100.0%, 100.0%] (24 of 24) | 0.010 |
-|  | after | 0.985 | 0.36% | 4.0% [1.6%, 6.4%] (10 of 249) | 16.1% | 99.0% [98.5%, 99.5%] (1628 of 1644) | 8.3% [0.0%, 20.8%] (2 of 24) | 0.199 |
+|  | after | 0.986 | 0.36% | 4.0% [1.6%, 6.4%] (10 of 249) | 16.1% | 99.1% [98.6%, 99.5%] (1629 of 1644) | 8.3% [0.0%, 20.8%] (2 of 24) | 0.199 |
 
 Precision @ 1 in 100: recall as on the public test, false alarms as on the inbox test senders.
 
@@ -31,8 +31,8 @@ Precision @ 1 in 100: recall as on the public test, false alarms as on the inbox
 | TF-IDF words + chars + LR | 0.0% [0.0%, 0.0%] (0 of 1) | 16.1% [3.2%, 29.0%] (5 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 7.5% [4.2%, 11.2%] (16 of 214) |
 | Trees on structured features | 100.0% [100.0%, 100.0%] (1 of 1) | 22.6% [9.7%, 38.7%] (7 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 5.6% [2.8%, 8.9%] (12 of 214) |
 | Trees on features + text score | 0.0% [0.0%, 0.0%] (0 of 1) | 19.4% [6.5%, 35.5%] (6 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 24.8% [19.2%, 30.4%] (53 of 214) |
-| DistilBERT, ONNX int8 | 0.0% [0.0%, 0.0%] (0 of 1) | 9.7% [0.0%, 19.4%] (3 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 3.3% [1.4%, 5.6%] (7 of 214) |
-| Cascade: stacked -> DistilBERT int8 | 0.0% [0.0%, 0.0%] (0 of 1) | 9.7% [0.0%, 19.4%] (3 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 3.3% [1.4%, 5.6%] (7 of 214) |
+| DistilBERT, ONNX fp32 | 0.0% [0.0%, 0.0%] (0 of 1) | 9.7% [0.0%, 19.4%] (3 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 3.3% [1.4%, 5.6%] (7 of 214) |
+| Cascade: stacked -> DistilBERT | 0.0% [0.0%, 0.0%] (0 of 1) | 9.7% [0.0%, 19.4%] (3 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 3.3% [1.4%, 5.6%] (7 of 214) |
 | Cascade + little-text rule (review counts as flagged) | 0.0% [0.0%, 0.0%] (0 of 1) | 9.7% [0.0%, 19.4%] (3 of 31) | 0.0% [0.0%, 0.0%] (0 of 3) | 3.3% [1.4%, 5.6%] (7 of 214) |
 
 ## Date-word shortcut check (after)
@@ -45,8 +45,8 @@ Years, month and weekday names removed from the test text. The rule, set before 
 | TF-IDF words + chars + LR | +0.0% | +0.0% | no |
 | Trees on structured features | +0.0% | +0.0% | no |
 | Trees on features + text score | +0.0% | +0.0% | no |
-| DistilBERT, ONNX int8 | +0.0% | +0.0% | no |
-| Cascade: stacked -> DistilBERT int8 | +0.0% | +0.0% | no |
+| DistilBERT, ONNX fp32 | +0.0% | +0.0% | no |
+| Cascade: stacked -> DistilBERT | +0.0% | +0.0% | no |
 | Cascade + little-text rule (review counts as flagged) | +0.0% | +0.0% | no |
 
 ## Little-text rule
@@ -74,8 +74,8 @@ The cascade refitted without them (set to missing):
 
 | | Inbox: false alarms | 2026 phishing: recall | Phishing that looks like a newsletter: recall |
 |---|---|---|---|
-| as trained | 4.0% [1.6%, 6.4%] (10 of 249) | 98.9% [98.4%, 99.4%] (1626 of 1644) | 80.6% [64.5%, 93.5%] (25 of 31) |
-| without the suspects | 4.0% [1.6%, 6.4%] (10 of 249) | 98.9% [98.4%, 99.4%] (1626 of 1644) | 80.6% [64.5%, 93.5%] (25 of 31) |
+| as trained | 4.0% [1.6%, 6.4%] (10 of 249) | 99.0% [98.5%, 99.5%] (1627 of 1644) | 80.6% [64.5%, 93.5%] (25 of 31) |
+| without the suspects | 4.0% [1.6%, 6.4%] (10 of 249) | 99.0% [98.5%, 99.5%] (1627 of 1644) | 80.6% [64.5%, 93.5%] (25 of 31) |
 
 Strongest on the inbox: `n_urls` 0.961 (public 0.507), `n_images` 0.939 (public 0.757), `dkim_aligned` 0.918 (public 0.582), `n_link_domains` 0.918 (public 0.525), `max_url_length` 0.896 (public 0.632).
 
@@ -89,6 +89,6 @@ Phishing in the public and 2026 tests that is DKIM-signed by its own domain and 
 | TF-IDF words + chars + LR | 100.0% [100.0%, 100.0%] (31 of 31) | 83.9% [71.0%, 96.8%] (26 of 31) |
 | Trees on structured features | 100.0% [100.0%, 100.0%] (31 of 31) | 51.6% [32.3%, 67.7%] (16 of 31) |
 | Trees on features + text score | 100.0% [100.0%, 100.0%] (31 of 31) | 93.5% [83.9%, 100.0%] (29 of 31) |
-| DistilBERT, ONNX int8 | 100.0% [100.0%, 100.0%] (31 of 31) | 80.6% [64.5%, 93.5%] (25 of 31) |
-| Cascade: stacked -> DistilBERT int8 | 100.0% [100.0%, 100.0%] (31 of 31) | 80.6% [64.5%, 93.5%] (25 of 31) |
+| DistilBERT, ONNX fp32 | 100.0% [100.0%, 100.0%] (31 of 31) | 80.6% [64.5%, 93.5%] (25 of 31) |
+| Cascade: stacked -> DistilBERT | 100.0% [100.0%, 100.0%] (31 of 31) | 80.6% [64.5%, 93.5%] (25 of 31) |
 | Cascade + little-text rule (review counts as flagged) | 100.0% [100.0%, 100.0%] (31 of 31) | 80.6% [64.5%, 93.5%] (25 of 31) |

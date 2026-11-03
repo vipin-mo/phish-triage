@@ -1,7 +1,7 @@
 {
  "values": {
-  "deployable_model": "with_inbox/distilbert_head_int8",
-  "recall_at_1pct_fpr": 0.9985724482512491,
+  "deployable_model": "with_inbox/distilbert_head",
+  "recall_at_1pct_fpr": 0.9978586723768736,
   "inbox_false_alarm_rate": 0.040160642570281124,
   "schema_valid_rate": 1.0,
   "grounding_failure_rate": 0.004885993485342019,

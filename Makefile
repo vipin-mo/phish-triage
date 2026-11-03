@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox gate
+.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox gate bundle serve
 
 help:  ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -75,6 +75,12 @@ eval-with-inbox:  ## before/after: models trained without and with part of my in
 
 eval-test-inbox:  ## false alarms on my private test inbox (local models only, aggregates only; never sent to an LLM)
 	uv run --group train python -m phish_triage.evaluation.test_inbox
+
+bundle:  ## export the deployable model bundle and check it against reports/with_inbox.md (reports/bundle.md)
+	uv run python -m phish_triage.service.bundle
+
+serve:  ## run the API locally on the latest bundle (prints a one-run API key)
+	uv run uvicorn --factory phish_triage.service.api:local_app --port 8000
 
 gate:  ## measure the eval gate from local results -> reports/gate.json (CI runs the free --check)
 	uv run python -m phish_triage.evaluation.gate

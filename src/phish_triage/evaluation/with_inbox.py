@@ -56,7 +56,7 @@ from phish_triage.service.triage import LITTLE_TEXT_WORDS, too_little_text
 REPORTS_DIR = Path("reports")
 ARTIFACTS_DIR = Path("artifacts")
 SETUPS = {"before": "random", "after": inbox.SPLIT}
-DISTILBERT = "distilbert_head_int8"
+DISTILBERT = "distilbert_head"  # served as ONNX fp32: int8 scores depend on the batch
 SHORTCUT_POINTS = 0.02
 SUSPECT_AUC, PUBLIC_MAX_AUC = 0.9, 0.7
 NEWSLETTER_LINKS = 12  # the median number of links in the inbox's test emails
@@ -64,7 +64,7 @@ MODEL_NAMES = MODELS | {"cascade_review": "Cascade + little-text rule (review co
 
 
 def _distilbert(split: str, val_ids: list[str], eval_ids: list[str], records: dict, texts: dict) -> tuple:
-    """Validation and evaluation scores: saved predictions where they exist, the exported int8 model otherwise."""
+    """Validation and evaluation scores: saved predictions where they exist, the exported ONNX fp32 model otherwise."""
     from phish_triage.models.transformer import OnnxClassifier
 
     saved = predictions.load(split, DISTILBERT)
@@ -73,7 +73,7 @@ def _distilbert(split: str, val_ids: list[str], eval_ids: list[str], records: di
     )
     missing = [i for i in eval_ids if i not in known]
     folder = "distilbert" if split == "random" else f"distilbert_{split}"
-    classifier = OnnxClassifier(ARTIFACTS_DIR / folder / "model.int8.onnx", threads=4)
+    classifier = OnnxClassifier(ARTIFACTS_DIR / folder / "model.onnx", threads=4)
     if missing:
         known |= dict(zip(missing, classifier.score([texts[i] for i in missing]), strict=True))
     return np.array([known[i] for i in val_ids]), np.array([known[i] for i in eval_ids]), classifier

@@ -28,10 +28,13 @@ import numpy as np
 from phish_triage.evaluation import metrics, predictions
 from phish_triage.service.analyst import PROMPT_VERSION
 
+# Served as ONNX fp32, which matches these PyTorch scores; int8 scores change with the batch (service/bundle.py).
+DEPLOYED_DISTILBERT = "distilbert_head"
+
 GATE_PATH = Path("reports/gate.json")
 THRESHOLDS = {
     # name: (direction, limit)
-    "recall_at_1pct_fpr": ("min", 0.98),  # the deployable classifier (DistilBERT int8) on the public `random` test
+    "recall_at_1pct_fpr": ("min", 0.98),  # the deployable classifier (DistilBERT) on the public `random` test
     "inbox_false_alarm_rate": ("max", 0.05),  # the deployable cascade on my test inbox's unseen senders
     "schema_valid_rate": ("min", 1.00),
     "grounding_failure_rate": ("max", 0.02),  # share of indicators dropped because their quote wasn't in the email
@@ -44,14 +47,14 @@ THRESHOLDS = {
 def measure() -> dict:
     index = {e["id"]: int(e["label"] == "phish") for e in json.loads(Path("data/interim/index.json").read_text())}
     deployable = "with_inbox" if "with_inbox" in predictions.available() else "random"
-    p = predictions.load(deployable, "distilbert_head_int8")
+    p = predictions.load(deployable, DEPLOYED_DISTILBERT)
     scores = dict(zip(p.test_ids, p.test_scores, strict=True))
     public = [i for i in p.test_ids if i in index]  # `with_inbox` also tests inbox and 2026 phishing emails
     if deployable == "with_inbox":
         public = json.loads(Path("data/private/test_inbox/split.json").read_text())["slices"]["public_test"]
     y_test = np.array([index[i] for i in public])
     values: dict = {
-        "deployable_model": f"{deployable}/distilbert_head_int8",
+        "deployable_model": f"{deployable}/{DEPLOYED_DISTILBERT}",
         "recall_at_1pct_fpr": metrics.recall_at_fpr(y_test, np.array([scores[i] for i in public]), 0.01),
     }
     inbox_report = Path("reports/with_inbox.json")
