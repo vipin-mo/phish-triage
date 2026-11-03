@@ -22,7 +22,7 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from phish_triage.data.records import MASKED_RECORDS, read_records
+from phish_triage.data.records import MASKED_RECORDS, read_analyst_view, read_records
 from phish_triage.data.splits import SPLITS_DIR
 from phish_triage.evaluation.injection import distilbert_scorer
 from phish_triage.features.domains import default_ranks
@@ -50,11 +50,12 @@ def build(emails: int = EMAILS):
     classifier, threshold = distilbert_scorer()
     scores = classifier.score([email_text(records[i]) for i in ids])
     ranks = default_ranks()
+    views = read_analyst_view(set(ids))  # the classifier and the signals use the masked record; the analyst this
     params, meaning = {}, {}
     for email_id, score in zip(ids, scores, strict=True):
         record = records[email_id]
         a = analyst.render(
-            record,
+            views[email_id],
             classifier_score=float(score),
             classifier_phish=bool(score > threshold),
             sender=check_sender(record),
@@ -67,7 +68,7 @@ def build(emails: int = EMAILS):
 
 def evaluate(responses: dict, meaning: dict) -> tuple[dict, list[dict]]:
     rows, verdicts, indicators, dropped, with_drop, invalid, errors = [], Counter(), 0, 0, 0, 0, Counter()
-    from_signals = 0
+    from_signals = conflicts = no_action = 0
     for email_id, m in meaning.items():
         raw = responses.get(email_id, {})
         if raw.get("error"):
@@ -79,6 +80,8 @@ def evaluate(responses: dict, meaning: dict) -> tuple[dict, list[dict]]:
         dropped += r.indicators_dropped
         with_drop += r.indicators_dropped > 0
         from_signals += sum(i.source == "signal" for i in r.output.indicators) if r.output else 0
+        no_action += bool(r.output) and r.output.recommended_action == "no_action"
+        conflicts += bool(r.output) and analyst.advice_conflict(r.output)
         verdicts[(m["label"], r.verdict)] += 1
         rows.append(
             {
@@ -109,6 +112,8 @@ def evaluate(responses: dict, meaning: dict) -> tuple[dict, list[dict]]:
         "grounding_failure_rate": dropped / indicators if indicators else 0.0,
         "kept_indicators_citing_a_signal": from_signals,
         "answers_with_a_dropped_indicator": with_drop,
+        "no_action_answers": no_action,
+        "no_action_with_advice_in_summary": conflicts,
         "errors": dict(errors),
         "verdicts": {f"{label} -> {verdict}": c for (label, verdict), c in sorted(verdicts.items())},
     }
@@ -244,6 +249,8 @@ def to_markdown(s: dict) -> str:
         f"| Grounding failures (dropped) | {s['grounding_failures']} ({s['grounding_failure_rate']:.1%}) |\n"
         f"| Answers with at least one dropped indicator | {s['answers_with_a_dropped_indicator']} |\n"
         f"| Kept indicators that cite one of our signals | {s.get('kept_indicators_citing_a_signal', 0)} |\n"
+        f'| "No action" answers whose summary still advises a check | '
+        f"{s.get('no_action_with_advice_in_summary', 0)} of {s.get('no_action_answers', 0)} |\n"
         f"| Errors (refusals, limits) | {sum(s['errors'].values())} |\n"
         + (
             f"| Latency per email, live call (p50 / p95) | {s['latency_s']['p50']:.1f} s / "

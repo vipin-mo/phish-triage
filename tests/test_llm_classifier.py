@@ -79,3 +79,19 @@ def test_sample_is_balanced_and_nested():
     labels = {i: "phish" if i[0] == "p" else "legit" for i in splits["random"]["test"]}
     big, small = llm.sample_ids(splits, 40, labels), llm.sample_ids(splits, 10, labels)
     assert small == big[:10] and sum(labels[i] == "phish" for i in big) == 20
+
+
+def test_link_targets_are_masked_like_the_body():
+    from phish_triage.models.llm_classifier import render_email
+
+    record = {
+        "source": "apache",
+        "headers": [("Subject", "project project 9")],
+        "subject": "project project 9",
+        "text": "Download at https://project.project.org/",
+        "html": "",
+        "urls": ["https://tomcat.apache.org/"],
+        "attachments": [],
+    }
+    shown = render_email(record)
+    assert "Links (targets): https://project.project.org/" in shown and "apache" not in shown

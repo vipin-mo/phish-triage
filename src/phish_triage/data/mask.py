@@ -16,9 +16,13 @@ The same rules are applied to every source, so masking itself doesn't create a n
 - for mail delivered through a mailing list, drop what the list software adds: the subject tag, a `Reply-To` that
   points back to the list, and the unsubscribe footer;
 - replace recipient addresses, and the collection inboxes' names and domains, with neutral placeholders;
-- in the subject and body, replace the legitimate source's own names (`apache`, `tomcat`, ...) with "project".
-  They are this dataset's version of the `enron` that leaked the label in my course project. Addresses and URLs
-  keep them, because domain features (popularity, look-alikes) need the real domain.
+- replace the legitimate source's own names (`apache`, `tomcat`, ...) with "project". They are this dataset's
+  version of the `enron` that leaked the label in my course project. In the subject and the plain text, which the
+  text models read, they are replaced everywhere, URLs and addresses included (`tomcat.apache.org` becomes
+  `project.project.org`). In the HTML, URLs, addresses and domain names keep the real name, because the link
+  features (where a link goes, what its text shows) need the real domain; `urls` keeps the real domains too.
+  `mask_record(..., source_names=False)` skips this step: the analyst step sees the names, as a subscriber would
+  (it isn't trained on this data, so they can't become a learned shortcut).
 
 The record's `date` is kept: it is used to build the splits, not as a model feature.
 """
@@ -71,6 +75,7 @@ COLLECTOR_DOMAINS = (
 COLLECTOR_ADDRESSES = ("phishing@pot",)  # phishing_pot's own redaction of the honeypot address
 COLLECTOR_NAMES = ("jose", "yyyy", "zzzz")  # Nazario's first name and SpamAssassin's redaction markers
 SOURCE_NAMES = ("apache", "tomcat", "cassandra", "httpd")  # the Apache lists' own names
+SOURCE_DOMAINS = ("apache.org",)  # the legitimate source's own domain; the leakage audit checks it isn't a shortcut
 PLACEHOLDER_PROJECT = "project"
 
 _DOMAIN_RE = re.compile(
@@ -79,6 +84,14 @@ _DOMAIN_RE = re.compile(
 )
 _NAME_RE = re.compile(r"\b(?:" + "|".join(COLLECTOR_NAMES) + r")\b", re.IGNORECASE)
 _SOURCE_NAME_RE = re.compile(r"(?<![^\W_])(?:" + "|".join(SOURCE_NAMES) + r")(?![^\W_])", re.IGNORECASE)
+# What `mask_source_names(..., keep_domains=True)` leaves alone: URLs, email addresses and domain names. Bounded
+# repeats, so crafted input can't make it backtrack (tests/test_adversarial_inputs.py).
+_DOMAIN_LIKE_RE = re.compile(
+    r"(?:https?://|www\.)[^\s<>\"']{1,2048}"
+    r"|[\w.+-]{1,64}@[\w-]{1,63}(?:\.[\w-]{1,63}){1,8}"
+    r"|(?<![\w.-])(?:[a-z0-9-]{1,63}\.){1,8}[a-z]{2,24}(?![\w-])(?:/[^\s<>\"']{0,2048})?",
+    re.IGNORECASE,
+)
 _AUTH_RESULT_RE = re.compile(r"\b(spf|dkim|dmarc)\s*=\s*([a-z]+)", re.IGNORECASE)
 _DKIM_TAG_RE = re.compile(r"\b([ds])\s*=\s*([^;\s]+)")
 _SUBJECT_TAG_RE = re.compile(r"^((?:\s*(?:re|fwd?|aw|sv)\s*:)*\s*)\[([^\]]{1,60})\]\s*", re.IGNORECASE)
@@ -94,11 +107,12 @@ _FOOTER_RES = (
 )
 
 
-def mask_record(record: dict) -> dict:
-    """Return a masked copy of one unified record (see `parse.EmailRecord`)."""
+def mask_record(record: dict, *, source_names: bool = True) -> dict:
+    """Return a masked copy of one unified record (see `parse.EmailRecord`); `source_names=False` keeps the
+    legitimate source's names (for the analyst step only)."""
+    names = mask_source_names if source_names else _unchanged
     raw_headers: list[tuple[str, str]] = [tuple(h) for h in record["headers"]]
-    names = {name.lower() for name, _ in raw_headers}
-    is_list_mail = bool(names & LIST_HEADERS)
+    is_list_mail = bool({name.lower() for name, _ in raw_headers} & LIST_HEADERS)
     list_names, list_addresses = _list_identity(raw_headers) if is_list_mail else (set(), set())
     replace = _replacer(_recipient_addresses(raw_headers))
 
@@ -118,7 +132,7 @@ def mask_record(record: dict) -> dict:
         position, canonical = _HEADER_ORDER[key]
         value = replace(value)
         if key == "subject":
-            value = mask_source_names(value)
+            value = names(value)
         headers.append((position, canonical, value))
     headers.sort(key=lambda h: h[0])  # stable: repeated headers (several DKIM signatures) keep their order
 
@@ -129,9 +143,9 @@ def mask_record(record: dict) -> dict:
         **record,
         "headers": [(name, value) for _, name, value in headers],
         "auth": auth_results(raw_headers),
-        "subject": mask_source_names(replace(subject)),
-        "text": mask_source_names(replace(strip_list_footer(record["text"] or ""))),
-        "html": mask_source_names(replace(strip_list_footer(record["html"] or ""))),
+        "subject": names(replace(subject)),
+        "text": names(replace(strip_list_footer(record["text"] or ""))),
+        "html": names(replace(strip_list_footer(record["html"] or "")), keep_domains=True),
         "urls": [replace(url) for url in record["urls"]],
         "attachments": [
             {**a, "filename": replace(a["filename"]) if a["filename"] else None} for a in record["attachments"]
@@ -184,8 +198,19 @@ def _replacer(recipients: set[str]):
     return replace
 
 
-def mask_source_names(value: str) -> str:
-    return _SOURCE_NAME_RE.sub(PLACEHOLDER_PROJECT, value)
+def mask_source_names(value: str, *, keep_domains: bool = False) -> str:
+    """Replace the source's names with "project"; with `keep_domains`, not inside URLs, addresses or domains."""
+    if not keep_domains:
+        return _SOURCE_NAME_RE.sub(PLACEHOLDER_PROJECT, value)
+    out, last = [], 0
+    for match in _DOMAIN_LIKE_RE.finditer(value):
+        out += [_SOURCE_NAME_RE.sub(PLACEHOLDER_PROJECT, value[last : match.start()]), match.group(0)]
+        last = match.end()
+    return "".join(out) + _SOURCE_NAME_RE.sub(PLACEHOLDER_PROJECT, value[last:])
+
+
+def _unchanged(value: str, **_) -> str:
+    return value
 
 
 def _addresses(value: str) -> set[str]:

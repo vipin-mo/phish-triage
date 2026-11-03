@@ -5,8 +5,10 @@ lists cross-post one announcement to several lists. If copies of one email land 
 set, the test measures memory, not detection.
 
 - **Exact:** same subject and body after lowercasing and replacing numbers, links and addresses with placeholders.
-  When the plain text is short (often just "your client can't display this message"), the visible text of the
-  HTML part is added, and the attachment types become part of the key.
+  The body is the text a reader sees: for HTML mail, the visible text of the HTML part, because some phishing pads
+  every copy with different hidden filler (30,000 characters of it, in comments or invisible text) so that the
+  full texts look unrelated. When that visible text is short, the plain text and all of the HTML text are used
+  instead, and the attachment types become part of the key.
 - **Near:** MinHash LSH on word 5-grams of that same text, at Jaccard similarity >= `THRESHOLD`. Groups are
   joined transitively (A~B and B~C puts all three in one group).
 
@@ -26,6 +28,7 @@ import numpy as np
 from datasketch import MinHash, MinHashLSH
 
 from phish_triage.data.parse import html_to_text
+from phish_triage.features.html import visible_html
 
 THRESHOLD = 0.9
 NUM_PERM = 128
@@ -77,9 +80,10 @@ def tokens(subject: str, text: str) -> list[str]:
 
 def make_item(record: dict, permutations: np.ndarray) -> Item:
     subject, text, attachments = record["subject"] or "", record["text"] or "", record.get("attachments") or []
-    words = tokens(subject, text)
-    if len(words) < MIN_TOKENS and record.get("html"):
-        words = tokens(subject, f"{text}\n{html_to_text(record['html'])}")
+    html = record.get("html") or ""
+    words = tokens(subject, visible_html(html).text if html else text)
+    if len(words) < MIN_TOKENS and html:
+        words = tokens(subject, f"{text}\n{html_to_text(html)}")
     key = " ".join(words)
     if len(words) < MIN_TOKENS:
         key += "\n" + " ".join(sorted(a["content_type"] for a in attachments))

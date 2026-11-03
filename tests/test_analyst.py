@@ -178,3 +178,15 @@ def test_signals_are_numbered_and_cited_by_number():
     # a signal's wording offered as a quote from the email is not in the email
     quoted = cite.model_copy(update={"source": "email", "evidence": a.signals[1]})
     assert not analyst.grounded(quoted, a)
+
+
+def test_advice_in_the_summary_conflicts_with_no_action():
+    def output(action, summary):
+        return analyst.AnalystOutput.model_validate(json.loads(_answer(recommended_action=action, summary=summary)))
+
+    assert analyst.advice_conflict(
+        output("no_action", "A normal list post. Still, check the sender if you are unsure.")
+    )
+    assert analyst.advice_conflict(output("no_action", "An ordinary notice, worth a quick look if unexpected."))
+    assert not analyst.advice_conflict(output("no_action", "A normal reply in a thread. The sender check passed."))
+    assert not analyst.advice_conflict(output("check_with_the_sender", "Check with the sender before paying."))
