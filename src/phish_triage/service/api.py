@@ -3,6 +3,7 @@
     POST /v1/scan                  raw email (.eml bytes or plain text) -> verdict, score and `phishing_above`
     POST /v1/explain               the same email again -> the analyst's explanation and final verdict (on demand)
     POST /v1/feedback              {"scan_id": ..., "label": "correct" | "false_alarm" | "missed_phish"}
+    POST /v1/retraining-email      ?label=phish|legit, the email again: kept for retraining (service/retraining.py)
     GET  /v1/health                no key needed; the model version
 
 Every call but health needs an `X-API-Key`. The rules from the threat model: input over 2 MB is refused (rule 11),
@@ -15,6 +16,9 @@ Explanations (`service/explain.py`) run only when asked for, with `PHISH_EXPLANA
 goes to Anthropic once and the answer comes straight back; neither is stored. Each key may ask for
 `EXPLAIN_PER_DAY` a day, and all keys together may spend `PHISH_DAILY_LLM_USD` a day (default $0.50), on top of
 the monthly limit set at Anthropic.
+
+The service keeps an email only when I send it for retraining (`POST /v1/retraining-email`, at most
+`RETRAINING_PER_DAY` a day per key): it goes to the private retraining bucket for at most 90 days.
 """
 
 from __future__ import annotations
@@ -35,6 +39,7 @@ from phish_triage.service.store import FEEDBACK_LABELS, MemoryStore, Store, scan
 MAX_BYTES = 2 * 1024 * 1024
 PER_MINUTE = 60
 EXPLAIN_PER_DAY = 50
+RETRAINING_PER_DAY = 20
 SPEND_COUNTER = "llm-spend-microusd"  # all keys together, in millionths of a dollar
 log = logging.getLogger("phish_triage.api")
 
@@ -51,6 +56,7 @@ def create_app(
     explanations: bool | None = None,
     explainer_factory: Callable[[], object] | None = None,
     shadow_factory: Callable[[], object | None] | None = None,
+    retraining_factory: Callable[[], object | None] | None = None,
 ) -> FastAPI:
     """`scanner_factory` is called once, on the first scan, so a cold start doesn't load the model for health; the
     same for `explainer_factory` (it reads the Anthropic key) on the first explanation. `shadow_factory` returns a
@@ -82,6 +88,18 @@ def create_app(
             entry = {"error": type(exc).__name__}
         live_entry = {"verdict": live.verdict, "score": round(live.score, 6), "stage": live.stage}
         log.info(json.dumps({"event": "shadow", "live": live_entry, "shadow": entry, "shadow_version": other.version}))
+
+    def retraining():
+        if "retraining" not in state:
+            if retraining_factory is not None:
+                state["retraining"] = retraining_factory()
+            elif bucket := os.environ.get("PHISH_RETRAINING_BUCKET"):
+                from phish_triage.service.retraining import S3Retraining
+
+                state["retraining"] = S3Retraining(bucket)
+            else:
+                state["retraining"] = None
+        return state["retraining"]
 
     def explainer():
         if "explainer" not in state:
@@ -191,6 +209,23 @@ def create_app(
         store.add_today(SPEND_COUNTER, round(result.cost_usd * 1e6))
         request.state.verdict = result.body["verdict"]
         return result.body
+
+    @app.post("/v1/retraining-email")
+    async def retraining_email(request: Request, label: str):
+        from phish_triage.service.retraining import KEEP_DAYS, LABELS
+
+        owner = owner_of(request)
+        if label not in LABELS:
+            raise HTTPException(422, f"label must be one of {', '.join(LABELS)}")
+        if (sink := retraining()) is None:
+            raise HTTPException(404, "retraining storage is off")
+        raw = await email_of(request)
+        if store.add_today(f"retraining#{owner}", 1) > RETRAINING_PER_DAY:
+            raise HTTPException(429, f"at most {RETRAINING_PER_DAY} emails a day per key")
+        verdict = verdict_of(owner, raw)  # stored with the email: what the model said about it
+        sink.put(owner, raw, label, verdict)
+        request.state.verdict = verdict["verdict"]
+        return {"status": "stored", "scan_id": verdict["scan_id"], "label": label, "deleted_after_days": KEEP_DAYS}
 
     @app.post("/v1/feedback")
     def feedback(body: Feedback, request: Request):

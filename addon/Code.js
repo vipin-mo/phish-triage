@@ -2,7 +2,8 @@
  * phish-triage for Gmail: a sidebar on the open email that sends it to my phish-triage API.
  *
  * Nothing runs until I click a button. Scan sends the open email to POST /v1/scan, Explain to POST /v1/explain
- * (Claude, on demand), and the feedback buttons send only the scan id and a label. The add-on keeps nothing but the
+ * (Claude, on demand), and the feedback buttons send only the scan id and a label. "Send as phishing / legitimate"
+ * is the one button that asks the API to keep the email: for retraining, for at most 90 days. The add-on keeps nothing but the
  * API address and my API key, in my own user properties; it logs nothing. It may call only the API address named in
  * the manifest (urlFetchWhitelist), and it reads only the open message (gmail.addons.current.message.readonly).
  */
@@ -136,10 +137,35 @@ function actionsSection(scanId) {
         .setOnClickAction(CardService.newAction().setFunctionName('sendFeedback').setParameters({ scanId: scanId, label: label }))
     );
   });
+  var keep = CardService.newButtonSet();
+  [['phish', 'Send as phishing'], ['legit', 'Send as legitimate']].forEach(function (choice) {
+    keep.addButton(
+      CardService.newTextButton()
+        .setText(choice[1])
+        .setOnClickAction(CardService.newAction().setFunctionName('sendForRetraining').setParameters({ label: choice[0] }))
+    );
+  });
   return CardService.newCardSection()
     .addWidget(explain)
     .addWidget(CardService.newTextParagraph().setText('Was the verdict right?'))
-    .addWidget(feedback);
+    .addWidget(feedback)
+    .addWidget(
+      CardService.newTextParagraph().setText('<b>Retraining:</b> keeps this email in my private bucket for at most 90 days.')
+    )
+    .addWidget(keep);
+}
+
+function sendForRetraining(e) {
+  var label = e.commonEventObject.parameters.label;
+  var email = openEmail(e);
+  if (email.error) {
+    return notify(email.error);
+  }
+  var answer = call('/v1/retraining-email?label=' + encodeURIComponent(label), email.raw);
+  if (answer.error) {
+    return notify(answer.error);
+  }
+  return notify('Kept for retraining as ' + (label === 'phish' ? 'phishing' : 'legitimate') + ' (deleted within 90 days)');
 }
 
 function explainMessage(e) {

@@ -8,6 +8,8 @@ nothing happens until I click a button:
 - **Explain** sends it to `POST /v1/explain`, which runs the analyst step with Claude and shows the summary, what to
   do, and each sign with its evidence. Only this button sends an email to Anthropic.
 - **Correct / False alarm / Missed phishing** send the scan id and the label, nothing else.
+- **Send as phishing / Send as legitimate** is the one button that asks the API to keep the email: it goes to my
+  private retraining bucket with that label, for at most 90 days (`make retrain` uses it and deletes it).
 
 ## What it can reach
 
