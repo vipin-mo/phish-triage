@@ -1,0 +1,125 @@
+name: Deploy
+
+# Pull requests: `terraform plan` for infra/service, posted as a comment (read-only role, no data access).
+# Merge to main: build the Lambda image, push it, and `terraform apply`, in the `production` environment, which
+# waits for my approval. AWS is reached with OIDC; no AWS keys are stored in GitHub.
+# Repository variables (not secrets, but kept out of the code): AWS_PLAN_ROLE_ARN, AWS_DEPLOY_ROLE_ARN,
+# TF_STATE_BUCKET, MODELS_BUCKET and, optionally, ALERT_EMAIL.
+# The jobs skip themselves while the role variables are unset: the AWS Free plan doesn't allow the OIDC provider
+# (infra/foundation/main.tf), so for now I deploy from my laptop with `make deploy`.
+
+on:
+  pull_request:
+    paths: ["infra/**", "src/**", "pyproject.toml", "uv.lock", ".github/workflows/deploy.yml"]
+  push:
+    branches: [main]
+    paths: ["infra/**", "src/**", "pyproject.toml", "uv.lock", ".github/workflows/deploy.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: us-east-2
+  TF_IN_AUTOMATION: "1"
+
+jobs:
+  plan:
+    if: vars.AWS_PLAN_ROLE_ARN != '' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: hashicorp/setup-terraform@v4.0.1
+        with:
+          terraform_wrapper: false
+      - name: Format and validate
+        run: |
+          terraform fmt -check -recursive infra
+          terraform -chdir=infra/service init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+          terraform -chdir=infra/service validate
+      - name: Plan
+        run: |
+          terraform -chdir=infra/service plan -input=false -lock=false -no-color \
+            -var "image_tag=${{ github.event.pull_request.head.sha }}" \
+            -var "alert_email=${{ vars.ALERT_EMAIL }}" > plan.txt 2>&1 || { cat plan.txt; exit 1; }
+          tail -c 60000 plan.txt > plan.tail
+      - name: Post the plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          {
+            echo "### terraform plan (infra/service)"
+            echo "Image tag: \`${{ github.event.pull_request.head.sha }}\` (built and pushed only after merge and approval)"
+            echo '```'
+            grep -E "^Plan:|No changes" plan.txt || true
+            echo '```'
+            echo "<details><summary>Full plan</summary>"
+            echo
+            echo '```'
+            cat plan.tail
+            echo '```'
+            echo "</details>"
+          } > comment.md
+          gh pr comment "${{ github.event.pull_request.number }}" --body-file comment.md
+
+  deploy:
+    if: vars.AWS_DEPLOY_ROLE_ARN != '' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04-arm
+    environment: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: aws-actions/configure-aws-credentials@v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - uses: astral-sh/setup-uv@v10.3.3
+      - name: Runtime requirements and the model bundle
+        run: |
+          mkdir -p build/bundle
+          uv export --no-default-groups --group service --no-hashes --no-emit-project --format requirements-txt -q \
+            > build/requirements.txt
+          aws s3 sync --only-show-errors "s3://${{ vars.MODELS_BUCKET }}/bundles/$(cat infra/bundle-version)/" build/bundle/
+          test -f build/bundle/bundle.json
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2.1.7
+      - name: Build and push the image (once per commit; tags are immutable)
+        env:
+          IMAGE: ${{ steps.ecr.outputs.registry }}/phish-triage:${{ github.sha }}
+        run: |
+          if aws ecr describe-images --repository-name phish-triage --image-ids imageTag=${{ github.sha }} >/dev/null 2>&1; then
+            echo "image already pushed"
+          else
+            # Lambda needs a single-platform image manifest, so no provenance or SBOM attestations.
+            docker build --platform linux/arm64 --provenance=false --sbom=false -f infra/lambda.Dockerfile -t "$IMAGE" .
+            docker push "$IMAGE"
+          fi
+      - uses: hashicorp/setup-terraform@v4.0.1
+        with:
+          terraform_wrapper: false
+      - name: Apply
+        run: |
+          terraform -chdir=infra/service init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+          terraform -chdir=infra/service apply -input=false -auto-approve \
+            -var "image_tag=${{ github.sha }}" -var "alert_email=${{ vars.ALERT_EMAIL }}"
+      - name: Smoke test
+        run: |
+          url=$(terraform -chdir=infra/service output -raw api_url)
+          for attempt in 1 2 3 4 5; do
+            if curl -fsS --max-time 30 "$url/v1/health"; then echo; exit 0; fi
+            sleep 10
+          done
+          exit 1

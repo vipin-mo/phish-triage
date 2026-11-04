@@ -12,6 +12,9 @@ The verdict is `phish`, `safe` or `review`. Nothing here opens a URL, stores the
 
 from __future__ import annotations
 
+import json
+import logging
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -21,6 +24,7 @@ import numpy as np
 from phish_triage.service.bundle import verify
 
 Verdict = Literal["phish", "safe", "review"]
+log = logging.getLogger("phish_triage.scanner")
 
 
 class FastTokenizer:
@@ -57,23 +61,40 @@ class ScanResult:
 
 class Scanner:
     def __init__(self, folder: Path, threads: int = 1):
+        timings: dict[str, float] = {}
+        started = last = time.perf_counter()
+
+        def step(name: str) -> None:  # how long each part of a cold start takes, logged once per load
+            nonlocal last
+            now = time.perf_counter()
+            timings[name] = round((now - last) * 1000)
+            last = now
+            log.info(json.dumps({"event": "scanner_loading", "step": name, "ms": timings[name]}))
+
         import joblib
 
         from phish_triage.features.domains import DomainRanks
         from phish_triage.models.transformer import OnnxClassifier
 
+        step("imports_ms")
         self.config = verify(folder)
         self.version: str = self.config["version"]
+        step("verify_ms")
         models = joblib.load(folder / "stacked.joblib")
         self._tfidf, self._lr = models["text"].named_steps["tfidf"], models["text"].named_steps["lr"]
         self._stacked = models["stacked"]
-        self._ranks = DomainRanks.load(folder / "tranco.csv")
+        step("stacked_ms")
+        self._ranks = DomainRanks.load_saved(folder / "domain_ranks.json")
+        step("domain_list_ms")
         self._distilbert = OnnxClassifier(
             folder / "distilbert.onnx",
             tokenizer=FastTokenizer(folder / "tokenizer.json"),
             strategy=self.config["distilbert_strategy"],
             threads=threads,
         )
+        step("distilbert_ms")
+        timings["total_ms"] = round((time.perf_counter() - started) * 1000)
+        log.info(json.dumps({"event": "scanner_loaded", "version": self.version, **timings}))
 
     def scan(self, raw: bytes) -> ScanResult:
         from phish_triage.data.mask import mask_record
@@ -86,7 +107,7 @@ class Scanner:
         """A masked record (`data/mask.py`), as in training."""
         from phish_triage.evaluation.cascade import Cutoffs, decide
         from phish_triage.features.extract import FEATURE_NAMES, extract
-        from phish_triage.features.sender import check_sender
+        from phish_triage.features.sender import check_sender, warning_sentence
         from phish_triage.models.baselines import email_text
         from phish_triage.service.analyst import signals_from_features
         from phish_triage.service.triage import too_little_text
@@ -113,5 +134,6 @@ class Scanner:
             cascade_phish=phish,
             little_text=little,
             signals=signals_from_features(features),
-            sender={"verdict": sender.verdict, "warnings": list(sender.warnings)},
+            # The warnings name the sender's domains; the verdict is stored, so only their kind is kept.
+            sender={"verdict": sender.verdict, "warnings": sorted({warning_sentence(w) for w in sender.warnings})},
         )

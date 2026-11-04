@@ -60,6 +60,8 @@ def create_app(scanner_factory: Callable[[], object], store: Store, *, explanati
             raise HTTPException(429, "too many requests; try again in a minute")
         return owner
 
+    app.state.load_scanner = scanner  # the Lambda warm-up ping loads the model without a request
+
     @app.middleware("http")
     async def json_log(request: Request, call_next):
         request_id = request.headers.get("x-request-id") or uuid.uuid4().hex

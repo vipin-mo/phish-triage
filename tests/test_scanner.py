@@ -72,13 +72,38 @@ def test_the_scanner_masks_the_recipient_before_the_models_see_it():
     assert "me@example.com" not in seen["t"][0]
 
 
-BUNDLES = sorted(p for p in Path("artifacts/bundle").glob("*") if (p / "bundle.json").exists())
+HAS_BUNDLE = any((p / "bundle.json").exists() for p in Path("artifacts/bundle").glob("*"))
 
 
-@pytest.mark.skipif(not BUNDLES, reason="needs a local bundle (`make bundle`); never in CI")
+@pytest.mark.skipif(not HAS_BUNDLE, reason="needs a local bundle (`make bundle`); never in CI")
 def test_the_real_bundle_scans_one_email_quickly():
-    scanner = Scanner(BUNDLES[-1])
+    from phish_triage.service.bundle import latest
+
+    scanner = Scanner(latest())
     scanner.scan(PLAIN)  # warm up
     started = time.perf_counter()
     result = scanner.scan(Path("tests/fixtures/spoofed_brand.eml").read_bytes())
     assert result.verdict in ("phish", "safe", "review") and time.perf_counter() - started < 2
+
+
+def test_the_sender_warnings_returned_and_stored_name_no_domain():
+    # From paypa1-security.test, Reply-To gmail.com: the raw warnings name both domains
+    result = fake(0.99).scan(Path("tests/fixtures/spoofed_brand.eml").read_bytes())
+    text = " ".join(result.sender["warnings"])
+    assert "look like" in text or "looks like" in text
+    assert "paypa1" not in text and "gmail" not in text and "@" not in text
+
+
+def test_scanning_an_email_with_links_makes_no_network_call(monkeypatch):
+    # Threat model rule 1: URLs are parsed as strings; nothing is fetched or resolved.
+    import socket
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("network call during a scan")
+
+    monkeypatch.setattr(socket, "getaddrinfo", refuse)
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    monkeypatch.setattr(socket, "create_connection", refuse)
+    raw = Path("tests/fixtures/html_link_and_attachment.eml").read_bytes()
+    assert fake(0.5, distilbert=0.9).scan(raw).verdict == "phish"
+    assert fake(0.99).scan(Path("tests/fixtures/spoofed_brand.eml").read_bytes()).verdict == "phish"

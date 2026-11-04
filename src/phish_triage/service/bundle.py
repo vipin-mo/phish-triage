@@ -10,7 +10,8 @@ training data (every step is seeded, so it is the same model) and writes, to art
 - `stacked.joblib`: the TF-IDF vectorizer, its logistic regression and the stacked trees;
 - `distilbert.onnx` and `tokenizer.json`: DistilBERT (ONNX fp32) and its tokenizer, served with onnxruntime and
   the `tokenizers` library (no torch, no transformers);
-- `tranco.csv`: the pinned domain-popularity list the features use;
+- `domain_ranks.json`: the pinned domain-popularity list the features use, as the finished lookup table (reading
+  the CSV took 8 s of a Lambda cold start);
 - `bundle.json`: the cascade's cutoffs and DistilBERT's threshold (both chosen on validation, as in the
   evaluation), the little-text rule, library versions, the evaluation numbers it must reproduce, and a SHA-256
   of every file, checked on load.
@@ -45,7 +46,7 @@ import numpy as np
 BUNDLE_ROOT = Path("artifacts/bundle")
 BUNDLE_FILE = "bundle.json"
 DISTILBERT_SOURCE = Path("artifacts/distilbert_with_inbox")
-FILES = ("stacked.joblib", "distilbert.onnx", "tokenizer.json", "tranco.csv")
+FILES = ("stacked.joblib", "distilbert.onnx", "tokenizer.json", "domain_ranks.json")
 REPORT = Path("reports/bundle.md")
 TARGET_FPR = 0.01
 
@@ -75,7 +76,7 @@ def export(root: Path = BUNDLE_ROOT) -> Path:
     from phish_triage.data import inbox
     from phish_triage.evaluation import metrics, predictions
     from phish_triage.evaluation.cascade import choose_cutoffs
-    from phish_triage.features.domains import TRANCO_PATH, default_ranks
+    from phish_triage.features.domains import default_ranks
     from phish_triage.features.extract import matrix
     from phish_triage.models.baselines import email_text, fit_all
     from phish_triage.service import triage
@@ -99,13 +100,22 @@ def export(root: Path = BUNDLE_ROOT) -> Path:
     cutoffs = choose_cutoffs(val[2], stacked_val)
     threshold = metrics.threshold_at_fpr(val[2], distilbert.val_scores, TARGET_FPR)
 
-    version = f"with-inbox-{datetime.now(UTC):%Y%m%d}-{sha256(DISTILBERT_SOURCE / 'model.onnx')[:8]}"
+    staging = root / "staging"
+    shutil.rmtree(staging, ignore_errors=True)
+    staging.mkdir(parents=True)
+    joblib.dump({"text": fitted.text, "stacked": fitted.stacked}, staging / "stacked.joblib")
+    shutil.copyfile(DISTILBERT_SOURCE / "model.onnx", staging / "distilbert.onnx")
+    shutil.copyfile(DISTILBERT_SOURCE / "pytorch" / "tokenizer.json", staging / "tokenizer.json")
+    ranks.save(staging / "domain_ranks.json")
+    hashes = {name: sha256(staging / name) for name in FILES}
+    # The name changes whenever any file does, so a rebuilt bundle never replaces one that is deployed.
+    content = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()[:8]
+    version = f"with-inbox-{datetime.now(UTC):%Y%m%d}-{content}"
     folder = root / version
-    folder.mkdir(parents=True, exist_ok=True)
-    joblib.dump({"text": fitted.text, "stacked": fitted.stacked}, folder / "stacked.joblib")
-    shutil.copyfile(DISTILBERT_SOURCE / "model.onnx", folder / "distilbert.onnx")
-    shutil.copyfile(DISTILBERT_SOURCE / "pytorch" / "tokenizer.json", folder / "tokenizer.json")
-    shutil.copyfile(TRANCO_PATH, folder / "tranco.csv")
+    if folder.exists():
+        shutil.rmtree(staging)
+        raise SystemExit(f"{folder} already exists with the same content")
+    staging.rename(folder)
 
     report = json.loads(Path("reports/with_inbox.json").read_text())["after"]["cascade"]
     expected = {
@@ -122,7 +132,7 @@ def export(root: Path = BUNDLE_ROOT) -> Path:
         "little_text_words": triage.LITTLE_TEXT_WORDS,
         "libraries": {"scikit-learn": sklearn.__version__, "onnxruntime": onnxruntime.__version__},
         "expected": expected,
-        "sha256": {name: sha256(folder / name) for name in FILES},
+        "sha256": hashes,
     }
     (folder / BUNDLE_FILE).write_text(json.dumps(config, indent=1) + "\n")
 
@@ -198,10 +208,11 @@ def parity(folder: Path, records: dict, slices: dict) -> dict:
 
 
 def latest(root: Path = BUNDLE_ROOT) -> Path:
-    found = sorted(p for p in root.glob("*") if (p / BUNDLE_FILE).exists())
+    """The newest complete bundle, by its `created` time (names end in a content hash, so they don't sort by age)."""
+    found = [p for p in root.glob("*") if (p / BUNDLE_FILE).exists()]
     if not found:
         raise SystemExit(f"no bundle in {root}; run `make bundle`")
-    return found[-1]
+    return max(found, key=lambda p: json.loads((p / BUNDLE_FILE).read_text())["created"])
 
 
 def main(argv: list[str] | None = None) -> int:

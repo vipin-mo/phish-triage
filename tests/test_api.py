@@ -97,3 +97,15 @@ def test_the_log_line_has_no_email_content(client, caplog):
     line = json.loads(caplog.records[-1].getMessage())
     assert line["verdict"] == "phish" and line["owner"] == "tester" and line["status"] == 200
     assert "ZQX" not in caplog.text and "Verify now" not in caplog.text and key not in caplog.text
+
+
+def test_the_warm_up_ping_loads_the_model_without_a_request(monkeypatch):
+    import importlib
+
+    monkeypatch.delenv("PHISH_TABLE_PREFIX", raising=False)
+    from phish_triage.service import lambda_handler
+
+    importlib.reload(lambda_handler)
+    monkeypatch.setattr(lambda_handler, "_scanner", lambda: FakeScanner())
+    lambda_handler.app = api.create_app(lambda: FakeScanner(), MemoryStore())
+    assert lambda_handler.handler({"source": "aws.events"}, None) == {"warm": True, "model_version": "test-1"}

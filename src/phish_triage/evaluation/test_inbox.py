@@ -38,7 +38,7 @@ from phish_triage.evaluation import metrics, predictions
 from phish_triage.evaluation.cascade import run_cascade
 from phish_triage.features.domains import default_ranks
 from phish_triage.features.extract import matrix
-from phish_triage.features.sender import check_sender, identity
+from phish_triage.features.sender import check_sender, identity, warning_type
 from phish_triage.models.baselines import email_text, fit_all
 
 REVIEW_SHEET = PRIVATE_DIR / "review.csv"
@@ -57,17 +57,6 @@ MODELS = {
 }
 REVIEW_LABELS = {"", "legit", "phish", "spam"}
 REVIEW_FIELDS = ("id", "category", "sender_domain", "subject", "flagged_by", "my_label", "my_note")
-WARNING_TYPES = (  # sender-check warnings by kind; the text itself names domains, so it is never reported
-    ("A lower Authentication-Results", "forged lower auth header"),
-    ("looks like", "look-alike domain"),
-    ("The display name says", "display-name brand mismatch"),
-    ("Replies go to", "Reply-To elsewhere"),
-    ("not among the top 1 million", "unranked sender domain"),
-)
-
-
-def warning_type(text: str) -> str:
-    return next((kind for prefix, kind in WARNING_TYPES if prefix in text), "other")
 
 
 def share(flags: np.ndarray, n_bootstrap: int) -> dict:

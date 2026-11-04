@@ -63,6 +63,33 @@ class SenderCheck:
     warnings: tuple[str, ...]
 
 
+# Each warning by kind, and a sentence for it that names no domain: the warnings themselves name the sender's
+# domains, so reports and the service's stored verdicts use these instead (threat model rule 8).
+WARNING_TYPES = (
+    ("A lower Authentication-Results", "forged lower auth header"),
+    ("looks like", "look-alike domain"),
+    ("The display name says", "display-name brand mismatch"),
+    ("Replies go to", "Reply-To elsewhere"),
+    ("not among the top 1 million", "unranked sender domain"),
+)
+WARNING_SENTENCES = {
+    "forged lower auth header": "A lower Authentication-Results header claims a pass the provider did not give.",
+    "look-alike domain": "The sender's domain looks like a well-known brand's domain but isn't it.",
+    "display-name brand mismatch": "The display name names a brand the sender's address doesn't belong to.",
+    "Reply-To elsewhere": "Replies go to a different domain than the sender's.",
+    "unranked sender domain": "The sender's domain is not among the top 1 million domains.",
+    "other": "Another sender-check warning.",
+}
+
+
+def warning_type(text: str) -> str:
+    return next((kind for prefix, kind in WARNING_TYPES if prefix in text), "other")
+
+
+def warning_sentence(text: str) -> str:
+    return WARNING_SENTENCES[warning_type(text)]
+
+
 def check_sender(record: dict, ranks: DomainRanks | None = None) -> SenderCheck:
     """Works on a parsed record (raw headers) or a masked one (which carries the topmost result in `auth`)."""
     headers = record.get("headers") or []
