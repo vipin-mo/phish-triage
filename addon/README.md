@@ -1,3 +1,35 @@
-# addon/
+# phish-triage for Gmail
 
-Gmail sidebar add-on, Google Apps Script (Phase 6).
+A Gmail sidebar for my phish-triage API, written in Google Apps Script ([Code.js](Code.js)). I open an email and
+nothing happens until I click a button:
+
+- **Scan** sends the open email to `POST /v1/scan` and shows the verdict, the score next to the threshold it is
+  compared with, the sender check and its warnings, and the signals.
+- **Explain** sends it to `POST /v1/explain`, which runs the analyst step with Claude and shows the summary, what to
+  do, and each sign with its evidence. Only this button sends an email to Anthropic.
+- **Correct / False alarm / Missed phishing** send the scan id and the label, nothing else.
+
+## What it can reach
+
+- **Mail:** only the open message (`gmail.addons.current.message.readonly`), not the rest of my mailbox. It reads the
+  message's original source; if Google doesn't allow that with this scope, it rebuilds the email from its headers
+  and body and says so on the result.
+- **Network:** only the API address in the manifest's `urlFetchWhitelist`.
+- **Storage:** the API address and my API key, in my own user properties. It logs nothing.
+
+The API stores the verdict, the score and the email's SHA-256, never the email (docs/THREAT_MODEL.md, rule 8).
+
+## How I install it
+
+The API address isn't committed, so the manifest is a template. `make addon` fills it in from
+`~/.config/phish-triage/api-url` (or `ADDON_API_URL=...`) and writes `build/addon/Code.js` and
+`build/addon/appsscript.json`. Then, in my own Google account:
+
+1. At [script.google.com](https://script.google.com) I create a new project named phish-triage.
+2. In Project Settings I tick "Show appsscript.json manifest file in editor".
+3. I paste `build/addon/Code.js` over `Code.gs`, and `build/addon/appsscript.json` over `appsscript.json`, and save.
+4. Deploy → Test deployments → Application: Gmail → Install. Then I open Gmail and reload it.
+5. In an email I open the phish-triage icon on the right, grant the three permissions, and enter the API address
+   and my key in Settings.
+
+A test deployment runs the code as it is in the editor, for my account only; nothing is published.

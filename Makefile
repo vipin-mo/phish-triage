@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox privacymail-counts private-collectors data-privacymail train-with-newsletters eval-privacymail gate bundle serve aws-bootstrap tf-foundation-plan tf-foundation-apply upload-bundle put-anthropic-key api-key deploy-image deploy-plan deploy-apply
+.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox privacymail-counts private-collectors data-privacymail train-with-newsletters eval-privacymail gate bundle serve aws-bootstrap tf-foundation-plan tf-foundation-apply upload-bundle put-anthropic-key api-key addon deploy-image deploy-plan deploy-apply
 
 help:  ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -116,6 +116,16 @@ tf-foundation-apply:  ## apply the saved foundation plan
 
 upload-bundle:  ## copy the bundle named in infra/bundle-version to the private model bucket
 	aws s3 sync --profile $(AWS_PROFILE_NAME) --only-show-errors "artifacts/bundle/$$(cat infra/bundle-version)/" "s3://phish-triage-models-$(ACCOUNT)/bundles/$$(cat infra/bundle-version)/"
+
+# The Gmail add-on (addon/): the manifest gets the API address, which isn't committed, from ADDON_API_URL or
+# ~/.config/phish-triage/api-url. The result in build/addon/ goes into the Apps Script editor (addon/README.md).
+ADDON_API_URL ?= $(shell cat ~/.config/phish-triage/api-url 2>/dev/null)
+
+addon:  ## build the Gmail add-on with the API address filled in (build/addon/, not committed)
+	@case "$(ADDON_API_URL)" in https://*) ;; *) echo "set ADDON_API_URL (or ~/.config/phish-triage/api-url) to the https:// API address"; exit 1;; esac
+	mkdir -p build/addon && cp addon/Code.js build/addon/Code.js
+	sed 's|__API_URL__|$(patsubst %/,%,$(ADDON_API_URL))|' addon/appsscript.template.json > build/addon/appsscript.json
+	@echo "build/addon/: Code.js and appsscript.json, for the Apps Script editor"
 
 put-anthropic-key:  ## store the Anthropic key from .env in the service's secret (never printed)
 	$(AWS_ENV) && uv run python scripts/put_anthropic_key.py
