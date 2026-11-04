@@ -6,9 +6,10 @@
     GET  /v1/health                no key needed; the model version
 
 Every call but health needs an `X-API-Key`. The rules from the threat model: input over 2 MB is refused (rule 11),
-the same email returns the same verdict (its SHA-256 is the scan id), each key has a per-minute limit, and only
-the verdict, never the email, is stored (`service/store.py`). Each request logs one JSON line with a request id,
-the key's owner, status, verdict and time taken; no email content is ever logged.
+the same email returns the same verdict from the same model (its SHA-256 is the scan id; after a new model is
+deployed it is scanned again), each key has a per-minute limit, and only the verdict, never the email, is stored
+(`service/store.py`). Each request logs one JSON line with a request id, the key's owner, status, verdict and
+time taken; no email content is ever logged.
 
 Explanations are built but switched off (`PHISH_EXPLANATIONS=on` turns them on in a later phase): a scan then
 answers `explanation_id: null`, and the explanations endpoint says they are off.
@@ -98,9 +99,9 @@ def create_app(scanner_factory: Callable[[], object], store: Store, *, explanati
         if not raw.strip():
             raise HTTPException(400, "empty email")
         scan = scan_id(raw)
+        s = scanner()
         cached = store.get_verdict(owner, scan)
-        if cached is None:
-            s = scanner()
+        if cached is None or cached.get("model_version") != s.version:  # a verdict of an older model is replaced
             result = s.scan(raw)
             cached = {
                 "scan_id": scan,
@@ -128,9 +129,10 @@ def create_app(scanner_factory: Callable[[], object], store: Store, *, explanati
         owner = owner_of(request)
         if body.label not in FEEDBACK_LABELS:
             raise HTTPException(422, f"label must be one of {', '.join(FEEDBACK_LABELS)}")
-        if store.get_verdict(owner, body.scan_id) is None:
+        verdict = store.get_verdict(owner, body.scan_id)
+        if verdict is None:
             raise HTTPException(404, "no scan with this id for this key")
-        store.put_feedback(owner, body.scan_id, body.label)
+        store.put_feedback(owner, body.scan_id, body.label, verdict.get("model_version"))
         return {"status": "recorded"}
 
     @app.exception_handler(HTTPException)

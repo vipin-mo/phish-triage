@@ -47,6 +47,17 @@ def test_the_same_email_returns_the_same_verdict_without_scanning_again(client):
     assert first == second and scanner.calls == 1
 
 
+def test_a_verdict_from_an_older_model_is_replaced_by_a_new_scan(client):
+    c, key, store, scanner = client
+    first = c.post("/v1/scan", content=EMAIL, headers={"x-api-key": key}).json()
+    scanner.version = "test-2"  # a new model deployed
+    second = c.post("/v1/scan", content=EMAIL, headers={"x-api-key": key}).json()
+    assert first["model_version"] == "test-1" and second["model_version"] == "test-2" and scanner.calls == 2
+    assert store.get_verdict("tester", first["scan_id"])["model_version"] == "test-2"
+    c.post("/v1/scan", content=EMAIL, headers={"x-api-key": key})
+    assert scanner.calls == 2
+
+
 def test_large_and_empty_emails_are_refused(client):
     c, key, _, scanner = client
     big = b"x" * (api.MAX_BYTES + 1)
@@ -74,6 +85,7 @@ def test_feedback_must_name_a_scan_of_this_key(client):
     assert send("correct", other) == 404
     assert send("false_alarm", key) == 200
     assert store.feedback[0]["label"] == "false_alarm" and store.feedback[0]["owner"] == "tester"
+    assert store.feedback[0]["model_version"] == "test-1"
 
 
 def test_explanations_say_they_are_off(client):

@@ -1,8 +1,9 @@
 """What the service keeps: API keys (hashed), verdicts, feedback and a per-key request count. Never an email.
 
 A verdict is stored under the SHA-256 of the email's bytes (the scan id), so the same email sent again returns the
-same verdict without scanning it again, and feedback can name the scan it is about. The hash identifies an email
-but can't be turned back into it.
+same verdict without scanning it again, and feedback can name the scan it is about. A verdict from an older model
+is replaced by a new scan, so a model that fixes a false alarm fixes it for emails already seen too; feedback
+records which model's verdict it was about. The hash identifies an email but can't be turned back into it.
 
 API keys are random 32-byte tokens, so a plain SHA-256 is enough to store them: there is nothing to guess, unlike
 a password. `MemoryStore` is for tests and local runs; `store_dynamo.DynamoStore` is what runs on AWS.
@@ -37,7 +38,7 @@ class Store(Protocol):
     def allow(self, owner: str, per_minute: int) -> bool: ...
     def get_verdict(self, owner: str, scan: str) -> dict | None: ...
     def put_verdict(self, owner: str, scan: str, verdict: dict) -> None: ...
-    def put_feedback(self, owner: str, scan: str, label: str) -> None: ...
+    def put_feedback(self, owner: str, scan: str, label: str, model_version: str | None = None) -> None: ...
 
 
 @dataclass
@@ -66,5 +67,7 @@ class MemoryStore:
     def put_verdict(self, owner: str, scan: str, verdict: dict) -> None:
         self.verdicts[(owner, scan)] = verdict
 
-    def put_feedback(self, owner: str, scan: str, label: str) -> None:
-        self.feedback.append({"owner": owner, "scan_id": scan, "label": label, "at": int(time.time())})
+    def put_feedback(self, owner: str, scan: str, label: str, model_version: str | None = None) -> None:
+        self.feedback.append(
+            {"owner": owner, "scan_id": scan, "label": label, "model_version": model_version, "at": int(time.time())}
+        )
