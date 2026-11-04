@@ -50,9 +50,12 @@ def create_app(
     *,
     explanations: bool | None = None,
     explainer_factory: Callable[[], object] | None = None,
+    shadow_factory: Callable[[], object | None] | None = None,
 ) -> FastAPI:
     """`scanner_factory` is called once, on the first scan, so a cold start doesn't load the model for health; the
-    same for `explainer_factory` (it reads the Anthropic key) on the first explanation."""
+    same for `explainer_factory` (it reads the Anthropic key) on the first explanation. `shadow_factory` returns a
+    second scanner or None: in shadow mode every new scan is scored by it too, and only the two verdicts, scores and
+    model versions are logged; the answer is always the live model's."""
     if explanations is None:
         explanations = os.environ.get("PHISH_EXPLANATIONS", "off") == "on"
     daily_budget_microusd = int(float(os.environ.get("PHISH_DAILY_LLM_USD", "0.50")) * 1e6)
@@ -63,6 +66,22 @@ def create_app(
         if "scanner" not in state:
             state["scanner"] = scanner_factory()
         return state["scanner"]
+
+    def shadow():
+        if "shadow" not in state:
+            state["shadow"] = shadow_factory() if shadow_factory else None
+        return state["shadow"]
+
+    def log_shadow(raw: bytes, live) -> None:
+        if (other := shadow()) is None:
+            return
+        try:
+            result = other.scan(raw)
+            entry = {"verdict": result.verdict, "score": round(result.score, 6), "stage": result.stage}
+        except Exception as exc:  # noqa: BLE001 - the shadow never affects the answer
+            entry = {"error": type(exc).__name__}
+        live_entry = {"verdict": live.verdict, "score": round(live.score, 6), "stage": live.stage}
+        log.info(json.dumps({"event": "shadow", "live": live_entry, "shadow": entry, "shadow_version": other.version}))
 
     def explainer():
         if "explainer" not in state:
@@ -135,6 +154,7 @@ def create_app(
         if cached is None or (cached.get("model_version"), cached.get("rules_version")) != current:
             # a verdict of an older model or older rules is replaced
             result = s.scan(raw)
+            log_shadow(raw, result)
             cached = {
                 "scan_id": scan,
                 "verdict": result.verdict,

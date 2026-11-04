@@ -2,5 +2,7 @@
 *
 !build/requirements.txt
 !build/bundle/**
+!build/smoke/**
+!build/shadow/**
 !src/phish_triage/**
 **/__pycache__
