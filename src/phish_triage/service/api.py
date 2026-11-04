@@ -26,7 +26,7 @@ from collections.abc import Callable
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from phish_triage.service.store import FEEDBACK_LABELS, MemoryStore, Store, scan_id
 
@@ -36,7 +36,7 @@ log = logging.getLogger("phish_triage.api")
 
 
 class Feedback(BaseModel):
-    scan_id: str
+    scan_id: str = Field(pattern=r"^[0-9a-f]{64}$")  # a SHA-256; DynamoDB refuses an empty key with a 500
     label: str
 
 
@@ -68,7 +68,12 @@ def create_app(scanner_factory: Callable[[], object], store: Store, *, explanati
         request_id = request.headers.get("x-request-id") or uuid.uuid4().hex
         started = time.perf_counter()
         request.state.owner, request.state.verdict = None, None
-        response = await call_next(request)
+        error = None
+        try:
+            response = await call_next(request)
+        except Exception as exc:  # noqa: BLE001 - logged by type only: a message could quote the email
+            error = type(exc).__name__
+            response = JSONResponse({"detail": "internal error"}, status_code=500)
         response.headers["x-request-id"] = request_id
         entry = {
             "request_id": request_id,
@@ -79,6 +84,8 @@ def create_app(scanner_factory: Callable[[], object], store: Store, *, explanati
             "verdict": request.state.verdict,
             "ms": round((time.perf_counter() - started) * 1000, 1),
         }
+        if error:
+            entry["error"] = error
         log.info(json.dumps(entry))
         return response
 
@@ -101,7 +108,9 @@ def create_app(scanner_factory: Callable[[], object], store: Store, *, explanati
         scan = scan_id(raw)
         s = scanner()
         cached = store.get_verdict(owner, scan)
-        if cached is None or cached.get("model_version") != s.version:  # a verdict of an older model is replaced
+        current = (s.version, getattr(s, "rules_version", None))
+        if cached is None or (cached.get("model_version"), cached.get("rules_version")) != current:
+            # a verdict of an older model or older rules is replaced
             result = s.scan(raw)
             cached = {
                 "scan_id": scan,
@@ -111,6 +120,7 @@ def create_app(scanner_factory: Callable[[], object], store: Store, *, explanati
                 "signals": result.signals,
                 "sender": result.sender,
                 "model_version": s.version,
+                "rules_version": current[1],
                 "explanation_id": None,
             }
             store.put_verdict(owner, scan, cached)

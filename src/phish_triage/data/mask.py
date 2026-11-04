@@ -148,6 +148,8 @@ def mask_record(record: dict, *, source_names: bool = True) -> dict:
         **record,
         "headers": [(name, value) for _, name, value in headers],
         "auth": auth_results(raw_headers),
+        # the lower copies are dropped with the other headers; whether one claims a pass is itself a warning
+        "auth_lower_claims_pass": lower_copy_claims_pass(raw_headers),
         "subject": names(replace(subject)),
         "text": names(replace(strip_list_footer(record["text"] or ""))),
         "html": names(replace(strip_list_footer(record["html"] or "")), keep_domains=True),
@@ -156,6 +158,12 @@ def mask_record(record: dict, *, source_names: bool = True) -> dict:
             {**a, "filename": replace(a["filename"]) if a["filename"] else None} for a in record["attachments"]
         ],
     }
+
+
+def lower_copy_claims_pass(headers: list[tuple[str, str]]) -> bool:
+    """A lower Authentication-Results header claims a DKIM or DMARC pass (only the topmost one is trusted)."""
+    copies = [v for k, v in headers if k.lower() == "authentication-results"][1:]
+    return any(re.search(r"\b(?:dkim|dmarc)\s*=\s*pass", v, re.IGNORECASE) for v in copies)
 
 
 def auth_results(headers: list[tuple[str, str]]) -> str | None:

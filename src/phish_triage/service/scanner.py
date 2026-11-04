@@ -25,6 +25,10 @@ from phish_triage.service.bundle import verify
 
 Verdict = Literal["phish", "safe", "review"]
 log = logging.getLogger("phish_triage.scanner")
+# Bump when the rules around the models change (triage, the sender check, masking, signals): stored verdicts carry
+# it, so an email seen before is scanned again, as after a new model. 2: the forged lower Authentication-Results
+# warning survives masking.
+RULES_VERSION = 2
 
 
 class FastTokenizer:
@@ -79,6 +83,7 @@ class Scanner:
         step("imports_ms")
         self.config = verify(folder)
         self.version: str = self.config["version"]
+        self.rules_version = RULES_VERSION
         step("verify_ms")
         models = joblib.load(folder / "stacked.joblib")
         self._tfidf, self._lr = models["text"].named_steps["tfidf"], models["text"].named_steps["lr"]
@@ -110,7 +115,7 @@ class Scanner:
         from phish_triage.features.sender import check_sender, warning_sentence
         from phish_triage.models.baselines import email_text
         from phish_triage.service.analyst import signals_from_features
-        from phish_triage.service.triage import too_little_text
+        from phish_triage.service.triage import LITTLE_TEXT_WORDS, too_little_text
 
         text = email_text(record)
         features = extract(record, self._ranks)
@@ -124,7 +129,7 @@ class Scanner:
         else:
             score = float(self._distilbert.score([text])[0])
             stage, phish = "distilbert", score > self.config["distilbert_threshold"]
-        little = too_little_text(record)
+        little = too_little_text(record, self.config.get("little_text_words", LITTLE_TEXT_WORDS))
         verdict: Verdict = "phish" if phish else ("review" if little else "safe")
         sender = check_sender(record, self._ranks)
         return ScanResult(

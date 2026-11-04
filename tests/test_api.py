@@ -106,7 +106,7 @@ def test_the_log_line_has_no_email_content(client, caplog):
     c, key, _, _ = client
     with caplog.at_level(logging.INFO, logger="phish_triage.api"):
         c.post("/v1/scan", content=EMAIL, headers={"x-api-key": key})
-    line = json.loads(caplog.records[-1].getMessage())
+    line = json.loads([r for r in caplog.records if r.name == "phish_triage.api"][-1].getMessage())
     assert line["verdict"] == "phish" and line["owner"] == "tester" and line["status"] == 200
     assert "ZQX" not in caplog.text and "Verify now" not in caplog.text and key not in caplog.text
 
@@ -121,3 +121,30 @@ def test_the_warm_up_ping_loads_the_model_without_a_request(monkeypatch):
     monkeypatch.setattr(lambda_handler, "_scanner", lambda: FakeScanner())
     lambda_handler.app = api.create_app(lambda: FakeScanner(), MemoryStore())
     assert lambda_handler.handler({"source": "aws.events"}, None) == {"warm": True, "model_version": "test-1"}
+
+
+def test_a_change_of_rules_scans_again_and_a_crash_is_logged_without_content(client, caplog):
+    c, key, _, scanner = client
+    c.post("/v1/scan", content=EMAIL, headers={"x-api-key": key})
+    scanner.rules_version = 3  # the scanning rules changed, same model
+    assert c.post("/v1/scan", content=EMAIL, headers={"x-api-key": key}).json()["rules_version"] == 3
+    assert scanner.calls == 2
+
+    def boom(raw):
+        raise ValueError("ZQX-secret-body")
+
+    scanner.scan = boom
+    with caplog.at_level(logging.INFO, logger="phish_triage.api"):
+        r = c.post("/v1/scan", content=EMAIL + b"x", headers={"x-api-key": key})
+    assert r.status_code == 500 and r.headers["x-request-id"]
+    line = json.loads([r for r in caplog.records if r.name == "phish_triage.api"][-1].getMessage())
+    assert line["status"] == 500 and line["error"] == "ValueError" and "ZQX" not in caplog.text
+
+
+def test_feedback_needs_a_real_scan_id(client):
+    c, key, _, _ = client
+    for bad in ("", "x" * 2000, "../etc"):
+        assert (
+            c.post("/v1/feedback", json={"scan_id": bad, "label": "correct"}, headers={"x-api-key": key}).status_code
+            == 422
+        )
