@@ -29,11 +29,13 @@ data "aws_ecr_repository" "service" {
 locals {
   name      = "phish-triage"
   image_uri = "${data.aws_ecr_repository.service.repository_url}:${var.image_tag}"
+  # backup: point-in-time recovery for what can't be rebuilt (the API keys, and feedback for retraining).
+  # Verdicts expire after 90 days (`store_dynamo.VERDICT_DAYS`): a scan id is kept only as long as it's useful.
   tables = {
-    keys     = { hash = "key_hash", range = null, range_type = null, ttl = false }
-    verdicts = { hash = "owner", range = "scan_id", range_type = "S", ttl = false }
-    feedback = { hash = "owner", range = "scan_at", range_type = "S", ttl = false }
-    rate     = { hash = "owner", range = "minute", range_type = "N", ttl = true }
+    keys     = { hash = "key_hash", range = null, range_type = null, ttl = false, backup = true }
+    verdicts = { hash = "owner", range = "scan_id", range_type = "S", ttl = true, backup = false }
+    feedback = { hash = "owner", range = "scan_at", range_type = "S", ttl = false, backup = true }
+    rate     = { hash = "owner", range = "minute", range_type = "N", ttl = true, backup = false }
   }
 }
 
@@ -65,6 +67,9 @@ resource "aws_dynamodb_table" "t" {
     }
   }
   server_side_encryption { enabled = true }
+  # A rename or a key change would otherwise replace the table, keys and feedback with it, without asking.
+  deletion_protection_enabled = true
+  point_in_time_recovery { enabled = each.value.backup }
 }
 
 # --- The scan function ---
@@ -89,9 +94,23 @@ data "aws_iam_policy_document" "scan" {
     actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
     resources = ["${aws_cloudwatch_log_group.scan.arn}:*"]
   }
+  # Each table only what the service does with it: it reads keys (never writes them: `make api-key` does that
+  # from my laptop), reads and writes verdicts, adds feedback and counts requests.
   statement {
-    actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem"]
-    resources = [for t in aws_dynamodb_table.t : t.arn]
+    actions   = ["dynamodb:GetItem"]
+    resources = [aws_dynamodb_table.t["keys"].arn]
+  }
+  statement {
+    actions   = ["dynamodb:GetItem", "dynamodb:PutItem"]
+    resources = [aws_dynamodb_table.t["verdicts"].arn]
+  }
+  statement {
+    actions   = ["dynamodb:PutItem"]
+    resources = [aws_dynamodb_table.t["feedback"].arn]
+  }
+  statement {
+    actions   = ["dynamodb:UpdateItem"]
+    resources = [aws_dynamodb_table.t["rate"].arn]
   }
 }
 
@@ -141,6 +160,13 @@ resource "aws_cloudwatch_event_rule" "warm" {
 resource "aws_cloudwatch_event_target" "warm" {
   rule = aws_cloudwatch_event_rule.warm.name
   arn  = aws_lambda_function.scan.arn
+}
+
+# The ping is the only asynchronous call: a failed one isn't retried (twice, by default), which would load the model
+# three times per ping while something is broken, at 3 GB each.
+resource "aws_lambda_function_event_invoke_config" "scan" {
+  function_name          = aws_lambda_function.scan.function_name
+  maximum_retry_attempts = 0
 }
 
 resource "aws_lambda_permission" "warm" {
@@ -282,7 +308,7 @@ resource "aws_sns_topic" "alarms" {
 }
 
 resource "aws_sns_topic_subscription" "email" {
-  count     = var.alert_email == "" ? 0 : 1
+  count     = nonsensitive(var.alert_email == "") ? 0 : 1
   topic_arn = aws_sns_topic.alarms.arn
   protocol  = "email"
   endpoint  = var.alert_email
@@ -304,6 +330,11 @@ locals {
       namespace  = "AWS/ApiGateway", metric = "5xx", stat = "Sum", threshold = 1, periods = 1,
       dimensions = { ApiId = aws_apigatewayv2_api.http.id, Stage = "$default" },
       text       = "The API returned a server error"
+    }
+    "api-requests" = {
+      namespace  = "AWS/ApiGateway", metric = "Count", stat = "Sum", threshold = 1500, periods = 1,
+      dimensions = { ApiId = aws_apigatewayv2_api.http.id, Stage = "$default" },
+      text       = "About 5 requests a second for 5 minutes, the throttle's rate: far above my use, and each costs money"
     }
     "explain-dlq" = {
       namespace  = "AWS/SQS", metric = "ApproximateNumberOfMessagesVisible", stat = "Maximum", threshold = 1, periods = 1,
@@ -329,13 +360,15 @@ resource "aws_cloudwatch_metric_alarm" "a" {
   alarm_actions       = [aws_sns_topic.alarms.arn]
 }
 
+# On the API's latency, what a caller waits for: the function's own duration also counts the 5-minute warm-up pings
+# and model loads (60 s on a new image), so it fired on every deploy with nobody waiting.
 resource "aws_cloudwatch_metric_alarm" "scan_p95" {
   alarm_name          = "${local.name}-scan-p95"
-  alarm_description   = "Scans are slow: p95 above ${var.p95_alarm_ms} ms for 15 minutes"
-  namespace           = "AWS/Lambda"
-  metric_name         = "Duration"
+  alarm_description   = "Requests are slow: API p95 above ${var.p95_alarm_ms} ms for 15 minutes"
+  namespace           = "AWS/ApiGateway"
+  metric_name         = "Latency"
   extended_statistic  = "p95"
-  dimensions          = { FunctionName = aws_lambda_function.scan.function_name }
+  dimensions          = { ApiId = aws_apigatewayv2_api.http.id, Stage = "$default" }
   period              = 300
   evaluation_periods  = 3
   threshold           = var.p95_alarm_ms

@@ -253,7 +253,16 @@ explanation queue and worker exist but are switched off.
   deploy workflow and roles are written and switch on with one variable on an account that allows OIDC.
 - **A privacy gap the live test found:** the sender check's warnings name the sender's domain, and the stored
   verdict kept them. The service now returns and stores a fixed sentence per kind of warning instead.
-- Expected cost at my use: under $1 a month (mostly image storage), within the Free plan's credits.
+- **The deploy checks itself.** A review of the deploy steps found that a deploy whose model failed to load still
+  printed success, that a plan without the alarm address removed the alarm emails, and that five test images would
+  have pushed the running image out of the registry. Now the deploy stops unless the loaded model is the one in
+  `infra/bundle-version`; only a clean, merged `main` is deployed; plans refuse an empty alarm address; test images
+  are cleaned up first; the tables can't be deleted by a plan; and the scan function can only read API keys. The
+  slowness alarm fired on both deploys with nobody waiting, because it watched the function's run time, which
+  counts the warm-up pings and the 60 s first load on a new image; it now watches the API's latency instead.
+- Expected cost at my use: under $1 a month (mostly image storage), within the Free plan's credits. The Free plan
+  ends on 2027-04-27 and the account closes with it unless I upgrade, taking every resource with it; before then I
+  either upgrade or export the feedback and API keys and destroy the service.
 
 ## Known issues
 

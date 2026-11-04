@@ -3,7 +3,7 @@ import pytest
 from moto import mock_aws
 
 from phish_triage.service.store import hash_key
-from phish_triage.service.store_dynamo import DynamoStore
+from phish_triage.service.store_dynamo import VERDICT_DAYS, DynamoStore
 
 # The same keys as infra/main.tf
 TABLES = {
@@ -45,6 +45,8 @@ def test_keys_verdicts_feedback_and_rate_round_trip(store):
     s.put_verdict("vipin", "abc", {"verdict": "phish", "score": 0.9})
     assert s.get_verdict("vipin", "abc") == {"verdict": "phish", "score": 0.9}
     assert s.get_verdict("someone", "abc") is None
+    item = client.scan(TableName="pt-verdicts")["Items"][0]
+    assert int(item["expires"]["N"]) - int(item["created"]["N"]) == VERDICT_DAYS * 86_400  # deleted after 90 days
 
     s.put_feedback("vipin", "abc", "false_alarm")
     s.put_feedback("vipin", "abc", "correct", "with-newsletters-1")

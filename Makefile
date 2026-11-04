@@ -102,7 +102,7 @@ gate:  ## measure the eval gate from local results -> reports/gate.json (CI runs
 
 # --- AWS (Phase 5). Sign in first in your own terminal: aws sts get-caller-identity --profile phish-triage ---
 AWS_PROFILE_NAME := phish-triage
-AWS_ENV = eval "$$(aws configure export-credentials --profile $(AWS_PROFILE_NAME) --format env)" && export AWS_REGION=us-east-2 AWS_DEFAULT_REGION=us-east-2
+AWS_ENV = eval "$$(aws configure export-credentials --profile $(AWS_PROFILE_NAME) --format env)" && export AWS_REGION=us-east-2 AWS_DEFAULT_REGION=us-east-2 && uv run python scripts/deploy_checks.py session
 ACCOUNT = $$(aws sts get-caller-identity --profile $(AWS_PROFILE_NAME) --query Account --output text)
 
 aws-bootstrap:  ## create the Terraform state bucket (once per account)
@@ -121,25 +121,36 @@ api-key:  ## create an API key for the deployed service (OWNER=name)
 	$(AWS_ENV) && uv run python -m phish_triage.service.keys create --owner $(OWNER)
 
 # Deploy from the laptop (the Free plan blocks CI's OIDC sign-in). Docker Desktop must be running.
-# make deploy-plan shows what will change; make deploy-apply applies exactly that plan and checks /v1/health.
+# make deploy-plan shows what will change; make deploy-apply applies exactly that plan and checks that the model in
+# infra/bundle-version is the one loaded. Only a clean, merged `main` is deployed; DEV=1 builds a dev-tagged test image.
 REGISTRY = $(ACCOUNT).dkr.ecr.us-east-2.amazonaws.com
-IMAGE_TAG = $$(git diff --quiet HEAD && git rev-parse HEAD || echo "dev-$$(git rev-parse --short HEAD)-$$(date +%Y%m%d%H%M%S)")
+IMAGE_TAG = $$(if [ -n "$(DEV)" ]; then echo "dev-$$(git rev-parse --short HEAD)-$$(date +%Y%m%d%H%M%S)"; else git rev-parse HEAD; fi)
+# Where alarms are emailed; never committed. An empty one would remove the email subscription, so plans refuse it.
+ALERT_EMAIL ?= $(shell cat ~/.config/phish-triage/alert-email 2>/dev/null)
 
-deploy-image:  ## build the arm64 Lambda image with the bundle and push it to the private registry
-	mkdir -p build && rm -rf build/bundle && cp -R "artifacts/bundle/$$(cat infra/bundle-version)" build/bundle
+deploy-image:  ## build the arm64 Lambda image with the bundle and push it to the private registry (DEV=1: a test image)
+	@if [ -z "$(DEV)" ]; then uv run python scripts/deploy_checks.py clean-main; fi
+	mkdir -p build && rm -rf build/bundle build/image-tag && cp -R "artifacts/bundle/$$(cat infra/bundle-version)" build/bundle
 	uv export --no-default-groups --group service --no-hashes --no-emit-project --format requirements-txt -q > build/requirements.txt
-	tag=$(IMAGE_TAG) && echo "$$tag" > build/image-tag && \
-	aws ecr get-login-password --profile $(AWS_PROFILE_NAME) --region us-east-2 | docker login --username AWS --password-stdin $(REGISTRY) && \
-	docker buildx build --platform linux/arm64 --provenance=false --sbom=false -f infra/lambda.Dockerfile -t "$(REGISTRY)/phish-triage:$$tag" --push . && \
-	echo "pushed phish-triage:$$tag"
+	tag=$(IMAGE_TAG) && \
+	if aws ecr describe-images --profile $(AWS_PROFILE_NAME) --region us-east-2 --repository-name phish-triage --image-ids imageTag="$$tag" >/dev/null 2>&1; then \
+	  echo "phish-triage:$$tag is already in the registry (tags are immutable)"; \
+	else \
+	  aws ecr get-login-password --profile $(AWS_PROFILE_NAME) --region us-east-2 | docker login --username AWS --password-stdin $(REGISTRY) && \
+	  docker buildx build --platform linux/arm64 --provenance=false --sbom=false -f infra/lambda.Dockerfile -t "$(REGISTRY)/phish-triage:$$tag" --push . && \
+	  echo "pushed phish-triage:$$tag"; \
+	fi && echo "$$tag" > build/image-tag
 
-deploy-plan:  ## plan infra/service for the image in build/image-tag (ALERT_EMAIL=... to email alarms)
+deploy-plan:  ## plan infra/service for the image in build/image-tag (alarm email from ~/.config/phish-triage/alert-email)
+	@test -n "$(ALERT_EMAIL)" || { echo "no ALERT_EMAIL (or ~/.config/phish-triage/alert-email): the plan would remove the alarm emails"; exit 1; }
+	@test -s build/image-tag || { echo "no build/image-tag: run make deploy-image first"; exit 1; }
 	$(AWS_ENV) && terraform -chdir=infra/service init -input=false -backend-config="bucket=phish-triage-tfstate-$(ACCOUNT)" && \
 	terraform -chdir=infra/service plan -input=false -out=service.tfplan -var "image_tag=$$(cat build/image-tag)" -var "alert_email=$(ALERT_EMAIL)"
 
-deploy-apply:  ## apply the saved service plan, load the model once (warm-up), then check /v1/health
+deploy-apply:  ## apply the saved service plan, load the model once (warm-up), then check it's the model in infra/bundle-version
 	$(AWS_ENV) && terraform -chdir=infra/service apply -input=false service.tfplan && \
 	aws lambda wait function-updated-v2 --function-name phish-triage-scan && \
 	aws lambda invoke --function-name phish-triage-scan --cli-binary-format raw-in-base64-out --cli-read-timeout 150 \
-	  --payload '{"source": "aws.events"}' build/warm.json >/dev/null && echo "warm-up: $$(cat build/warm.json)" && \
-	curl -fsS --retry 5 --retry-delay 10 --max-time 60 "$$(terraform -chdir=infra/service output -raw api_url)/v1/health" && echo
+	  --payload '{"source": "aws.events"}' build/warm.json > build/invoke.json && echo "warm-up: $$(cat build/warm.json)" && \
+	curl -fsS --retry 5 --retry-delay 10 --max-time 60 "$$(terraform -chdir=infra/service output -raw api_url)/v1/health" > build/health.json && \
+	cat build/health.json && echo && uv run python scripts/deploy_checks.py loaded build/invoke.json build/warm.json build/health.json

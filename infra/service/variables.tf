@@ -42,7 +42,7 @@ variable "explanations_enabled" {
 }
 
 variable "alert_email" {
-  description = "Where alarms are emailed (ALERT_EMAIL=... at plan time, not committed); empty = no email"
+  description = "Where alarms are emailed (ALERT_EMAIL=... or ~/.config/phish-triage/alert-email, never committed)"
   type        = string
-  default     = ""
+  sensitive   = true # kept out of plan output, so it can't end up in a log or a PR comment
 }
