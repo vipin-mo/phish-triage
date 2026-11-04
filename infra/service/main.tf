@@ -355,6 +355,96 @@ resource "aws_lambda_function" "smoke" {
   }
 }
 
+# --- The weekly drift check (service/drift.py): PSI of this week's verdicts against held-out legitimate mail ---
+
+resource "aws_iam_role" "drift" {
+  name               = "${local.name}-svc-drift"
+  assume_role_policy = data.aws_iam_policy_document.lambda_trust.json
+}
+
+data "aws_iam_policy_document" "drift" {
+  statement {
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = ["${aws_cloudwatch_log_group.drift.arn}:*"]
+  }
+  statement {
+    actions   = ["dynamodb:Scan"] # the stored verdicts only (score, stage, sender check); never an email
+    resources = [aws_dynamodb_table.t["verdicts"].arn]
+  }
+  statement {
+    actions   = ["cloudwatch:PutMetricData"]
+    resources = ["*"] # PutMetricData has no resource; the condition keeps it to the drift namespace
+    condition {
+      test     = "StringEquals"
+      variable = "cloudwatch:namespace"
+      values   = ["phish-triage/drift"]
+    }
+  }
+}
+
+resource "aws_iam_role_policy" "drift" {
+  role   = aws_iam_role.drift.id
+  policy = data.aws_iam_policy_document.drift.json
+}
+
+resource "aws_cloudwatch_log_group" "drift" {
+  name              = "/aws/lambda/${local.name}-drift"
+  retention_in_days = 14
+}
+
+resource "aws_lambda_function" "drift" {
+  function_name = "${local.name}-drift"
+  role          = aws_iam_role.drift.arn
+  package_type  = "Image"
+  image_uri     = local.image_uri
+  architectures = ["arm64"]
+  memory_size   = 512
+  timeout       = 120
+  image_config {
+    command = ["phish_triage.service.drift.handler"]
+  }
+  environment {
+    variables = { PHISH_TABLE_PREFIX = local.name }
+  }
+  logging_config {
+    log_format = "Text"
+    log_group  = aws_cloudwatch_log_group.drift.name
+  }
+}
+
+resource "aws_cloudwatch_event_rule" "drift" {
+  name                = "${local.name}-drift"
+  description         = "Compare this week's verdicts with the drift reference"
+  schedule_expression = "cron(0 13 ? * MON *)" # Mondays, 13:00 UTC
+}
+
+resource "aws_cloudwatch_event_target" "drift" {
+  rule = aws_cloudwatch_event_rule.drift.name
+  arn  = aws_lambda_function.drift.arn
+}
+
+resource "aws_lambda_permission" "drift" {
+  statement_id  = "AllowWeeklyDrift"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.drift.function_name
+  principal     = "events.amazonaws.com"
+  source_arn    = aws_cloudwatch_event_rule.drift.arn
+}
+
+resource "aws_cloudwatch_metric_alarm" "drift" {
+  alarm_name          = "${local.name}-drift"
+  alarm_description   = "This week's verdicts moved away from the reference: a PSI above 0.25 (service/drift.py)"
+  namespace           = "phish-triage/drift"
+  metric_name         = "MaxPSI"
+  statistic           = "Maximum"
+  period              = 86400
+  evaluation_periods  = 1
+  threshold           = 0.25
+  comparison_operator = "GreaterThanThreshold"
+  treat_missing_data  = "notBreaching" # a week with too few scans publishes no number
+  alarm_actions       = [aws_sns_topic.alarms.arn]
+}
+
 # --- Alarms and a dashboard ---
 
 resource "aws_sns_topic" "alarms" {
