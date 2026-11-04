@@ -3,6 +3,9 @@
 Shared by the analyst evaluations. Same money rules as `llm_classifier.py`: the worst case (counted input tokens +
 `max_tokens` per request) plus everything already spent must stay under `LLM_MAX_SPEND_USD`, and the real cost of
 every batch goes to the spend ledger. A batch that was submitted but not collected is resumed, never resent.
+
+An answer that came back but doesn't match the schema is asked for once more (`retry_invalid`), as the service will
+do; a refusal is kept as it is (`service/analyst.py` sends a refused email to a person).
 """
 
 from __future__ import annotations
@@ -10,6 +13,7 @@ from __future__ import annotations
 import json
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from phish_triage.config import max_llm_spend_usd
@@ -47,6 +51,17 @@ def load_saved(name: str) -> dict[str, dict]:
     return {row.pop("id"): row for row in rows}
 
 
+def answer_of(message) -> dict:
+    text = next((b.text for b in message.content if b.type == "text"), None)
+    error = None
+    if message.stop_reason == "refusal":
+        category = getattr(message.stop_details, "category", None) if message.stop_details else None
+        error = f"refusal ({category})"
+    elif message.stop_reason == "max_tokens":
+        error = "max_tokens"
+    return {"text": text, "stop_reason": message.stop_reason, "error": error}
+
+
 def run(name: str, params: dict[str, dict], client, poll_seconds: int = 30) -> dict[str, dict]:
     """custom_id -> {"text": str | None, "stop_reason": str, "error": str | None}; records the real cost."""
     from anthropic.types.message_create_params import MessageCreateParamsNonStreaming
@@ -82,16 +97,40 @@ def run(name: str, params: dict[str, dict], client, poll_seconds: int = 30) -> d
             continue
         message = result.result.message
         cost += cost_usd(model, message.usage, batch=True)
-        text = next((b.text for b in message.content if b.type == "text"), None)
-        error = None
-        if message.stop_reason == "refusal":
-            category = getattr(message.stop_details, "category", None) if message.stop_details else None
-            error = f"refusal ({category})"
-        elif message.stop_reason == "max_tokens":
-            error = "max_tokens"
-        out[result.custom_id] = {"text": text, "stop_reason": message.stop_reason, "error": error}
+        out[result.custom_id] = answer_of(message)
     record_spend({"run": name, "batch_id": batch_id, "model": model, "requests": len(out), "cost_usd": cost})
     Path(LLM_DIR / f"{name}.responses.jsonl").write_text(
         "".join(json.dumps({"id": i, **r}) + "\n" for i, r in out.items())
     )
     return out
+
+
+def needs_retry(answer: dict, is_valid: Callable[[str | None], bool]) -> bool:
+    """Came back, wasn't refused, and doesn't match the schema (a cut-off answer counts)."""
+    return answer.get("stop_reason") not in (None, "refusal") and not is_valid(answer.get("text"))
+
+
+def retry_invalid(
+    name: str, params: dict[str, dict], responses: dict[str, dict], is_valid: Callable[[str | None], bool], client=None
+) -> tuple[dict[str, dict], int]:
+    """(the answers with each invalid one asked for once more, how many were). The retries are ordinary calls, saved
+    and recorded in the spend ledger, so a rerun or rescore reuses them instead of paying again."""
+    todo = [i for i, answer in responses.items() if needs_retry(answer, is_valid)]
+    saved = LLM_DIR / f"{name}_retry.responses.jsonl"
+    if saved.exists():
+        retried = load_saved(f"{name}_retry")
+    elif not todo:
+        return responses, 0
+    elif client is None:
+        raise SystemExit(f"{len(todo)} answers need a retry, which calls the API; run with --confirm")
+    else:
+        model = params[todo[0]]["model"]
+        check_budget(worst_case_usd(model, 4_000 * len(todo), len(todo), batch=False) * 2, max_llm_spend_usd())
+        retried, cost = {}, 0.0
+        for i in todo:
+            message = client.messages.create(**params[i])
+            cost += cost_usd(model, message.usage, batch=False)
+            retried[i] = answer_of(message)
+        record_spend({"run": f"{name}_retry", "model": model, "requests": len(todo), "cost_usd": cost})
+        saved.write_text("".join(json.dumps({"id": i, **r}) + "\n" for i, r in retried.items()))
+    return {**responses, **retried}, len(retried)

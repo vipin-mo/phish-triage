@@ -5,7 +5,9 @@
     python -m phish_triage.evaluation.analyst_eval rescore         # re-check the saved answers (no API)
     python -m phish_triage.evaluation.analyst_eval ratings         # summarize my ratings once I've filled them in
 
-The defended analyst runs on 200 emails of the fixed Claude sample (half phishing), behind DistilBERT int8.
+The defended analyst runs on 200 emails of the fixed Claude sample (half phishing), behind the deployed cascade (its
+bundle, one email at a time, as the service runs it). Saved answers are named by prompt version and bundle version,
+so a new model or prompt means a new run.
 Measured: schema-valid rate, grounding failures (indicators dropped because their quote wasn't in the email or their
 URL wasn't one the extractor found), final verdicts against the true labels, and cost.
 
@@ -24,12 +26,11 @@ from pathlib import Path
 
 from phish_triage.data.records import MASKED_RECORDS, read_analyst_view, read_records
 from phish_triage.data.splits import SPLITS_DIR
-from phish_triage.evaluation.injection import distilbert_scorer
+from phish_triage.evaluation.injection import deployed_classifier
 from phish_triage.features.domains import default_ranks
 from phish_triage.features.extract import extract
 from phish_triage.features.sender import check_sender
 from phish_triage.models import llm_batch
-from phish_triage.models.baselines import email_text
 from phish_triage.models.llm_classifier import max_llm_spend_usd, sample_ids, spent_usd
 from phish_triage.service import analyst
 
@@ -40,40 +41,44 @@ RATING_SHEET = ANALYST_DIR / "rating_sheet.csv"
 RATING_EMAILS = ANALYST_DIR / "rating_emails.md"  # each email as the model saw it, then its answer
 RUBRIC = ("correct", "grounded", "clear", "useful")  # each scored 1-3, see docs/ANALYST_RUBRIC.md
 REPORTS_DIR = Path("reports")
-BATCH = f"analyst_eval_v{analyst.PROMPT_VERSION}"
+
+
+def batch_name(classifier: str) -> str:
+    return f"analyst_eval_v{analyst.PROMPT_VERSION}_{classifier}"
 
 
 def build(emails: int = EMAILS):
     splits = json.loads((SPLITS_DIR / "splits.json").read_text())
     records = read_records(MASKED_RECORDS, set(splits["random"]["test"]))
     ids = sample_ids(splits, emails, {i: r["label"] for i, r in records.items()})
-    classifier, threshold = distilbert_scorer()
-    scores = classifier.score([email_text(records[i]) for i in ids])
+    classify, version = deployed_classifier()
+    scored = [classify(records[i]) for i in ids]
     ranks = default_ranks()
     views = read_analyst_view(set(ids))  # the classifier and the signals use the masked record; the analyst this
     params, meaning = {}, {}
-    for email_id, score in zip(ids, scores, strict=True):
+    for email_id, (score, flagged) in zip(ids, scored, strict=True):
         record = records[email_id]
         a = analyst.render(
             views[email_id],
             classifier_score=float(score),
-            classifier_phish=bool(score > threshold),
+            classifier_phish=flagged,
             sender=check_sender(record),
             signals=analyst.signals_from_features(extract(record, ranks)),
         )
         params[email_id] = analyst.request_params(a)
-        meaning[email_id] = {"label": record["label"], "flagged": bool(score > threshold), "_input": a}
-    return params, meaning
+        meaning[email_id] = {"label": record["label"], "flagged": flagged, "_input": a}
+    return params, meaning, version
 
 
-def evaluate(responses: dict, meaning: dict) -> tuple[dict, list[dict]]:
+def evaluate(responses: dict, meaning: dict, classifier: str = "") -> tuple[dict, list[dict]]:
     rows, verdicts, indicators, dropped, with_drop, invalid, errors = [], Counter(), 0, 0, 0, 0, Counter()
     from_signals = conflicts = no_action = 0
     for email_id, m in meaning.items():
         raw = responses.get(email_id, {})
         if raw.get("error"):
             errors[raw["error"]] += 1
-        r = analyst.finish(None if raw.get("error") else raw.get("text"), m["_input"], m["flagged"])
+        refused = raw.get("stop_reason") == "refusal"
+        r = analyst.finish(None if raw.get("error") else raw.get("text"), m["_input"], m["flagged"], refused=refused)
         invalid += not r.schema_valid
         kept = len(r.output.indicators) if r.output else 0
         indicators += kept + r.indicators_dropped
@@ -105,6 +110,7 @@ def evaluate(responses: dict, meaning: dict) -> tuple[dict, list[dict]]:
     n = len(meaning)
     summary = {
         "prompt_version": analyst.PROMPT_VERSION,
+        "classifier": classifier,
         "emails": n,
         "schema_valid_rate": (n - invalid) / n,
         "indicators": indicators,
@@ -120,7 +126,7 @@ def evaluate(responses: dict, meaning: dict) -> tuple[dict, list[dict]]:
     return summary, rows
 
 
-def measure_latency(params: dict[str, dict], client, emails: int = 20) -> dict:
+def measure_latency(params: dict[str, dict], client, batch: str, emails: int = 20) -> dict:
     """Seconds per email with ordinary (not batch) calls, one at a time; cost recorded in the spend ledger."""
     import time
 
@@ -128,7 +134,7 @@ def measure_latency(params: dict[str, dict], client, emails: int = 20) -> dict:
 
     from phish_triage.models.llm_classifier import check_budget, cost_usd, record_spend, worst_case_usd
 
-    path = Path("data/llm") / f"{BATCH}.latency.json"
+    path = Path("data/llm") / f"{batch}.latency.json"
     if path.exists():
         return json.loads(path.read_text())
     chosen = list(params)[:emails]
@@ -139,7 +145,7 @@ def measure_latency(params: dict[str, dict], client, emails: int = 20) -> dict:
         message = client.messages.create(**params[email_id])
         timings.append(time.perf_counter() - started)
         cost += cost_usd(analyst.MODEL, message.usage, batch=False)
-    record_spend({"run": f"{BATCH}_latency", "model": analyst.MODEL, "emails": len(chosen), "cost_usd": cost})
+    record_spend({"run": f"{batch}_latency", "model": analyst.MODEL, "emails": len(chosen), "cost_usd": cost})
     result = {"p50": float(np.percentile(timings, 50)), "p95": float(np.percentile(timings, 95)), "cost_usd": cost}
     path.write_text(json.dumps(result) + "\n")
     return result
@@ -240,11 +246,14 @@ def to_markdown(s: dict) -> str:
     verdict_rows = "\n".join(f"| {k} | {v} |" for k, v in s["verdicts"].items())
     return (
         "# Analyst step on ordinary emails\n\n"
-        "Generated by `python -m phish_triage.evaluation.analyst_eval run`. Claude Haiku 5.5 behind DistilBERT int8, "
-        f"on {s['emails']} emails of the fixed sample (half phishing). "
+        "Generated by `python -m phish_triage.evaluation.analyst_eval run`. Claude Haiku 5.5 behind the deployed "
+        f"cascade (bundle `{s['classifier']}`, one email at a time, as the service runs it), on {s['emails']} emails "
+        "of the fixed sample (half phishing). "
         f"Analyst prompt version {s['prompt_version']}.\n\n"
         "| Measure | Value |\n|---|---:|\n"
-        f"| Schema-valid answers | {s['schema_valid_rate']:.1%} |\n"
+        f"| Schema-valid answers, first try | {s.get('schema_valid_first_try', s['schema_valid_rate']):.1%} |\n"
+        f"| Schema-valid answers, after asking once more ({s.get('retried', 0)} asked) | "
+        f"{s['schema_valid_rate']:.1%} |\n"
         f"| Indicators returned | {s['indicators']:,} |\n"
         f"| Grounding failures (dropped) | {s['grounding_failures']} ({s['grounding_failure_rate']:.1%}) |\n"
         f"| Answers with at least one dropped indicator | {s['answers_with_a_dropped_indicator']} |\n"
@@ -271,25 +280,32 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "ratings":
         print(json.dumps(summarize_ratings(), indent=1))
         return 0
-    params, meaning = build()
+    params, meaning, version = build()
+    batch = batch_name(version)
     if args.command == "plan":
         print(
             f"{len(params)} requests; worst case ${llm_batch.worst_case(params):.2f}; "
             f"spent so far ${spent_usd():.2f}; cap ${max_llm_spend_usd():.2f}"
         )
         return 0
+    client = None
     if args.command == "rescore":  # re-apply the checks to the saved answers; no API calls
-        responses = llm_batch.load_saved(BATCH)
+        responses = llm_batch.load_saved(batch)
     elif not args.confirm:
         parser.error("this calls the Claude API and costs money; add --confirm")
     else:
         from phish_triage.models.llm_classifier import _client
 
         client = _client()
-        responses = llm_batch.run(BATCH, params, client)
-        measure_latency(params, client)
-    summary, rows = evaluate(responses, meaning)
-    latency_path = Path("data/llm") / f"{BATCH}.latency.json"
+        responses = llm_batch.run(batch, params, client)
+        measure_latency(params, client, batch)
+    first_try, _ = evaluate(responses, meaning, version)
+    valid = lambda raw: analyst.parse_answer(raw) is not None  # noqa: E731
+    responses, retried = llm_batch.retry_invalid(batch, params, responses, valid, client)
+    summary, rows = evaluate(responses, meaning, version)
+    summary["schema_valid_first_try"] = first_try["schema_valid_rate"]
+    summary["retried"] = retried
+    latency_path = Path("data/llm") / f"{batch}.latency.json"
     if latency_path.exists():
         summary["latency_s"] = json.loads(latency_path.read_text())
     REPORTS_DIR.mkdir(exist_ok=True)

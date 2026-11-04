@@ -320,11 +320,21 @@ def advice_conflict(output: AnalystOutput) -> bool:
     return output.recommended_action == "no_action" and bool(_ADVICE.search(output.summary))
 
 
-def final_verdict(classifier_phish: bool, suggestion: Suggestion | None, ai_found: bool) -> tuple[Verdict, list[str]]:
-    """Raise only: the analyst can push the classifier's verdict up, never down."""
+def final_verdict(
+    classifier_phish: bool, suggestion: Suggestion | None, ai_found: bool, refused: bool = False
+) -> tuple[Verdict, list[str]]:
+    """Raise only: the analyst can push the classifier's verdict up, never down.
+
+    With no valid answer the classifier's verdict stands, except after a refusal: the email's content caused it, so
+    an attacker could cause one on purpose to switch the analyst off, and an email the classifier didn't flag goes
+    to a person instead of being marked safe. Errors the email can't cause (timeouts, limits) keep the fallback.
+    """
     reasons = []
-    if suggestion is None:
-        verdict: Verdict = "phish" if classifier_phish else "safe"
+    if suggestion is None and refused and not classifier_phish:
+        verdict: Verdict = "needs_human_review"
+        reasons.append("the analyst refused to read this email; a person checks it")
+    elif suggestion is None:
+        verdict = "phish" if classifier_phish else "safe"
         reasons.append("analyst unavailable; classifier verdict kept")
     elif suggestion == "phish":
         verdict = "phish"
@@ -341,16 +351,28 @@ def final_verdict(classifier_phish: bool, suggestion: Suggestion | None, ai_foun
     return verdict, reasons
 
 
-def finish(
-    raw: str | None, analyst_input: AnalystInput, classifier_phish: bool, *, defended: bool = True
-) -> AnalystResult:
-    """Validate the model's answer, drop ungrounded indicators and apply the raise-only rule."""
+def parse_answer(raw: str | None) -> AnalystOutput | None:
+    """The answer if it is JSON matching the schema, else None (the caller asks once more, then falls back)."""
     try:
-        output = AnalystOutput.model_validate(json.loads(raw)) if raw else None
+        return AnalystOutput.model_validate(json.loads(raw)) if raw else None
     except (json.JSONDecodeError, ValidationError):
-        output = None
+        return None
+
+
+def finish(
+    raw: str | None,
+    analyst_input: AnalystInput,
+    classifier_phish: bool,
+    *,
+    defended: bool = True,
+    refused: bool = False,
+) -> AnalystResult:
+    """Validate the model's answer, drop ungrounded indicators and apply the raise-only rule. `refused`: the model
+    declined to answer (`stop_reason` "refusal")."""
+    output = parse_answer(raw)
     if output is None:
-        verdict, reasons = final_verdict(classifier_phish, None, bool(analyst_input.ai_instructions))
+        ai_found = bool(analyst_input.ai_instructions)
+        verdict, reasons = final_verdict(classifier_phish, None, ai_found, refused=refused and defended)
         return AnalystResult(verdict, None, False, 0, reasons)
     kept = [i for i in output.indicators if grounded(i, analyst_input)]
     dropped = len(output.indicators) - len(kept)

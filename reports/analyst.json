@@ -1,25 +1,27 @@
 {
  "prompt_version": 5,
+ "classifier": "with-newsletters-20261104-e7f1d257",
  "emails": 200,
  "schema_valid_rate": 1.0,
- "indicators": 614,
- "grounding_failures": 3,
- "grounding_failure_rate": 0.004885993485342019,
- "kept_indicators_citing_a_signal": 344,
- "answers_with_a_dropped_indicator": 3,
- "no_action_answers": 74,
- "no_action_with_advice_in_summary": 1,
+ "indicators": 623,
+ "grounding_failures": 7,
+ "grounding_failure_rate": 0.011235955056179775,
+ "kept_indicators_citing_a_signal": 353,
+ "answers_with_a_dropped_indicator": 6,
+ "no_action_answers": 77,
+ "no_action_with_advice_in_summary": 3,
  "errors": {},
  "verdicts": {
-  "legit -> needs_human_review": 1,
-  "legit -> phish": 1,
-  "legit -> safe": 91,
+  "legit -> safe": 93,
   "legit -> suspicious": 7,
-  "phish -> phish": 100
+  "phish -> phish": 99,
+  "phish -> suspicious": 1
  },
+ "schema_valid_first_try": 0.995,
+ "retried": 1,
  "latency_s": {
-  "p50": 2.5867531250041793,
-  "p95": 3.457348594395444,
-  "cost_usd": 0.005769705
+  "p50": 3.068706396006746,
+  "p95": 4.083829859799882,
+  "cost_usd": 0.006051405
  }
 }

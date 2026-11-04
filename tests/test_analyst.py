@@ -103,6 +103,15 @@ def test_raise_only(classifier_phish, suggestion, ai_found, expected):
     assert analyst.final_verdict(classifier_phish, suggestion, ai_found)[0] == expected
 
 
+def test_a_refusal_sends_an_unflagged_email_to_a_person_not_to_safe():
+    # The email's content causes a refusal, so an attacker could switch the analyst off with one
+    assert analyst.final_verdict(False, None, False, refused=True)[0] == "needs_human_review"
+    assert analyst.final_verdict(True, None, False, refused=True)[0] == "phish"
+    a = analyst.render(_record("clean_newsletter.eml"), classifier_score=0.1, classifier_phish=False)
+    assert analyst.finish(None, a, classifier_phish=False, refused=True).verdict == "needs_human_review"
+    assert analyst.finish(None, a, classifier_phish=False).verdict == "safe"  # a timeout: the classifier stands
+
+
 def test_schema_violations_fall_back_to_the_classifier():
     a = analyst.render(_record(), classifier_score=0.97, classifier_phish=True)
     too_long = _answer(summary=" ".join(["word"] * 81))
