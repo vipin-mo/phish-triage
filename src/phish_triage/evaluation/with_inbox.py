@@ -71,6 +71,8 @@ def _distilbert(split: str, val_ids: list[str], eval_ids: list[str], records: di
     from phish_triage.models.transformer import OnnxClassifier
 
     saved = predictions.load(split, DISTILBERT)
+    if saved.val_ids != val_ids:  # the split changed since training: these scores are of another model's data
+        raise SystemExit(f"saved DistilBERT predictions don't match the {split} validation split; re-run training")
     known = dict(zip(saved.val_ids, saved.val_scores, strict=True)) | dict(
         zip(saved.test_ids, saved.test_scores, strict=True)
     )

@@ -333,7 +333,7 @@ def build(n_bootstrap: int) -> str:
         *llm_lines,
         "## 5. The cascade: how much LLM is needed?",
         "",
-        "### `random` (the deployable models)",
+        "### `random` (the public-data models)",
         "",
         *cascade_section(y, sample, n_bootstrap),
         "### `by_time` (trained on 2015–2022, tested on 2023–2026)",

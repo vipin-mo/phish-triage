@@ -94,9 +94,10 @@ def inject(record: dict, technique: str, payload: str) -> dict:
 def deployed_classifier():
     """(record -> (score, flagged), bundle version): the deployed bundle, one email at a time, as the service runs it.
     Its training split holds none of the `random` test emails these evaluations use."""
-    from phish_triage.service.bundle import DEPLOYED_SPLIT, latest
+    from phish_triage.service.bundle import DEPLOYED_SPLIT, latest, load_split
     from phish_triage.service.scanner import Scanner
 
+    load_split(DEPLOYED_SPLIT)  # stops if the `random` test emails are in its training data
     scanner = Scanner(latest(split=DEPLOYED_SPLIT), threads=4)
 
     def classify(record: dict) -> tuple[float, bool]:
@@ -199,6 +200,7 @@ def evaluate(responses: dict[str, dict], meaning: dict[str, dict], classifier: s
     defended_clean = [r for (_, c), r in clean.items() if c == "defended"]
     return {
         "prompt_version": analyst.PROMPT_VERSION,
+        "llm_model": analyst.MODEL,
         "classifier": classifier,
         "emails": len(clean_flag),
         "variants_per_condition": sum(1 for m in meaning.values() if m["technique"] != "clean") // len(CONDITIONS),
@@ -267,6 +269,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
     if args.command == "rescore":  # re-apply the checks to the saved answers; no API calls
+        llm_batch.check_fingerprint(batch, params)
         responses = llm_batch.load_saved(batch)
     elif not args.confirm:
         parser.error("this calls the Claude API and costs money; add --confirm")

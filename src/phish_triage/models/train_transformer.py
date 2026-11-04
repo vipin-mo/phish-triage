@@ -1,4 +1,4 @@
-"""Fine-tune DistilBERT on the splits, save its predictions, and export the deployable model to ONNX int8.
+"""Fine-tune DistilBERT on the splits, save its predictions, and export it to ONNX (fp32 served, int8 compared).
 
     python -m phish_triage.models.train_transformer                        # head strategy, every split
     python -m phish_triage.models.train_transformer random by_time --strategy head_tail

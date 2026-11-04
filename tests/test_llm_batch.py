@@ -47,3 +47,13 @@ def test_a_needed_retry_without_a_client_stops(ledger):
     responses = {"b": {"text": "bad", "stop_reason": "end_turn", "error": None}}
     with pytest.raises(SystemExit):
         llm_batch.retry_invalid("u", {"b": {"model": "m"}}, responses, lambda raw: False, None)
+
+
+def test_saved_answers_are_reused_only_for_the_same_requests(ledger):
+    asked = {"a": {"model": "m", "messages": [{"content": "This request's tag id is 1a2b3c4d. <email-1a2b3c4d>"}]}}
+    again = {"a": {"model": "m", "messages": [{"content": "This request's tag id is 99ff00aa. <email-99ff00aa>"}]}}
+    assert llm_batch.fingerprint(asked) == llm_batch.fingerprint(again)  # only the random tag differs
+    llm_batch.check_fingerprint("f", asked)
+    llm_batch.check_fingerprint("f", again)
+    with pytest.raises(SystemExit):
+        llm_batch.check_fingerprint("f", {"a": {**asked["a"], "model": "another-model"}})
