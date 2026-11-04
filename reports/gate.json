@@ -5,7 +5,7 @@
   "inbox_false_alarm_rate": 0.020080321285140562,
   "privacymail_false_alarm_rate": 0.008560727661851257,
   "schema_valid_rate": 1.0,
-  "grounding_failure_rate": 0.004885993485342019,
+  "grounding_failure_rate": 0.011235955056179775,
   "ungrounded_indicators_shown": 0,
   "injection_verdict_flip_rate": 0.0,
   "injection_model_flip_rate": 0.0,
