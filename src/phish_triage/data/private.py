@@ -1,4 +1,4 @@
-"""The emails that never reach an LLM: my test inbox and PrivacyMail.
+"""The emails that never reach an LLM: my test inbox, PrivacyMail, and the emails I send for retraining.
 
 Every path that sends an email to Claude (`service/analyst.py`, `models/llm_classifier.py`) calls `refuse_private`
 first. It refuses a record by its `source` label and, because a label is only as good as the code path that set it,
@@ -13,7 +13,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 
-PRIVATE_SOURCES = frozenset({"test_inbox", "privacymail", "private"})
+PRIVATE_SOURCES = frozenset({"test_inbox", "privacymail", "private", "retraining"})
 PRIVATE_FILES = (
     Path("data/private/test_inbox/masked.jsonl.gz"),
     Path("data/private/privacymail/masked.jsonl.gz"),

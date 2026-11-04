@@ -116,6 +116,10 @@ data "aws_iam_policy_document" "scan" {
     actions   = ["secretsmanager:GetSecretValue"]
     resources = [aws_secretsmanager_secret.anthropic.arn]
   }
+  statement {
+    actions   = ["s3:PutObject"] # write only: the service can't read an email back
+    resources = ["${aws_s3_bucket.retraining.arn}/emails/*"]
+  }
 }
 
 resource "aws_iam_role_policy" "scan" {
@@ -143,12 +147,13 @@ resource "aws_lambda_function" "scan" {
   publish                        = true # each image is a numbered version; CodeDeploy moves the `live` alias to it
   environment {
     variables = {
-      PHISH_TABLE_PREFIX     = local.name
-      PHISH_BUNDLE_DIR       = "/opt/bundle"
-      PHISH_EXPLANATIONS     = var.explanations_enabled ? "on" : "off"
-      PHISH_ANTHROPIC_SECRET = aws_secretsmanager_secret.anthropic.name
-      PHISH_DAILY_LLM_USD    = tostring(var.daily_llm_usd)
-      LOKY_MAX_CPU_COUNT     = "1" # joblib can't count cores on Lambda and logs a traceback otherwise
+      PHISH_TABLE_PREFIX      = local.name
+      PHISH_BUNDLE_DIR        = "/opt/bundle"
+      PHISH_EXPLANATIONS      = var.explanations_enabled ? "on" : "off"
+      PHISH_ANTHROPIC_SECRET  = aws_secretsmanager_secret.anthropic.name
+      PHISH_DAILY_LLM_USD     = tostring(var.daily_llm_usd)
+      PHISH_RETRAINING_BUCKET = aws_s3_bucket.retraining.bucket
+      LOKY_MAX_CPU_COUNT      = "1" # joblib can't count cores on Lambda and logs a traceback otherwise
     }
   }
   logging_config {
@@ -249,6 +254,62 @@ resource "aws_lambda_permission" "api" {
   qualifier     = aws_lambda_alias.live.name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.http.execution_arn}/*/*"
+}
+
+# --- Emails I send for retraining: the only email the service ever keeps, and only when I ask ---
+
+# Written by the scan function (POST /v1/retraining-email), which can't read them back; read and deleted from my
+# laptop by `make retrain`. Not versioned, so a deleted email is gone, and each one expires after 90 days anyway.
+resource "aws_s3_bucket" "retraining" {
+  bucket = "${local.name}-retraining-${data.aws_caller_identity.me.account_id}"
+}
+
+resource "aws_s3_bucket_public_access_block" "retraining" {
+  bucket                  = aws_s3_bucket.retraining.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "retraining" {
+  bucket = aws_s3_bucket.retraining.id
+  rule {
+    apply_server_side_encryption_by_default { sse_algorithm = "AES256" }
+    bucket_key_enabled = true
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "retraining" {
+  bucket = aws_s3_bucket.retraining.id
+  rule {
+    id     = "delete-after-90-days"
+    status = "Enabled"
+    filter {}
+    expiration { days = 90 }
+  }
+}
+
+data "aws_iam_policy_document" "retraining_tls" {
+  statement {
+    effect    = "Deny"
+    actions   = ["s3:*"]
+    resources = [aws_s3_bucket.retraining.arn, "${aws_s3_bucket.retraining.arn}/*"]
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "retraining" {
+  bucket = aws_s3_bucket.retraining.id
+  policy = data.aws_iam_policy_document.retraining_tls.json
 }
 
 # --- Explanations, on demand: the scan function calls Anthropic in the request (service/explain.py) ---
@@ -564,3 +625,4 @@ resource "aws_cloudwatch_dashboard" "main" {
 output "api_url" { value = aws_apigatewayv2_api.http.api_endpoint }
 output "scan_function" { value = aws_lambda_function.scan.function_name }
 output "scan_version" { value = aws_lambda_function.scan.version }
+output "retraining_bucket" { value = aws_s3_bucket.retraining.bucket }

@@ -235,7 +235,8 @@ I kept English mail only, removed duplicates within each website and took at mos
 
 The service runs on AWS (us-east-2): a container-image Lambda (arm64, 3 GB) behind an API Gateway HTTP API, with
 DynamoDB for API keys (hashed), verdicts and feedback, all in Terraform ([infra/](infra/)). It stores no email:
-a verdict, a score and the email's SHA-256 (see [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md), rule 8).
+a verdict, a score and the email's SHA-256 (see [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md), rule 8), unless I
+send one for retraining from the add-on, which keeps it in a private bucket for at most 90 days.
 Explanations run on demand (`POST /v1/explain`): the email in the request goes to Claude once, the answer comes
 straight back, and neither is stored; at most 50 a day per key and $0.50 a day in all. The queue and worker built
 for a background design were removed, since a queue would have had to hold the email.
