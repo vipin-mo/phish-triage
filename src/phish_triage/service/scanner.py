@@ -104,6 +104,11 @@ class Scanner:
         timings["total_ms"] = round((time.perf_counter() - started) * 1000)
         log.info(json.dumps({"event": "scanner_loaded", "version": self.version, **timings}))
 
+    @property
+    def ranks(self):
+        """The domain-popularity table, for the explanation step's sender check."""
+        return self._ranks
+
     def scan(self, raw: bytes) -> ScanResult:
         from phish_triage.data.mask import mask_record
         from phish_triage.data.parse import parse_email

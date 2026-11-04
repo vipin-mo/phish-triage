@@ -39,6 +39,7 @@ class Store(Protocol):
     def get_verdict(self, owner: str, scan: str) -> dict | None: ...
     def put_verdict(self, owner: str, scan: str, verdict: dict) -> None: ...
     def put_feedback(self, owner: str, scan: str, label: str, model_version: str | None = None) -> None: ...
+    def add_today(self, counter: str, amount: int) -> int: ...  # the day's total after adding (UTC days)
 
 
 @dataclass
@@ -66,6 +67,11 @@ class MemoryStore:
 
     def put_verdict(self, owner: str, scan: str, verdict: dict) -> None:
         self.verdicts[(owner, scan)] = verdict
+
+    def add_today(self, counter: str, amount: int) -> int:
+        day = int(time.time() // 86_400)
+        self._counts[(f"day#{counter}", day)] += amount
+        return self._counts[(f"day#{counter}", day)]
 
     def put_feedback(self, owner: str, scan: str, label: str, model_version: str | None = None) -> None:
         self.feedback.append(

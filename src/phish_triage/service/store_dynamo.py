@@ -48,6 +48,18 @@ class DynamoStore:
         )
         return int(result["Attributes"]["requests"]["N"]) <= per_minute
 
+    def add_today(self, counter: str, amount: int) -> int:
+        """A per-day counter in the rate table (its `minute` key holds the day here), deleted two days later."""
+        day = int(time.time() // 86_400)
+        result = self._db.update_item(
+            TableName=self.rate,
+            Key={"owner": {"S": f"day#{counter}"}, "minute": {"N": str(day)}},
+            UpdateExpression="ADD amount :n SET expires = :expires",
+            ExpressionAttributeValues={":n": {"N": str(amount)}, ":expires": {"N": str((day + 2) * 86_400)}},
+            ReturnValues="UPDATED_NEW",
+        )
+        return int(result["Attributes"]["amount"]["N"])
+
     def get_verdict(self, owner: str, scan: str) -> dict | None:
         key = {"owner": {"S": owner}, "scan_id": {"S": scan}}
         item = self._db.get_item(TableName=self.verdicts, Key=key).get("Item")

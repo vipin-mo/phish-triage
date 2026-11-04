@@ -62,3 +62,11 @@ def test_a_key_hash_cannot_be_overwritten(store):
     s.add_key_hash("h", "vipin")
     with pytest.raises(Exception, match="ConditionalCheckFailed"):
         s.add_key_hash("h", "someone else")
+
+
+def test_daily_counters_add_up_and_expire(store):
+    s, client = store
+    assert s.add_today("explain#vipin", 1) == 1 and s.add_today("explain#vipin", 1) == 2
+    assert s.add_today("llm-spend-microusd", 0) == 0 and s.add_today("llm-spend-microusd", 1500) == 1500
+    items = [i for i in client.scan(TableName="pt-rate")["Items"] if i["owner"]["S"].startswith("day#")]
+    assert len(items) == 2 and all(int(i["expires"]["N"]) > int(i["minute"]["N"]) * 86_400 for i in items)

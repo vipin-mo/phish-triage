@@ -1,7 +1,7 @@
 """The HTTP API: FastAPI locally, the same app on Lambda through Mangum (`service/lambda_handler.py`).
 
     POST /v1/scan                  raw email (.eml bytes or plain text) -> verdict, score and `phishing_above`
-    GET  /v1/explanations/{id}     the LLM explanation of a scan (switched off for now)
+    POST /v1/explain               the same email again -> the analyst's explanation and final verdict (on demand)
     POST /v1/feedback              {"scan_id": ..., "label": "correct" | "false_alarm" | "missed_phish"}
     GET  /v1/health                no key needed; the model version
 
@@ -11,8 +11,10 @@ deployed it is scanned again), each key has a per-minute limit, and only the ver
 (`service/store.py`). Each request logs one JSON line with a request id, the key's owner, status, verdict and
 time taken; no email content is ever logged.
 
-Explanations are built but switched off (`PHISH_EXPLANATIONS=on` turns them on in a later phase): a scan then
-answers `explanation_id: null`, and the explanations endpoint says they are off.
+Explanations (`service/explain.py`) run only when asked for, with `PHISH_EXPLANATIONS=on`: the email in the request
+goes to Anthropic once and the answer comes straight back; neither is stored. Each key may ask for
+`EXPLAIN_PER_DAY` a day, and all keys together may spend `PHISH_DAILY_LLM_USD` a day (default $0.50), on top of
+the monthly limit set at Anthropic.
 """
 
 from __future__ import annotations
@@ -32,6 +34,8 @@ from phish_triage.service.store import FEEDBACK_LABELS, MemoryStore, Store, scan
 
 MAX_BYTES = 2 * 1024 * 1024
 PER_MINUTE = 60
+EXPLAIN_PER_DAY = 50
+SPEND_COUNTER = "llm-spend-microusd"  # all keys together, in millionths of a dollar
 log = logging.getLogger("phish_triage.api")
 
 
@@ -40,10 +44,18 @@ class Feedback(BaseModel):
     label: str
 
 
-def create_app(scanner_factory: Callable[[], object], store: Store, *, explanations: bool | None = None) -> FastAPI:
-    """`scanner_factory` is called once, on the first scan, so a cold start doesn't load the model for health."""
+def create_app(
+    scanner_factory: Callable[[], object],
+    store: Store,
+    *,
+    explanations: bool | None = None,
+    explainer_factory: Callable[[], object] | None = None,
+) -> FastAPI:
+    """`scanner_factory` is called once, on the first scan, so a cold start doesn't load the model for health; the
+    same for `explainer_factory` (it reads the Anthropic key) on the first explanation."""
     if explanations is None:
         explanations = os.environ.get("PHISH_EXPLANATIONS", "off") == "on"
+    daily_budget_microusd = int(float(os.environ.get("PHISH_DAILY_LLM_USD", "0.50")) * 1e6)
     app = FastAPI(title="phish-triage", docs_url=None, redoc_url=None, openapi_url=None)
     state: dict = {}
 
@@ -51,6 +63,16 @@ def create_app(scanner_factory: Callable[[], object], store: Store, *, explanati
         if "scanner" not in state:
             state["scanner"] = scanner_factory()
         return state["scanner"]
+
+    def explainer():
+        if "explainer" not in state:
+            if explainer_factory is None:
+                from phish_triage.service.explain import Explainer, anthropic_client
+
+                state["explainer"] = Explainer(anthropic_client())
+            else:
+                state["explainer"] = explainer_factory()
+        return state["explainer"]
 
     def owner_of(request: Request) -> str:
         owner = store.key_owner(request.headers.get("x-api-key", ""))
@@ -94,9 +116,7 @@ def create_app(scanner_factory: Callable[[], object], store: Store, *, explanati
         version = state["scanner"].version if "scanner" in state else None
         return {"status": "ok", "model_version": version, "explanations": "on" if explanations else "off"}
 
-    @app.post("/v1/scan")
-    async def scan(request: Request):
-        owner = owner_of(request)
+    async def email_of(request: Request) -> bytes:
         declared = request.headers.get("content-length")
         if declared and declared.isdigit() and int(declared) > MAX_BYTES:
             raise HTTPException(413, "email is larger than 2 MB")
@@ -105,6 +125,9 @@ def create_app(scanner_factory: Callable[[], object], store: Store, *, explanati
             raise HTTPException(413, "email is larger than 2 MB")
         if not raw.strip():
             raise HTTPException(400, "empty email")
+        return raw
+
+    def verdict_of(owner: str, raw: bytes) -> dict:
         scan = scan_id(raw)
         s = scanner()
         cached = store.get_verdict(owner, scan)
@@ -122,18 +145,32 @@ def create_app(scanner_factory: Callable[[], object], store: Store, *, explanati
                 "sender": result.sender,
                 "model_version": s.version,
                 "rules_version": current[1],
-                "explanation_id": None,
             }
             store.put_verdict(owner, scan, cached)
-        request.state.verdict = cached["verdict"]
         return cached
 
-    @app.get("/v1/explanations/{explanation_id}")
-    def explanation(explanation_id: str, request: Request):
-        owner_of(request)
+    @app.post("/v1/scan")
+    async def scan(request: Request):
+        owner = owner_of(request)
+        verdict = verdict_of(owner, await email_of(request))
+        request.state.verdict = verdict["verdict"]
+        return verdict
+
+    @app.post("/v1/explain")
+    async def explain(request: Request):
+        owner = owner_of(request)
         if not explanations:
             raise HTTPException(404, "explanations are switched off")
-        raise HTTPException(404, "no such explanation")
+        raw = await email_of(request)
+        if store.add_today(f"explain#{owner}", 1) > EXPLAIN_PER_DAY:
+            raise HTTPException(429, f"at most {EXPLAIN_PER_DAY} explanations a day per key")
+        if store.add_today(SPEND_COUNTER, 0) >= daily_budget_microusd:
+            raise HTTPException(429, "today's LLM budget is used up; the scan verdict still works")
+        verdict = verdict_of(owner, raw)
+        result = explainer().explain(raw, verdict, getattr(scanner(), "ranks", None))
+        store.add_today(SPEND_COUNTER, round(result.cost_usd * 1e6))
+        request.state.verdict = result.body["verdict"]
+        return result.body
 
     @app.post("/v1/feedback")
     def feedback(body: Feedback, request: Request):

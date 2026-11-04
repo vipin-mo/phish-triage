@@ -112,6 +112,10 @@ data "aws_iam_policy_document" "scan" {
     actions   = ["dynamodb:UpdateItem"]
     resources = [aws_dynamodb_table.t["rate"].arn]
   }
+  statement {
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [aws_secretsmanager_secret.anthropic.arn]
+  }
 }
 
 resource "aws_iam_role_policy" "scan" {
@@ -138,10 +142,12 @@ resource "aws_lambda_function" "scan" {
   reserved_concurrent_executions = var.scan_concurrency
   environment {
     variables = {
-      PHISH_TABLE_PREFIX = local.name
-      PHISH_BUNDLE_DIR   = "/opt/bundle"
-      PHISH_EXPLANATIONS = "off"
-      LOKY_MAX_CPU_COUNT = "1" # joblib can't count cores on Lambda and logs a traceback otherwise
+      PHISH_TABLE_PREFIX     = local.name
+      PHISH_BUNDLE_DIR       = "/opt/bundle"
+      PHISH_EXPLANATIONS     = var.explanations_enabled ? "on" : "off"
+      PHISH_ANTHROPIC_SECRET = aws_secretsmanager_secret.anthropic.name
+      PHISH_DAILY_LLM_USD    = tostring(var.daily_llm_usd)
+      LOKY_MAX_CPU_COUNT     = "1" # joblib can't count cores on Lambda and logs a traceback otherwise
     }
   }
   logging_config {
@@ -230,75 +236,14 @@ resource "aws_lambda_permission" "api" {
   source_arn    = "${aws_apigatewayv2_api.http.execution_arn}/*/*"
 }
 
-# --- Explanations: built, switched off (no trigger, no Anthropic key in AWS) ---
+# --- Explanations, on demand: the scan function calls Anthropic in the request (service/explain.py) ---
 
-resource "aws_sqs_queue" "explain_dlq" {
-  name                      = "${local.name}-explain-dlq"
-  message_retention_seconds = 1209600
-  sqs_managed_sse_enabled   = true
-}
-
-resource "aws_sqs_queue" "explain" {
-  name                       = "${local.name}-explain"
-  visibility_timeout_seconds = 120
-  message_retention_seconds  = 86400
-  sqs_managed_sse_enabled    = true
-  redrive_policy             = jsonencode({ deadLetterTargetArn = aws_sqs_queue.explain_dlq.arn, maxReceiveCount = 3 })
-}
-
-resource "aws_iam_role" "explain" {
-  name               = "${local.name}-svc-explain"
-  assume_role_policy = data.aws_iam_policy_document.lambda_trust.json
-}
-
-data "aws_iam_policy_document" "explain" {
-  statement {
-    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
-    resources = ["${aws_cloudwatch_log_group.explain.arn}:*"]
-  }
-  statement {
-    actions   = ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"]
-    resources = [aws_sqs_queue.explain.arn]
-  }
-}
-
-resource "aws_iam_role_policy" "explain" {
-  role   = aws_iam_role.explain.id
-  policy = data.aws_iam_policy_document.explain.json
-}
-
-resource "aws_cloudwatch_log_group" "explain" {
-  name              = "/aws/lambda/${local.name}-explain"
-  retention_in_days = 14
-}
-
-resource "aws_lambda_function" "explain" {
-  function_name = "${local.name}-explain"
-  role          = aws_iam_role.explain.arn
-  package_type  = "Image"
-  image_uri     = local.image_uri
-  architectures = ["arm64"]
-  memory_size   = 512
-  timeout       = 60
-
-  reserved_concurrent_executions = 1 # threat model rule 11: every function has a cap
-  image_config {
-    command = ["phish_triage.service.lambda_handler.explain"]
-  }
-  environment {
-    variables = { PHISH_EXPLANATIONS = "off" }
-  }
-  logging_config {
-    log_format = "Text"
-    log_group  = aws_cloudwatch_log_group.explain.name
-  }
-}
-
-resource "aws_lambda_event_source_mapping" "explain" {
-  event_source_arn = aws_sqs_queue.explain.arn
-  function_name    = aws_lambda_function.explain.arn
-  batch_size       = 1
-  enabled          = var.explanations_enabled
+# The key's value is put from my laptop (`make put-anthropic-key`, read from .env), never through Terraform, so it
+# isn't in the plan or the state. Only the scan function can read it.
+resource "aws_secretsmanager_secret" "anthropic" {
+  name                    = "${local.name}/anthropic-api-key"
+  description             = "Anthropic API key for on-demand explanations"
+  recovery_window_in_days = 7
 }
 
 # --- Alarms and a dashboard ---
@@ -335,11 +280,6 @@ locals {
       namespace  = "AWS/ApiGateway", metric = "Count", stat = "Sum", threshold = 1500, periods = 1,
       dimensions = { ApiId = aws_apigatewayv2_api.http.id, Stage = "$default" },
       text       = "About 5 requests a second for 5 minutes, the throttle's rate: far above my use, and each costs money"
-    }
-    "explain-dlq" = {
-      namespace  = "AWS/SQS", metric = "ApproximateNumberOfMessagesVisible", stat = "Maximum", threshold = 1, periods = 1,
-      dimensions = { QueueName = aws_sqs_queue.explain_dlq.name },
-      text       = "A message reached the explanation dead-letter queue"
     }
   }
 }
@@ -414,8 +354,8 @@ resource "aws_cloudwatch_dashboard" "main" {
       {
         type = "metric", x = 12, y = 6, width = 12, height = 6,
         properties = {
-          title   = "Explanation dead-letter queue", region = var.region, stat = "Maximum", period = 300,
-          metrics = [["AWS/SQS", "ApproximateNumberOfMessagesVisible", "QueueName", aws_sqs_queue.explain_dlq.name]]
+          title   = "API latency (p95, ms)", region = var.region, stat = "p95", period = 300,
+          metrics = [["AWS/ApiGateway", "Latency", "ApiId", aws_apigatewayv2_api.http.id, "Stage", "$default"]]
         }
       },
     ]
