@@ -252,9 +252,9 @@ explanation queue and worker exist but are switched off.
 
 ## Known issues
 
-All but one are fixed. The first two were found while rating the analyst's answers by hand, the next six
-afterwards, on my test inbox, while packaging the model and on PrivacyMail, all in November 2026; every number
-above was re-measured after the fixes, except the Claude runs, as noted.
+All but two are fixed. The first two were found while rating the analyst's answers by hand, the rest afterwards:
+on my test inbox, while packaging the model, on PrivacyMail, in the Claude re-run and in a review of the code, all
+in November 2026. Every number above was re-measured after the fixes, except my hand ratings, as noted.
 
 - **Masking rewrote links (fixed).** Replacing the Apache list names with `project` ran over the whole body and
   HTML, including URLs and addresses. It rewrote a URL or address in 7,978 of the 13,541 legitimate emails the
@@ -295,6 +295,16 @@ above was re-measured after the fixes, except the Claude runs, as noted.
   [docs/DATA.md](docs/DATA.md)); the report tracks this number for every model I train.
 - **The analyst and injection results were from before these fixes (fixed).** Re-run behind the deployed model for
   $0.26; that run found the refusal gap above, now closed.
+- **The service lost the forged-header warning (fixed).** Masking drops the lower Authentication-Results headers, so
+  the warning that one of them claims a pass the provider didn't give never fired in the service, only on raw
+  emails. Masking now keeps whether one did. Stored verdicts also carry a rules version now, so a change like this
+  one scans stored emails again, as a new model does.
+- **Filler can lift an image email out of review (open, kept on purpose).** An email whose HTML is an image, with
+  20 words of hidden text or of a plain-text part next to it, isn't sent to review. Counting only the words the
+  HTML shows would catch it, but legitimate image newsletters are built the same way: the deployed cascade would
+  flag or send to review 22.5% of my inbox's test emails instead of 2.0%, and 6.1% of the held-out newsletters
+  instead of 1.8%, for 0.4 points more of the public test's phishing (none more of the 2026 phishing). Reading the
+  image itself (OCR, QR codes) is the fix I'd make instead.
 
 ## Progress
 

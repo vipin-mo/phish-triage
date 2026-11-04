@@ -125,3 +125,26 @@ def test_latest_picks_the_newest_bundle_or_the_newest_of_one_split(tmp_path):
     assert latest(tmp_path, split="with_inbox").name == "b"
     with pytest.raises(SystemExit):
         latest(tmp_path, split="random")
+
+
+def test_known_limit_hidden_or_plain_text_filler_lifts_an_image_email_out_of_review():
+    # Kept on purpose (see triage.too_little_text): legitimate image newsletters look the same. A change here is a
+    # decision, so this test pins it.
+    from phish_triage.data.mask import mask_record
+    from phish_triage.data.parse import parse_email
+    from phish_triage.service.triage import too_little_text
+
+    filler = b"Thanks for being with us this season and we hope the weather stays good for the family and friends " * 2
+    head = b"From: Bank <a@bank.example>\nTo: me@example.com\nSubject: Scan\nMIME-Version: 1.0\n"
+    hidden = head + b"Content-Type: text/html\n\n<html><body><img src='cid:qr'><div style='display:none'>" + filler
+    hidden += b"</div></body></html>\n"
+    alternative = (
+        head
+        + b"Content-Type: multipart/alternative; boundary=X\n\n--X\nContent-Type: text/plain\n\n"
+        + filler
+        + b"\n--X\nContent-Type: text/html\n\n<html><body><img src='cid:qr'></body></html>\n--X--\n"
+    )
+    for raw in (hidden, alternative):
+        assert not too_little_text(mask_record(parse_email(raw, source="t", label="phish", origin="x").to_dict()))
+    visible = head + b"Content-Type: text/html\n\n<html><body><img src='cid:qr'><p>" + filler + b"</p></body></html>\n"
+    assert not too_little_text(mask_record(parse_email(visible, source="t", label="phish", origin="x").to_dict()))

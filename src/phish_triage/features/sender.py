@@ -15,7 +15,7 @@ import re
 from dataclasses import dataclass, field
 from email.utils import parseaddr
 
-from phish_triage.data.mask import auth_results
+from phish_triage.data.mask import auth_results, lower_copy_claims_pass
 from phish_triage.features.domains import (
     DomainRanks,
     address_domain,
@@ -109,7 +109,10 @@ def check_sender(record: dict, ranks: DomainRanks | None = None) -> SenderCheck:
         verdict = "partial"
 
     warnings = []
-    if verdict != "pass" and _lower_copy_claims_pass(headers):
+    lower_pass = (
+        record["auth_lower_claims_pass"] if "auth_lower_claims_pass" in record else lower_copy_claims_pass(headers)
+    )
+    if verdict != "pass" and lower_pass:
         warnings.append("A lower Authentication-Results header claims a pass the provider did not give (ignored).")
     if sender.host and (brand := lookalike_brand(sender.host)):
         warnings.append(f"The sender's domain {sender.domain} looks like {brand} but is not {brand}'s.")
@@ -125,8 +128,3 @@ def check_sender(record: dict, ranks: DomainRanks | None = None) -> SenderCheck:
 
 def _first(headers: list, name: str) -> str:
     return next((value for key, value in headers if key.lower() == name), "")
-
-
-def _lower_copy_claims_pass(headers: list) -> bool:
-    copies = [v for k, v in headers if k.lower() == "authentication-results"][1:]
-    return any(re.search(r"\b(?:dkim|dmarc)\s*=\s*pass", v, re.IGNORECASE) for v in copies)

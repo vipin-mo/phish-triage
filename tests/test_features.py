@@ -87,7 +87,8 @@ def test_sender_check_fails_the_spoof_and_flags_the_forged_copy():
 def test_sender_check_on_masked_record_uses_the_auth_field():
     check = check_sender(_record("spoofed_brand.eml"), RANKS)
     assert check.verdict == "fail"
-    assert not any("lower Authentication-Results" in w for w in check.warnings)  # copies are gone after masking
+    # the lower copies are gone after masking, but whether one claimed a pass is kept, so the warning still shows
+    assert any("lower Authentication-Results" in w for w in check.warnings)
 
 
 def test_sender_check_passes_an_aligned_newsletter():
