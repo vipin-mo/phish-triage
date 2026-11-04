@@ -78,7 +78,9 @@ def evaluate(responses: dict, meaning: dict, classifier: str = "") -> tuple[dict
         if raw.get("error"):
             errors[raw["error"]] += 1
         refused = raw.get("stop_reason") == "refusal"
-        r = analyst.finish(None if raw.get("error") else raw.get("text"), m["_input"], m["flagged"], refused=refused)
+        cut_off = raw.get("error") == "max_tokens"
+        text = None if raw.get("error") else raw.get("text")
+        r = analyst.finish(text, m["_input"], m["flagged"], refused=refused, cut_off=cut_off)
         invalid += not r.schema_valid
         kept = len(r.output.indicators) if r.output else 0
         indicators += kept + r.indicators_dropped
