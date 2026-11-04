@@ -30,12 +30,14 @@ def test_the_smoke_check_needs_both_test_emails_right():
 
 
 class FakeCodeDeploy:
-    def __init__(self):
-        self.status = None
+    def __init__(self, description="phish-triage-scan: version 6 -> 7"):
+        self.status, self.description = None, description
 
     def get_deployment(self, deploymentId):
-        appspec = {"Resources": [{"scan": {"Properties": {"Name": "phish-triage-scan", "TargetVersion": "7"}}}]}
-        return {"deploymentInfo": {"revision": {"appSpecContent": {"content": json.dumps(appspec)}}}}
+        # What AWS really returns for an AppSpec given as content: its hash, not the content (the first live run of
+        # the hook failed on reading it), and the description canary.py wrote
+        revision = {"revisionType": "AppSpecContent", "appSpecContent": {"sha256": "0" * 64}}
+        return {"deploymentInfo": {"revision": revision, "description": self.description}}
 
     def put_lifecycle_event_hook_execution_status(self, **kwargs):
         self.status = kwargs["status"]
@@ -63,6 +65,10 @@ def test_the_hook_passes_only_a_version_whose_smoke_check_passed():
         codedeploy, lam = FakeCodeDeploy(), FakeLambda(answer, error)
         assert before_traffic(event, None, codedeploy, lam)["status"] == expected == codedeploy.status
         assert lam.called == ("phish-triage-scan", "7", {"source": "phish-triage.smoke"})
+    # anything unexpected still reports a status, so the deployment never waits for the hook's timeout
+    unreadable = FakeCodeDeploy(description="something else")
+    assert before_traffic(event, None, unreadable, FakeLambda({"passed": True}))["status"] == "Failed"
+    assert unreadable.status == "Failed"
 
 
 def test_shadow_mode_logs_both_verdicts_and_never_changes_the_answer(caplog):
@@ -127,6 +133,7 @@ def test_the_canary_moves_the_alias_through_codedeploy_with_the_smoke_hook():
         "TargetVersion": "4",
     }
     assert spec["Hooks"] == [{"BeforeAllowTraffic": "CodeDeployHook_phish-triage-smoke"}]
+    assert deployments.created["description"] == "phish-triage-scan: version 3 -> 4"  # what the hook reads
     stopped = FakeDeployments(["InProgress", "Stopped"])
     assert canary.deploy(FakeAlias("3"), stopped, "4", sleep=lambda s: None) == "Stopped"
     nothing = FakeDeployments([])

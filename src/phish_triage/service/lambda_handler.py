@@ -69,8 +69,15 @@ def handler(event, context):
 
 def before_traffic(event, context, codedeploy=None, lambda_client=None):
     """CodeDeploy's BeforeAllowTraffic hook (its own small function, infra/service): run the smoke check on the new
-    version, which also loads its model, and pass or fail the deployment before any traffic moves."""
+    version, which also loads its model, and pass or fail the deployment before any traffic moves.
+
+    The target comes from the deployment's description, which `scripts/canary.py` writes as
+    "<function>: version <current> -> <target>" (the only way these deployments are made): AWS keeps only a hash of
+    an AppSpec given as content. A status is always reported, even when something here fails, so a deployment never
+    waits for the hook's hour-long timeout.
+    """
     import json
+    import re
 
     import boto3
     from botocore.config import Config
@@ -79,25 +86,28 @@ def before_traffic(event, context, codedeploy=None, lambda_client=None):
     lambda_client = lambda_client or boto3.client(
         "lambda", config=Config(read_timeout=200, retries={"max_attempts": 0})
     )
-    deployment = codedeploy.get_deployment(deploymentId=event["DeploymentId"])["deploymentInfo"]
-    appspec = json.loads(deployment["revision"]["appSpecContent"]["content"])
-    target = next(iter(appspec["Resources"][0].values()))["Properties"]
-    status = "Failed"
+    status, log = "Failed", {"event": "smoke"}
     try:
+        description = codedeploy.get_deployment(deploymentId=event["DeploymentId"])["deploymentInfo"]["description"]
+        found = re.fullmatch(r"([\w-]+): version (\d+) -> (\d+)", description or "")
+        if not found:
+            raise ValueError("the deployment's description doesn't name a target version")
+        function, target = found.group(1), found.group(3)
+        log["version"] = target
         answer = lambda_client.invoke(
-            FunctionName=target["Name"],
-            Qualifier=str(target["TargetVersion"]),
-            Payload=json.dumps({"source": "phish-triage.smoke"}).encode(),
+            FunctionName=function, Qualifier=target, Payload=json.dumps({"source": "phish-triage.smoke"}).encode()
         )
         result = json.loads(answer["Payload"].read() or b"{}")
-        logging.info(json.dumps({"event": "smoke", "version": target["TargetVersion"], **result}))
+        log |= result
         if not answer.get("FunctionError") and result.get("passed"):
             status = "Succeeded"
     except Exception as exc:  # noqa: BLE001 - any failure fails the deployment
-        logging.info(json.dumps({"event": "smoke", "version": target["TargetVersion"], "error": type(exc).__name__}))
-    codedeploy.put_lifecycle_event_hook_execution_status(
-        deploymentId=event["DeploymentId"],
-        lifecycleEventHookExecutionId=event["LifecycleEventHookExecutionId"],
-        status=status,
-    )
+        log["error"] = type(exc).__name__
+    finally:
+        logging.info(json.dumps(log))
+        codedeploy.put_lifecycle_event_hook_execution_status(
+            deploymentId=event["DeploymentId"],
+            lifecycleEventHookExecutionId=event["LifecycleEventHookExecutionId"],
+            status=status,
+        )
     return {"status": status}

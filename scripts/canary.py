@@ -63,7 +63,7 @@ def deploy(lambda_client, codedeploy, target: str, poll_seconds: int = 20, sleep
         applicationName=APP,
         deploymentGroupName=GROUP,
         revision={"revisionType": "AppSpecContent", "appSpecContent": {"content": appspec(current, target)}},
-        description=f"version {current} -> {target}",
+        description=f"{FUNCTION}: version {current} -> {target}",  # the smoke hook reads the target from here
     )["deploymentId"]
     print(f"{deployment}: version {current} -> {target} (smoke check, then 10% for 10 minutes)", flush=True)
     last = None
