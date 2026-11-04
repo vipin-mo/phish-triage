@@ -1,13 +1,16 @@
-"""Before and after: the models trained on public data only, and with part of my private test inbox.
+"""Before and after: the models trained on public data only, with part of my private test inbox, and with
+PrivacyMail newsletters too.
 
     python -m phish_triage.evaluation.with_inbox    # or `make eval-with-inbox` (after `make train-with-inbox`)
 
 "Before" is the `random` split's models; "after" is the `with_inbox` split's (`random` plus part of the inbox and
-2026 phishing, split by sender; see `data/inbox.py`). Each model's threshold is chosen on its own validation
-data for 1% false alarms. Both are measured on:
+2026 phishing, split by sender; see `data/inbox.py`); "newsletters" is the `with_newsletters` split's (that plus
+English PrivacyMail newsletters, split by website; see `data/privacymail.py`), once built. Each model's threshold
+is chosen on its own validation data for 1% false alarms. All are measured on:
 
 - the public `random` test (does adding the inbox cost phishing recall?);
 - the inbox's test senders, which neither model saw (false alarms per email, and averaged per sender);
+- the PrivacyMail test websites, which no model saw (false alarms per email, and averaged per website);
 - the 2026 phishing test emails (newest phishing; neither model saw these);
 - the Spam folder (share flagged; it is not labelled).
 
@@ -43,7 +46,7 @@ from pathlib import Path
 
 import numpy as np
 
-from phish_triage.data import inbox
+from phish_triage.data import inbox, privacymail
 from phish_triage.data.splits import SPLITS_DIR
 from phish_triage.evaluation import metrics, predictions
 from phish_triage.evaluation.cascade import run_cascade
@@ -55,7 +58,7 @@ from phish_triage.service.triage import LITTLE_TEXT_WORDS, too_little_text
 
 REPORTS_DIR = Path("reports")
 ARTIFACTS_DIR = Path("artifacts")
-SETUPS = {"before": "random", "after": inbox.SPLIT}
+SETUPS = {"before": "random", "after": inbox.SPLIT, "newsletters": privacymail.NEWSLETTER_SPLIT}
 DISTILBERT = "distilbert_head"  # served as ONNX fp32: int8 scores depend on the batch
 SHORTCUT_POINTS = 0.02
 SUSPECT_AUC, PUBLIC_MAX_AUC = 0.9, 0.7
@@ -125,6 +128,8 @@ def measure(flags: dict[str, np.ndarray], eval_ids: list[str], records: dict, sl
     newsletter_like = sub("newsletter_like_phish")
     y_public = np.array([int(records[eval_ids[k]]["label"] == "phish") for k in public])
     groups = np.array([slices["sender_group"][eval_ids[k]] for k in inbox_test])
+    newsletters = sub("privacymail_test") if "privacymail_test" in slices else None
+    sites = np.array([slices["website"][eval_ids[k]] for k in newsletters]) if newsletters is not None else None
     categories = np.array([slices["category"][eval_ids[k]] for k in inbox_test])
     out = {}
     for model, f in flags.items():
@@ -145,11 +150,17 @@ def measure(flags: dict[str, np.ndarray], eval_ids: list[str], records: dict, sl
             "spam_folder_flagged": share(f[spam], n_bootstrap),
             "precision_at_1_in_100": metrics.precision_at_prevalence(recall, inbox_fpr["share"]),
         }
+        if newsletters is not None:
+            out[model]["privacymail_fpr"] = share(f[newsletters], n_bootstrap)
+            out[model]["privacymail_fpr_per_website"] = float(
+                np.mean([f[newsletters][sites == s].mean() for s in np.unique(sites)])
+            )
     return out
 
 
 def to_markdown(r: dict) -> str:
     c = r["counts"]
+    present = [s for s in SETUPS if s in r]
     lines = [
         "# Trained with part of my test inbox: before and after",
         "",
@@ -158,6 +169,17 @@ def to_markdown(r: dict) -> str:
         f"{c['inbox_train']} inbox emails to training and {c['inbox_val']} to validation (at most "
         f"{inbox.PER_SENDER_CAP} per sender) and as many 2026 phishing emails. Each model's threshold is chosen on "
         "its own validation data for 1% false alarms. Local models only; the inbox is never sent to an LLM.",
+        *(
+            [
+                "",
+                f"*Newsletters:* the `with_newsletters` split's, which also adds {c['newsletters_train']:,} "
+                f"PrivacyMail newsletters to training and {c['newsletters_val']:,} to validation (at most "
+                f"{privacymail.PER_WEBSITE_TRAIN} per website, from websites kept out of the test), after the "
+                "deployed model flagged 76.5% of them (reports/privacymail.md).",
+            ]
+            if "newsletters" in present
+            else []
+        ),
         "",
         f"Tested on the public `random` test ({c['public_test']:,} emails), {c['inbox_test']} inbox emails from "
         f"{c['inbox_test_senders']} senders neither model saw, {c['phish_2026_test']:,} 2026 phishing emails neither "
@@ -168,7 +190,7 @@ def to_markdown(r: dict) -> str:
         "|---|---|---:|---:|---|---:|---|---|---:|",
     ]
     for model, name in MODEL_NAMES.items():
-        for setup in ("before", "after"):
+        for setup in [s for s in SETUPS if s in r]:
             v = r[setup][model]
             lines.append(
                 f"| {name if setup == 'before' else ''} | {setup} | {v['public_recall']:.3f} | {v['public_fpr']:.2%} | "
@@ -256,14 +278,37 @@ def to_markdown(r: dict) -> str:
         f"{NEWSLETTER_LINKS} links, like the inbox's bulk mail: {c['newsletter_like_phish']} emails. With so few, the "
         "intervals are wide.",
         "",
-        "| Model | Before | After |",
-        "|---|---|---|",
+        "| Model | " + " | ".join(s.capitalize() for s in present) + " |",
+        "|---|" + "---|" * len(present),
         *[
-            f"| {name} | {fmt_share(r['before'][m]['newsletter_like_recall'])} | "
-            f"{fmt_share(r['after'][m]['newsletter_like_recall'])} |"
+            f"| {name} | " + " | ".join(fmt_share(r[s][m]["newsletter_like_recall"]) for s in present) + " |"
             for m, name in MODEL_NAMES.items()
         ],
     ]
+    if "privacymail_fpr" in r["before"]["cascade"]:
+        lines += [
+            "",
+            "## PrivacyMail: newsletters from websites no model saw",
+            "",
+            f"{c['privacymail_test']:,} English newsletters from {c['privacymail_test_websites']} websites "
+            "(PrivacyMail, 2019–2022) held out of the `newsletters` setup's training; the other two setups never saw "
+            "PrivacyMail at all. Every email counts as legitimate. Only these aggregates leave the private folder.",
+            "",
+            "| Model | "
+            + " | ".join(f"{s.capitalize()}: false alarms" for s in present)
+            + " | "
+            + " | ".join(f"{s.capitalize()}: per website" for s in present)
+            + " |",
+            "|---|" + "---|" * len(present) + "---:|" * len(present),
+            *[
+                f"| {name} | "
+                + " | ".join(fmt_share(r[s][m]["privacymail_fpr"]) for s in present)
+                + " | "
+                + " | ".join(f"{r[s][m]['privacymail_fpr_per_website']:.1%}" for s in present)
+                + " |"
+                for m, name in MODEL_NAMES.items()
+            ],
+        ]
     return "\n".join(lines) + "\n"
 
 
@@ -327,8 +372,17 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     with_inbox, slices = inbox.load_split()
     splits = {"before": json.loads((SPLITS_DIR / "splits.json").read_text())["random"], "after": with_inbox}
+    if privacymail.SPLIT_FILE.exists():  # the newsletters setup, once `make data-privacymail` has built it
+        splits["newsletters"], newsletter_slices = privacymail.load_split()
+        slices = slices | newsletter_slices
     eval_ids = list(
-        dict.fromkeys(slices["public_test"] + slices["inbox_test"] + slices["phish_2026_test"] + slices["spam_folder"])
+        dict.fromkeys(
+            slices["public_test"]
+            + slices["inbox_test"]
+            + slices["phish_2026_test"]
+            + slices["spam_folder"]
+            + slices.get("privacymail_test", [])
+        )
     )
     ids = {i for s in splits.values() for part in ("train", "val") for i in s[part]} | set(eval_ids)
     records = inbox.read_split_records(ids)
@@ -348,9 +402,17 @@ def main(argv: list[str] | None = None) -> int:
             "phish_2026_test": len(slices["phish_2026_test"]),
             "spam_folder": len(slices["spam_folder"]),
             "newsletter_like_phish": len(slices["newsletter_like_phish"]),
+            "privacymail_test": len(slices.get("privacymail_test", [])),
+            **{
+                f"newsletters_{part}": len(splits["newsletters"][part]) - len(with_inbox[part])
+                if "newsletters" in splits
+                else 0
+                for part in ("train", "val")
+            },
+            "privacymail_test_websites": len(set(slices.get("website", {}).values())),
         }
     }
-    for setup in ("before", "after"):
+    for setup in splits:
         flags, dateless = evaluate_setup(splits[setup], eval_ids, records, ranks, texts, features, setup)
         result[setup] = measure(flags, eval_ids, records, slices, args.bootstrap)
         if setup == "after":

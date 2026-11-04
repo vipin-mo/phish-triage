@@ -107,3 +107,21 @@ def test_scanning_an_email_with_links_makes_no_network_call(monkeypatch):
     raw = Path("tests/fixtures/html_link_and_attachment.eml").read_bytes()
     assert fake(0.5, distilbert=0.9).scan(raw).verdict == "phish"
     assert fake(0.99).scan(Path("tests/fixtures/spoofed_brand.eml").read_bytes()).verdict == "phish"
+
+
+def test_latest_picks_the_newest_bundle_or_the_newest_of_one_split(tmp_path):
+    import json
+
+    from phish_triage.service.bundle import latest
+
+    for name, split, created in [
+        ("b", "with_inbox", "2026-11-04T01:00:00+00:00"),
+        ("a", "with_newsletters", "2026-11-04T02:00:00+00:00"),
+        ("c", "with_inbox", "2026-11-03T01:00:00+00:00"),
+    ]:
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "bundle.json").write_text(json.dumps({"split": split, "created": created}))
+    assert latest(tmp_path).name == "a"
+    assert latest(tmp_path, split="with_inbox").name == "b"
+    with pytest.raises(SystemExit):
+        latest(tmp_path, split="random")

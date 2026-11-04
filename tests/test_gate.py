@@ -3,6 +3,7 @@ from phish_triage.evaluation.gate import THRESHOLDS, check
 GOOD = {
     "recall_at_1pct_fpr": 0.999,
     "inbox_false_alarm_rate": 0.03,
+    "privacymail_false_alarm_rate": 0.01,
     "schema_valid_rate": 1.0,
     "grounding_failure_rate": 0.01,
     "ungrounded_indicators_shown": 0,
@@ -18,6 +19,8 @@ def test_gate_passes_good_numbers_and_names_every_failure():
     failures = check(bad, prompt_version=3)
     assert len(failures) == 3 and failures[0].startswith("recall_at_1pct_fpr")
     assert any(f.startswith("inbox_false_alarm_rate") for f in failures)
+    newsletters = check({**GOOD, "privacymail_false_alarm_rate": 0.765}, prompt_version=3)
+    assert newsletters == ["privacymail_false_alarm_rate = 0.765 (max 0.05)"]
     missing = {k: v for k, v in GOOD.items() if k != "schema_valid_rate"}
     assert check(missing, prompt_version=3) == ["schema_valid_rate: missing"]
     assert set(GOOD) - {"prompt_versions"} == set(THRESHOLDS)
