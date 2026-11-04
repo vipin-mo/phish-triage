@@ -32,6 +32,7 @@ from typing import Literal
 from pydantic import BaseModel, ValidationError, field_validator
 
 from phish_triage.data.parse import html_to_text
+from phish_triage.data.private import refuse_private
 from phish_triage.features.html import summarize_html, visible_html
 from phish_triage.features.sender import SenderCheck
 from phish_triage.service.pii import redact
@@ -47,7 +48,6 @@ MAX_LINKS = 15
 MAX_SUMMARY_WORDS = 80  # enforced in code; the prompt asks for at most PROMPT_SUMMARY_WORDS to leave headroom
 PROMPT_SUMMARY_WORDS = 50
 MAX_OUTPUT_TOKENS = 1_024
-PRIVATE_SOURCES = frozenset({"test_inbox", "privacymail", "private"})  # never sent to an LLM
 
 Suggestion = Literal["phish", "suspicious", "likely_safe"]
 Verdict = Literal["phish", "suspicious", "needs_human_review", "safe"]
@@ -190,8 +190,7 @@ def render(
     defended: bool = True,
     nonce: str | None = None,
 ) -> AnalystInput:
-    if record.get("source") in PRIVATE_SOURCES and not record.get("consented"):
-        raise PermissionError("private emails (my test inbox, PrivacyMail) are never sent to an LLM")
+    refuse_private(record)  # by source and by id (`data/private.py`)
     html = record.get("html") or ""
     view = visible_html(html) if html else None
     subject_header = _header(record, "subject") or record.get("subject") or ""
@@ -321,28 +320,39 @@ def advice_conflict(output: AnalystOutput) -> bool:
 
 
 def final_verdict(
-    classifier_phish: bool, suggestion: Suggestion | None, ai_found: bool, refused: bool = False
+    classifier_phish: bool,
+    suggestion: Suggestion | None,
+    ai_found: bool,
+    content_failure: bool = False,
+    classifier_review: bool = False,
 ) -> tuple[Verdict, list[str]]:
     """Raise only: the analyst can push the classifier's verdict up, never down.
 
-    With no valid answer the classifier's verdict stands, except after a refusal: the email's content caused it, so
-    an attacker could cause one on purpose to switch the analyst off, and an email the classifier didn't flag goes
-    to a person instead of being marked safe. Errors the email can't cause (timeouts, limits) keep the fallback.
+    With no valid answer the classifier's verdict stands, except when the email's content may have caused the
+    failure (`content_failure`): a refusal, an answer cut off at its token limit, or one that still didn't match the
+    schema after asking once more. An attacker could cause those on purpose to switch the analyst off, so an email
+    the classifier didn't flag goes to a person instead of being marked safe. Errors the email can't cause
+    (timeouts, rate limits) keep the fallback. `classifier_review` (the little-text rule: too little text for the
+    models to judge) is a floor too: the analyst can raise it, never clear it.
     """
     reasons = []
-    if suggestion is None and refused and not classifier_phish:
-        verdict: Verdict = "needs_human_review"
-        reasons.append("the analyst refused to read this email; a person checks it")
-    elif suggestion is None:
-        verdict = "phish" if classifier_phish else "safe"
-        reasons.append("analyst unavailable; classifier verdict kept")
+    if suggestion is None:
+        if classifier_phish:
+            verdict: Verdict = "phish"
+            reasons.append("analyst unavailable; classifier verdict kept")
+        elif content_failure or classifier_review:
+            verdict = "needs_human_review"
+            reasons.append("the analyst gave no usable answer for this email; a person checks it")
+        else:
+            verdict = "safe"
+            reasons.append("analyst unavailable; classifier verdict kept")
     elif suggestion == "phish":
         verdict = "phish"
     elif suggestion == "suspicious":
         verdict = "phish" if classifier_phish else "suspicious"
-    elif classifier_phish:
+    elif classifier_phish or classifier_review:
         verdict = "needs_human_review"
-        reasons.append("the analyst said safe but the classifier flagged it; the analyst can't lower the risk")
+        reasons.append("the analyst said safe but the classifier didn't clear it; the analyst can't lower the risk")
     else:
         verdict = "safe"
     if ai_found and verdict == "safe":
@@ -366,13 +376,20 @@ def finish(
     *,
     defended: bool = True,
     refused: bool = False,
+    cut_off: bool = False,
+    classifier_review: bool = False,
 ) -> AnalystResult:
     """Validate the model's answer, drop ungrounded indicators and apply the raise-only rule. `refused`: the model
-    declined to answer (`stop_reason` "refusal")."""
+    declined to answer (`stop_reason` "refusal"); `cut_off`: it hit its token limit; an answer that came back but
+    doesn't match the schema counts the same (the caller has already asked once more). `classifier_review`: the
+    scanner sent the email to review (too little text)."""
     output = parse_answer(raw)
     if output is None:
         ai_found = bool(analyst_input.ai_instructions)
-        verdict, reasons = final_verdict(classifier_phish, None, ai_found, refused=refused and defended)
+        content_failure = defended and (refused or cut_off or raw is not None)
+        verdict, reasons = final_verdict(
+            classifier_phish, None, ai_found, content_failure=content_failure, classifier_review=classifier_review
+        )
         return AnalystResult(verdict, None, False, 0, reasons)
     kept = [i for i in output.indicators if grounded(i, analyst_input)]
     dropped = len(output.indicators) - len(kept)
@@ -380,7 +397,12 @@ def finish(
     if not defended:  # the undefended pipeline passes the model's suggestion straight through
         verdict = {"phish": "phish", "suspicious": "suspicious", "likely_safe": "safe"}[output.verdict_suggestion]
         return AnalystResult(verdict, output, True, dropped, [])
-    verdict, reasons = final_verdict(classifier_phish, output.verdict_suggestion, bool(analyst_input.ai_instructions))
+    verdict, reasons = final_verdict(
+        classifier_phish,
+        output.verdict_suggestion,
+        bool(analyst_input.ai_instructions),
+        classifier_review=classifier_review,
+    )
     return AnalystResult(verdict, output, True, dropped, reasons)
 
 

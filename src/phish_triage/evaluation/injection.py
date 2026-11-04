@@ -168,6 +168,7 @@ def evaluate(responses: dict[str, dict], meaning: dict[str, dict], classifier: s
             m["classifier_flagged"],
             defended=m["condition"] == "defended",
             refused=raw.get("stop_reason") == "refusal",
+            cut_off=raw.get("error") == "max_tokens",
         )
         results[custom_id] = {
             "suggestion": r.output.verdict_suggestion if r.output else None,

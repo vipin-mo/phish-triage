@@ -56,6 +56,9 @@ def test_stage_1_decides_when_sure_and_distilbert_only_otherwise():
     r = unsure.scan(PLAIN)
     assert (r.verdict, r.stage, unsure._distilbert.calls) == ("phish", "distilbert", 1)
     assert fake(0.5, distilbert=0.1).scan(PLAIN).verdict == "safe"
+    # each verdict says which threshold its score was compared with: the stages' scores mean different things
+    assert r.phishing_above == unsure.config["distilbert_threshold"]
+    assert sure.scan(PLAIN).phishing_above == sure.config["stage1_cutoffs"]["high"]
 
 
 def test_an_image_with_almost_no_text_goes_to_review_unless_flagged():

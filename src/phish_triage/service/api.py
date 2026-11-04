@@ -1,6 +1,6 @@
 """The HTTP API: FastAPI locally, the same app on Lambda through Mangum (`service/lambda_handler.py`).
 
-    POST /v1/scan                  raw email (.eml bytes or plain text) -> verdict
+    POST /v1/scan                  raw email (.eml bytes or plain text) -> verdict, score and `phishing_above`
     GET  /v1/explanations/{id}     the LLM explanation of a scan (switched off for now)
     POST /v1/feedback              {"scan_id": ..., "label": "correct" | "false_alarm" | "missed_phish"}
     GET  /v1/health                no key needed; the model version
@@ -116,6 +116,7 @@ def create_app(scanner_factory: Callable[[], object], store: Store, *, explanati
                 "scan_id": scan,
                 "verdict": result.verdict,
                 "score": round(result.score, 6),
+                "phishing_above": result.phishing_above,  # the deciding stage's threshold (see `stage`)
                 "stage": result.stage,
                 "signals": result.signals,
                 "sender": result.sender,

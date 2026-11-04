@@ -33,6 +33,7 @@ import numpy as np
 
 from phish_triage.config import load_env, max_llm_spend_usd
 from phish_triage.data.mask import mask_source_names
+from phish_triage.data.private import refuse_private
 from phish_triage.data.records import MASKED_RECORDS, read_records
 from phish_triage.data.splits import SPLITS_DIR
 from phish_triage.evaluation import predictions
@@ -46,7 +47,6 @@ MAX_EMAIL_CHARS = 6_000
 MAX_LINKS = 15
 MAX_OUTPUT_TOKENS = 512  # thinking at effort "low" plus a short JSON answer; caps the worst case
 EFFORT = "low"
-PRIVATE_SOURCES = frozenset({"test_inbox", "privacymail", "private"})  # never sent to an LLM
 
 # Standard price per million tokens (input, output). Batches are billed at half; cache reads at 0.1x input and
 # 5-minute cache writes at 1.25x input.
@@ -94,8 +94,7 @@ of at most 20 words."""
 
 def render_email(record: dict) -> str:
     """The email as the model sees it: sender headers, subject, link targets, attachments and the body."""
-    if record.get("source") in PRIVATE_SOURCES:
-        raise PermissionError("private emails (my test inbox, PrivacyMail) are never sent to an LLM")
+    refuse_private(record)  # by source and by id (`data/private.py`)
     headers = {name.lower(): value for name, value in reversed(record.get("headers") or [])}
     lines = [
         f"{name}: {headers[name.lower()]}" for name in ("From", "Reply-To", "To", "Subject") if name.lower() in headers

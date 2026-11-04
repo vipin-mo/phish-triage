@@ -111,7 +111,9 @@ November 2026 after the input fixes and the new model, for $0.26.
   variants, and with no answer the classifier's "safe" stood: 2 of 240 ended as safe (the rule-based detector
   caught the other 4). The old DistilBERT flagged all 40, so this never showed. Now a refused email the classifier
   didn't flag goes to a person; re-checked on the saved answers, 0 of 240 end as safe. An attacker could cause a
-  refusal on purpose, so it can't mean "use the classifier alone".
+  refusal on purpose, so it can't mean "use the classifier alone". The same goes for an answer cut off at its
+  token limit or still invalid after the retry: the email decides how long the answer runs. And an email the
+  scanner sent to review for too little text can be raised by the analyst, never cleared.
 - **The rule-based detector is only one layer:** it caught 67% of the first round and none of the second, which is
   why the random tags, hidden-text removal and the raise-only rule don't depend on it.
 - **Grounding needed a design change, not a looser check.** With prompt version 3, 2.5% of indicators were dropped

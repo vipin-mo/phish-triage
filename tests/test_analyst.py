@@ -105,8 +105,8 @@ def test_raise_only(classifier_phish, suggestion, ai_found, expected):
 
 def test_a_refusal_sends_an_unflagged_email_to_a_person_not_to_safe():
     # The email's content causes a refusal, so an attacker could switch the analyst off with one
-    assert analyst.final_verdict(False, None, False, refused=True)[0] == "needs_human_review"
-    assert analyst.final_verdict(True, None, False, refused=True)[0] == "phish"
+    assert analyst.final_verdict(False, None, False, content_failure=True)[0] == "needs_human_review"
+    assert analyst.final_verdict(True, None, False, content_failure=True)[0] == "phish"
     a = analyst.render(_record("clean_newsletter.eml"), classifier_score=0.1, classifier_phish=False)
     assert analyst.finish(None, a, classifier_phish=False, refused=True).verdict == "needs_human_review"
     assert analyst.finish(None, a, classifier_phish=False).verdict == "safe"  # a timeout: the classifier stands
@@ -199,3 +199,41 @@ def test_advice_in_the_summary_conflicts_with_no_action():
     assert analyst.advice_conflict(output("no_action", "An ordinary notice, worth a quick look if unexpected."))
     assert not analyst.advice_conflict(output("no_action", "A normal reply in a thread. The sender check passed."))
     assert not analyst.advice_conflict(output("check_with_the_sender", "Check with the sender before paying."))
+
+
+def test_a_cut_off_or_still_invalid_answer_is_treated_like_a_refusal():
+    # The email's content decides how long the answer runs, so an attacker could cause these too
+    a = analyst.render(_record("clean_newsletter.eml"), classifier_score=0.1, classifier_phish=False)
+    assert analyst.finish(None, a, classifier_phish=False, cut_off=True).verdict == "needs_human_review"
+    too_long = _answer(verdict_suggestion="phish", summary=" ".join(["word"] * 81))
+    assert analyst.finish(too_long, a, classifier_phish=False).verdict == "needs_human_review"
+    assert analyst.finish('{"verdict_sugg', a, classifier_phish=False).verdict == "needs_human_review"
+    undefended = analyst.render(_record("clean_newsletter.eml"), defended=False)
+    assert analyst.finish(None, undefended, classifier_phish=False, defended=False, cut_off=True).verdict == "safe"
+
+
+def test_the_analyst_cannot_clear_an_email_sent_to_review_for_too_little_text():
+    a = analyst.render(_record("clean_newsletter.eml"), classifier_score=0.1, classifier_phish=False)
+    safe = _answer(verdict_suggestion="likely_safe", indicators=[])
+    assert analyst.finish(safe, a, classifier_phish=False, classifier_review=True).verdict == "needs_human_review"
+    assert analyst.finish(None, a, classifier_phish=False, classifier_review=True).verdict == "needs_human_review"
+    assert analyst.finish(safe, a, classifier_phish=False).verdict == "safe"
+
+
+def test_a_private_email_is_refused_by_its_id_even_with_another_label(tmp_path, monkeypatch):
+    import gzip
+    import json
+
+    from phish_triage.data import private
+
+    masked = tmp_path / "masked.jsonl.gz"
+    with gzip.open(masked, "wt") as f:
+        f.write(json.dumps({"id": "abc123", "source": "test_inbox"}) + "\n")
+    monkeypatch.setattr(private, "PRIVATE_FILES", (masked,))
+    private.private_ids.cache_clear()
+    try:
+        record = {**_record("clean_newsletter.eml"), "id": "abc123", "source": "live"}
+        with pytest.raises(PermissionError):
+            analyst.render(record)
+    finally:
+        private.private_ids.cache_clear()

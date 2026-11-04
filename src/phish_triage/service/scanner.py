@@ -27,8 +27,8 @@ Verdict = Literal["phish", "safe", "review"]
 log = logging.getLogger("phish_triage.scanner")
 # Bump when the rules around the models change (triage, the sender check, masking, signals): stored verdicts carry
 # it, so an email seen before is scanned again, as after a new model. 2: the forged lower Authentication-Results
-# warning survives masking.
-RULES_VERSION = 2
+# warning survives masking. 3: each verdict carries the threshold its score is compared with.
+RULES_VERSION = 3
 
 
 class FastTokenizer:
@@ -61,6 +61,9 @@ class ScanResult:
     little_text: bool
     signals: list[str] = field(default_factory=list)
     sender: dict = field(default_factory=dict)
+    # The score is the deciding stage's, so it means something different per stage: phishing above this. DistilBERT's
+    # threshold is 0.9964, so a score of 0.99 is still safe.
+    phishing_above: float | None = None
 
 
 class Scanner:
@@ -125,10 +128,11 @@ class Scanner:
         cut = self.config["stage1_cutoffs"]
         decision = int(decide(np.array([stacked]), Cutoffs(cut["low"], cut["high"]))[0])
         if decision >= 0:
-            stage, score, phish = "stacked", stacked, bool(decision)
+            stage, score, phish, above = "stacked", stacked, bool(decision), cut["high"]
         else:
             score = float(self._distilbert.score([text])[0])
-            stage, phish = "distilbert", score > self.config["distilbert_threshold"]
+            above = self.config["distilbert_threshold"]
+            stage, phish = "distilbert", score > above
         little = too_little_text(record, self.config.get("little_text_words", LITTLE_TEXT_WORDS))
         verdict: Verdict = "phish" if phish else ("review" if little else "safe")
         sender = check_sender(record, self._ranks)
@@ -141,4 +145,5 @@ class Scanner:
             signals=signals_from_features(features),
             # The warnings name the sender's domains; the verdict is stored, so only their kind is kept.
             sender={"verdict": sender.verdict, "warnings": sorted({warning_sentence(w) for w in sender.warnings})},
+            phishing_above=above,
         )
