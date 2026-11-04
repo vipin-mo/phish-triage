@@ -1,0 +1,26 @@
+{
+ "emails": 2,
+ "labels": {
+  "legit": 2
+ },
+ "before": {
+  "bundle": "with-newsletters-20261104-e7f1d257",
+  "flagged": {
+   "phish": 0,
+   "legit": 2
+  },
+  "decided_by": {
+   "distilbert": 2
+  }
+ },
+ "after": {
+  "bundle": "with-retraining-20261104-6addaf34",
+  "flagged": {
+   "phish": 0,
+   "legit": 2
+  },
+  "decided_by": {
+   "distilbert": 2
+  }
+ }
+}

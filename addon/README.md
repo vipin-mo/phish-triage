@@ -22,6 +22,12 @@ nothing happens until I click a button:
 
 The API stores the verdict, the score and the email's SHA-256, never the email (docs/THREAT_MODEL.md, rule 8).
 
+**Not in Spam.** Gmail doesn't run add-ons on messages in Spam or marked suspicious ("Spam and suspicious messages
+can't be used for recommended content or actions"), so the add-on can't scan, explain or send for retraining the
+phishing Gmail has already caught. The brand-lookalike signal also fires on mailing services' tracking domains that
+carry a brand in their name (a `comcastdotcom-...` subdomain of an email-marketing service, say): that is the
+pattern phishers use, so the signal shows, though the verdict on those emails was safe.
+
 ## How I install it
 
 The API address isn't committed, so the manifest is a template. `make addon` fills it in from

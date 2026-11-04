@@ -54,10 +54,16 @@ BUNDLE_FILE = "bundle.json"
 BUNDLE_VERSION_FILE = Path("infra/bundle-version")
 
 
+def split_of_version(version: str) -> str | None:
+    """A bundle version's split: "with-retraining-20261105-ab12cd34" -> with_retraining."""
+    found = re.match(r"(with-[a-z-]+?)-\d{8}-[0-9a-f]+$", version.strip())
+    return found.group(1).replace("-", "_") if found else None
+
+
 def _deployed_split() -> str:
-    """The split of the bundle in infra/bundle-version: "with-retraining-20261105-ab12cd34" -> with_retraining."""
-    if BUNDLE_VERSION_FILE.exists() and (found := re.match(r"(with-[a-z-]+?)-\d{8}-", BUNDLE_VERSION_FILE.read_text())):
-        return found.group(1).replace("-", "_")
+    """The split of the bundle in infra/bundle-version."""
+    if BUNDLE_VERSION_FILE.exists() and (split := split_of_version(BUNDLE_VERSION_FILE.read_text())):
+        return split
     return "with_newsletters"
 
 

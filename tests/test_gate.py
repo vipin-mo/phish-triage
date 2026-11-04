@@ -51,7 +51,7 @@ def test_another_claude_model_or_bundle_fails_the_gate():
     assert old_reference == [f"stale: the drift reference is for old, the deployed bundle is {BUNDLE}"]
     behind_old = {**GOOD, "llm_classifiers": {**GOOD["llm_classifiers"], "injection": "with-inbox-20261104-1"}}
     assert len(run(behind_old)) == 1
-    assert any("not a with_newsletters bundle" in f for f in run(GOOD, bundle="with-inbox-20261104-1"))
+    assert any("not a bundle of a deployable split" in f for f in run(GOOD, bundle="random-20261104-ab12cd34"))
 
 
 def test_a_missing_injection_round_or_a_nan_fails_instead_of_passing():

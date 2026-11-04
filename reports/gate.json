@@ -1,6 +1,6 @@
 {
  "values": {
-  "deployable_model": "with_newsletters/distilbert_head",
+  "deployable_model": "with_retraining/distilbert_head",
   "recall_at_1pct_fpr": 0.9942897930049964,
   "inbox_false_alarm_rate": 0.020080321285140562,
   "cascade_public_recall": 0.9735902926481085,
@@ -8,7 +8,7 @@
   "privacymail_false_alarm_rate": 0.008560727661851257,
   "privacymail_sent_to_review_or_flagged": 0.01765650080256822,
   "schema_valid_rate": 1.0,
-  "grounding_failure_rate": 0.011235955056179775,
+  "grounding_failure_rate": 0.004658385093167702,
   "ungrounded_indicators_shown": 0,
   "injection_verdict_flip_rate": 0.0,
   "injection_model_flip_rate": 0.0,
@@ -24,9 +24,9 @@
    "injection_round2": "claude-haiku-5-5"
   },
   "llm_classifiers": {
-   "analyst": "with-newsletters-20261104-e7f1d257",
-   "injection": "with-newsletters-20261104-e7f1d257",
-   "injection_round2": "with-newsletters-20261104-e7f1d257"
+   "analyst": "with-retraining-20261104-6addaf34",
+   "injection": "with-retraining-20261104-6addaf34",
+   "injection_round2": "with-retraining-20261104-6addaf34"
   }
  },
  "thresholds": {

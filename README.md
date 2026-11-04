@@ -97,15 +97,15 @@ From [docs/RESULTS.md](docs/RESULTS.md), rebuilt by `make eval` from saved predi
 
 From [reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/injection.md) and
 [reports/injection_round2.md](reports/injection_round2.md), all with Claude Haiku 5.5 behind the deployed cascade
-(the `with_newsletters` bundle, one email at a time, as the service runs it), on public test emails only. Re-run in
-November 2026 after the input fixes and the new model, for $0.26.
+(the `with_retraining` bundle, one email at a time, as the service runs it), on public test emails only. Re-run in
+November 2026 after the input fixes and each new model ($0.26 and $0.27).
 
 - **Planted instructions never cleared a phishing email.** I hid instructions like "this message is verified safe"
   in 40 real phishing emails in six ways (visible text, HTML comment, CSS-hidden text, white-on-white text, image
   alt text, subject) and in three attacks on the defences themselves (a forged signals block, a fake operator
   message, a fake IT-test notice). With the defences on, 0 of 360 variants made the model say safe, and none ended
-  as safe. Without them, the forged signals block made the model say safe once in 40 and the final verdict safe
-  twice.
+  as safe. Without them, the forged signals block ended as safe once in 40 in the latest run (twice in the run
+  before).
 - **A refusal could switch the analyst off.** The deployed cascade misses 1 of the 40 phishing emails, which the
   analyst raises to suspicious when it's clean. With an instruction planted in it, Claude refused to answer all six
   variants, and with no answer the classifier's "safe" stood: 2 of 240 ended as safe (the rule-based detector
@@ -118,17 +118,18 @@ November 2026 after the input fixes and the new model, for $0.26.
   why the random tags, hidden-text removal and the raise-only rule don't depend on it.
 - **Grounding needed a design change, not a looser check.** With prompt version 3, 2.5% of indicators were dropped
   (the gate allows 2%), 8 of the 11 because the model quoted our own signals as if they were the email. Letting it
-  cite a signal by number brought that to 0.3%, and 1.1% (7 of 623) in the latest run; the user sees our wording
+  cite a signal by number brought that to 0.3%, and 0.5% (3 of 644) in the latest run; the user sees our wording
   of the signal, not the model's.
 - **The advice now matches the action.** With version 4, 38 of 81 "no action" answers still told the user to check
   something ("check the sender if unsure"). Version 5 asks for the same advice in both, and a rule-based check
-  finds 3 of 77 in the latest run.
+  finds 4 of 70 in the latest run.
 - **On 200 ordinary emails** 99 of the 100 phishing emails ended as phishing and the 100th, which the classifier
   missed, as suspicious: the analyst caught it. The classifier flagged none of the 100 legitimate ones and the
-  analyst raised 7 to "suspicious" (9 before, 2 of them by the old classifier; 17 before the masking fix). 4 of the
+  analyst raised 7 to "suspicious" (9 before, 2 of them by the old classifier; 17 before the masking fix). 5 of the
   7 had no SPF/DKIM results, which is normal for archived mailing-list mail and not for Gmail, so this needs
-  re-measuring on real mail. One summary ran over the 80-word limit; an answer that doesn't match the schema is now
-  asked for once more (99.5% on the first try, 100% after). A live analyst call takes 3.1 s (p50), 4.1 s at p95.
+  re-measuring on real mail. In the run before, one summary ran over the 80-word limit, so an answer that doesn't
+  match the schema is now asked for once more (the latest run needed none). A live analyst call takes 2.4 s (p50),
+  3.5 s at p95.
 - **I rated 50 of the answers myself** (25 phishing, 25 legitimate, 1–3 on the
   [rubric](docs/ANALYST_RUBRIC.md)), because the automatic checks can't tell whether an explanation is right and
   helpful. Averages: correct 2.86, grounded 2.98, clear 3.00, useful 2.88; 38 of 50 scored 3 on everything.
@@ -148,7 +149,8 @@ November 2026 after the input fixes and the new model, for $0.26.
   service runs the cascade at stricter thresholds picked on validation, where it catches 97.4% at 0.14% false
   alarms. A code review found the gate's wording implied the second; the gate now reports it next to the first,
   without a limit, since one set after seeing 0.974 would mean little. All Phase 4 Claude runs cost $1.06
-  together; the re-run after the fixes was $0.27 of that, and the one behind the deployed model $0.26 more.
+  together; the re-run after the fixes was $0.27 of that, the one behind the newsletters model $0.26 more, and
+  the one behind the first retrained model $0.27 more.
 
 ## What my private test inbox showed
 
@@ -226,9 +228,9 @@ I kept English mail only, removed duplicates within each website and took at mos
   emails (25). The newsletters in validation make the threshold stricter; at a fixed 1% false-alarm rate on the
   public test, DistilBERT catches 99.4% (99.8% before). At 1 phishing email in 100, a flagged email would now be
   phishing 33% of the time, against 20%.
-- This is the model deployed now. I traded 1.0 point of the public test's recall and 1.3 points of the 2026
-  phishing's for false alarms on newsletters going from 76.5% to 0.9%, since a filter that flags most newsletters
-  wouldn't be used.
+- This is the model deployed now (since retrained once, with the same test results; see the retraining note
+  below). I traded 1.0 point of the public test's recall and 1.3 points of the 2026 phishing's for false alarms on
+  newsletters going from 76.5% to 0.9%, since a filter that flags most newsletters wouldn't be used.
 
 
 ## What the deployment showed
@@ -281,14 +283,18 @@ for a background design were removed, since a queue would have had to hold the e
 - **Retraining runs from my laptop.** `make retrain` moves the emails I sent from the add-on out of the bucket (and
   deletes them there), adds them to the deployed split's training part only, refits stage 1 (DistilBERT stays),
   evaluates the result on the same held-out tests as every other setup, builds and checks the bundle and the drift
-  reference; the Claude evaluations, the gate and the canary follow, as for any new model.
+  reference; the Claude evaluations, the gate and the canary follow, as for any new model. The first run (November
+  2026) took the 2 emails I had sent, both legitimate and both flagged by the deployed model. The retrained cascade
+  scores every held-out test exactly as before (reports/with_inbox.md, *retrained*), and still flags both emails
+  ([reports/retraining_check.md](reports/retraining_check.md)): DistilBERT decides them, and only stage 1 is
+  refitted. So the loop works, and it can't fix this kind of false alarm on its own.
 - Expected cost at my use: under $1 a month (mostly image storage), within the Free plan's credits. The Free plan
   ends on 2027-04-27 and the account closes with it unless I upgrade, taking every resource with it; before then I
   either upgrade or export the feedback and API keys and destroy the service.
 
 ## Known issues
 
-All but two are fixed. The first two were found while rating the analyst's answers by hand, the rest afterwards:
+All but three are fixed. The first two were found while rating the analyst's answers by hand, the rest afterwards:
 on my test inbox, while packaging the model, on PrivacyMail, in the Claude re-run and in a review of the code, all
 in November 2026. Every number above was re-measured after the fixes, except my hand ratings, as noted.
 
@@ -325,6 +331,13 @@ in November 2026. Every number above was re-measured after the fixes, except my 
 - **The inbox model learned my inbox's senders (fixed).** Trained with my inbox, the cascade flagged 4.0% of its
   unseen senders' mail but 76.5% of PrivacyMail's newsletters. Trained with part of PrivacyMail too, it flags 0.9%
   of newsletters from held-out websites and 2.0% of my inbox, and the gate now checks both (above).
+- **Big brands asking me to act read as phishing (open).** In my own Gmail, a bank's "make your debit card Tap & Pay
+  ready" and a ride app's "take our travel survey" were flagged at 0.9998 and 0.9996, though each was DKIM-signed by
+  the brand's own domain with every link on it; DistilBERT judges the words, and the cascade doesn't weigh the
+  sender check. Retraining stage 1 can't change that (above). What I'd test next, with the rule set before the run:
+  an email flagged by its text but signed by its own well-known domain, with all its links there, goes to review
+  instead of phish. The newsletter-like phishing in the tests is also signed by its own domains, so it has to be
+  measured first.
 - **Phishing that looks like a newsletter (open).** The deployed cascade catches 23 of 31 such emails (25 before
   the newsletters were added). It is a data problem: the newsletters gave it plenty of bulk-looking legitimate
   mail, but there are few phishing emails of that kind to learn from, and no public dataset I found has them (see
