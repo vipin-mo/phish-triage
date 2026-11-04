@@ -36,7 +36,7 @@ import numpy as np
 
 from phish_triage.evaluation import metrics, predictions
 from phish_triage.service.analyst import MODEL, PROMPT_VERSION
-from phish_triage.service.bundle import DEPLOYED_SPLIT, SOURCES
+from phish_triage.service.bundle import DEPLOYED_SPLIT, SOURCES, distilbert_split
 
 # Served as ONNX fp32, which matches these PyTorch scores; int8 scores change with the batch (service/bundle.py).
 DEPLOYED_DISTILBERT = "distilbert_head"
@@ -63,8 +63,8 @@ REPORTED = ("cascade_public_recall", "cascade_public_false_alarm_rate", "privacy
 
 def measure() -> dict:
     index = {e["id"]: int(e["label"] == "phish") for e in json.loads(Path("data/interim/index.json").read_text())}
-    deployable = DEPLOYED_SPLIT if DEPLOYED_SPLIT in predictions.available() else "random"
-    p = predictions.load(deployable, DEPLOYED_DISTILBERT)
+    deployable = DEPLOYED_SPLIT if distilbert_split(DEPLOYED_SPLIT) in predictions.available() else "random"
+    p = predictions.load(distilbert_split(deployable), DEPLOYED_DISTILBERT)
     scores = dict(zip(p.test_ids, p.test_scores, strict=True))
     public = [i for i in p.test_ids if i in index]  # the private splits also test inbox and 2026 phishing emails
     if deployable != "random":

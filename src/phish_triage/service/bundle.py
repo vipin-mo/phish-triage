@@ -41,6 +41,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import sys
 from datetime import UTC, datetime
@@ -50,12 +51,32 @@ import numpy as np
 
 BUNDLE_ROOT = Path("artifacts/bundle")
 BUNDLE_FILE = "bundle.json"
-DEPLOYED_SPLIT = "with_newsletters"
+BUNDLE_VERSION_FILE = Path("infra/bundle-version")
+
+
+def _deployed_split() -> str:
+    """The split of the bundle in infra/bundle-version: "with-retraining-20261105-ab12cd34" -> with_retraining."""
+    if BUNDLE_VERSION_FILE.exists() and (found := re.match(r"(with-[a-z-]+?)-\d{8}-", BUNDLE_VERSION_FILE.read_text())):
+        return found.group(1).replace("-", "_")
+    return "with_newsletters"
+
+
+DEPLOYED_SPLIT = _deployed_split()
 # split -> (its DistilBERT, its setup in reports/with_inbox.json, which the bundle must reproduce)
 SOURCES = {
     "with_inbox": (Path("artifacts/distilbert_with_inbox"), "after"),
     "with_newsletters": (Path("artifacts/distilbert_with_newsletters"), "newsletters"),
+    # `make retrain` refits stage 1 only: DistilBERT and its saved scores are the newsletters split's
+    "with_retraining": (Path("artifacts/distilbert_with_newsletters"), "retrained"),
 }
+DISTILBERT_FROM = {"with_retraining": "with_newsletters"}
+
+
+def distilbert_split(split: str) -> str:
+    """Whose DistilBERT (and saved predictions) a split uses."""
+    return DISTILBERT_FROM.get(split, split)
+
+
 FILES = ("stacked.joblib", "distilbert.onnx", "tokenizer.json", "domain_ranks.json")
 REPORT = Path("reports/bundle.md")
 TARGET_FPR = 0.01
@@ -80,12 +101,14 @@ def verify(folder: Path) -> dict:
 
 def load_split(name: str) -> tuple[dict[str, list[str]], dict]:
     """The split and its test slices; `with_newsletters` adds the held-out PrivacyMail websites to the inbox's."""
-    from phish_triage.data import inbox, privacymail
+    from phish_triage.data import inbox, privacymail, retraining
 
     split, slices = inbox.load_split()
-    if name == privacymail.NEWSLETTER_SPLIT:
+    if name in (privacymail.NEWSLETTER_SPLIT, retraining.SPLIT):
         split, extra = privacymail.load_split()
         slices = slices | extra
+    if name == retraining.SPLIT:
+        split = retraining.load_split()
     check_public_test_unseen(split["train"] + split["val"])
     return split, slices
 
@@ -128,7 +151,7 @@ def export(split_name: str = DEPLOYED_SPLIT, root: Path = BUNDLE_ROOT) -> Path:
     train, val = part(split["train"]), part(split["val"])
     fitted = fit_all(*train, *val)
     stacked_val = fitted.scores(val[0], val[1])["stacked"]
-    distilbert = predictions.load(split_name, "distilbert_head")
+    distilbert = predictions.load(distilbert_split(split_name), "distilbert_head")
     if distilbert.val_ids != split["val"]:
         raise SystemExit(f"saved DistilBERT predictions don't match the {split_name} validation split; re-run training")
     cutoffs = choose_cutoffs(val[2], stacked_val)

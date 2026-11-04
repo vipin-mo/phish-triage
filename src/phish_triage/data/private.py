@@ -17,6 +17,7 @@ PRIVATE_SOURCES = frozenset({"test_inbox", "privacymail", "private", "retraining
 PRIVATE_FILES = (
     Path("data/private/test_inbox/masked.jsonl.gz"),
     Path("data/private/privacymail/masked.jsonl.gz"),
+    Path("data/private/retraining/masked.jsonl.gz"),
 )
 REFUSAL = "private emails (my test inbox, PrivacyMail) are never sent to an LLM"
 
