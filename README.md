@@ -226,7 +226,8 @@ explanation queue and worker exist but are switched off.
 
 - **A scan takes about 0.2 s** end to end from my laptop once the function is loaded (0.18–0.26 s for 10 new
   emails), and returns the same scores as the local run on the same test emails. The same email again is answered
-  from its stored verdict.
+  from its stored verdict, unless that verdict came from an older model: the first redeploy showed old verdicts
+  outliving the model that made them, so now a new model scans the email again.
 - **Loading the model is the slow part:** about 20 s on a cold start, and 60 s the first time a new image runs,
   while Lambda fetches the 600 MB image. API Gateway stops waiting at 29 s, so the first requests after a deploy
   timed out. Two changes fixed it for use: the deploy loads the model once before it finishes, and a ping every 5

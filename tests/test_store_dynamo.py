@@ -47,8 +47,10 @@ def test_keys_verdicts_feedback_and_rate_round_trip(store):
     assert s.get_verdict("someone", "abc") is None
 
     s.put_feedback("vipin", "abc", "false_alarm")
-    s.put_feedback("vipin", "abc", "correct")
-    assert len(client.scan(TableName="pt-feedback")["Items"]) == 2
+    s.put_feedback("vipin", "abc", "correct", "with-newsletters-1")
+    items = client.scan(TableName="pt-feedback")["Items"]
+    versions = sorted(i.get("model_version", {}).get("S", "") for i in items)
+    assert len(items) == 2 and versions == ["", "with-newsletters-1"]
 
     assert [s.allow("vipin", 2) for _ in range(3)] == [True, True, False]
 

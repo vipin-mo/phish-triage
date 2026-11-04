@@ -63,15 +63,15 @@ class DynamoStore:
             },
         )
 
-    def put_feedback(self, owner: str, scan: str, label: str) -> None:
+    def put_feedback(self, owner: str, scan: str, label: str, model_version: str | None = None) -> None:
         now = time.time()
-        self._db.put_item(
-            TableName=self.feedback,
-            Item={
-                "owner": {"S": owner},
-                "scan_at": {"S": f"{scan}#{now:.3f}#{uuid.uuid4().hex[:8]}"},  # two in one ms stay two
-                "scan_id": {"S": scan},
-                "label": {"S": label},
-                "at": {"N": str(int(now))},
-            },
-        )
+        item = {
+            "owner": {"S": owner},
+            "scan_at": {"S": f"{scan}#{now:.3f}#{uuid.uuid4().hex[:8]}"},  # two in one ms stay two
+            "scan_id": {"S": scan},
+            "label": {"S": label},
+            "at": {"N": str(int(now))},
+        }
+        if model_version:
+            item["model_version"] = {"S": model_version}
+        self._db.put_item(TableName=self.feedback, Item=item)
