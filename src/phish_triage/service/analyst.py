@@ -47,7 +47,7 @@ MAX_LINKS = 15
 MAX_SUMMARY_WORDS = 80  # enforced in code; the prompt asks for at most PROMPT_SUMMARY_WORDS to leave headroom
 PROMPT_SUMMARY_WORDS = 50
 MAX_OUTPUT_TOKENS = 1_024
-PRIVATE_SOURCES = frozenset({"test_inbox", "private"})
+PRIVATE_SOURCES = frozenset({"test_inbox", "privacymail", "private"})  # never sent to an LLM
 
 Suggestion = Literal["phish", "suspicious", "likely_safe"]
 Verdict = Literal["phish", "suspicious", "needs_human_review", "safe"]
@@ -191,7 +191,7 @@ def render(
     nonce: str | None = None,
 ) -> AnalystInput:
     if record.get("source") in PRIVATE_SOURCES and not record.get("consented"):
-        raise PermissionError("private test-inbox emails are never sent to an LLM")
+        raise PermissionError("private emails (my test inbox, PrivacyMail) are never sent to an LLM")
     html = record.get("html") or ""
     view = visible_html(html) if html else None
     subject_header = _header(record, "subject") or record.get("subject") or ""

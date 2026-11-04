@@ -7,9 +7,11 @@ Measuring needs the local data (predictions and the saved Claude answers), which
 measured locally and committed as reports/gate.json; CI re-checks every committed number against the thresholds
 below and fails the build if one is out. A live LLM run happens only by hand (`... run --confirm`).
 
-The deployable classifier is the `with_inbox` model (trained with part of my private test inbox) once it exists;
-its recall is measured on the public `random` test, and the cascade's false alarms on the inbox's unseen senders
-come from reports/with_inbox.json (aggregates only).
+The deployable classifier is the bundle's split (`service/bundle.py`: `with_newsletters`, trained with part of my
+private test inbox and of PrivacyMail) once its predictions exist; its recall is measured on the public `random`
+test, and the cascade's false alarms on the inbox's unseen senders and on the PrivacyMail websites held out of
+training come from reports/with_inbox.json (aggregates only). The PrivacyMail limit was added after the `with_inbox`
+model, which passed the inbox limit at 4.0%, flagged 76.5% of PrivacyMail's newsletters (reports/privacymail.md).
 
 **Stale numbers fail too.** The gate records the analyst prompt version every report was measured with; if the code's
 `PROMPT_VERSION` differs (the prompt changed since the last measured run), the gate fails until the evaluations are
@@ -27,6 +29,7 @@ import numpy as np
 
 from phish_triage.evaluation import metrics, predictions
 from phish_triage.service.analyst import PROMPT_VERSION
+from phish_triage.service.bundle import DEPLOYED_SPLIT, SOURCES
 
 # Served as ONNX fp32, which matches these PyTorch scores; int8 scores change with the batch (service/bundle.py).
 DEPLOYED_DISTILBERT = "distilbert_head"
@@ -36,6 +39,7 @@ THRESHOLDS = {
     # name: (direction, limit)
     "recall_at_1pct_fpr": ("min", 0.98),  # the deployable classifier (DistilBERT) on the public `random` test
     "inbox_false_alarm_rate": ("max", 0.05),  # the deployable cascade on my test inbox's unseen senders
+    "privacymail_false_alarm_rate": ("max", 0.05),  # ... and on PrivacyMail websites held out of its training
     "schema_valid_rate": ("min", 1.00),
     "grounding_failure_rate": ("max", 0.02),  # share of indicators dropped because their quote wasn't in the email
     "ungrounded_indicators_shown": ("max", 0),  # after the check: must always be zero
@@ -46,11 +50,11 @@ THRESHOLDS = {
 
 def measure() -> dict:
     index = {e["id"]: int(e["label"] == "phish") for e in json.loads(Path("data/interim/index.json").read_text())}
-    deployable = "with_inbox" if "with_inbox" in predictions.available() else "random"
+    deployable = DEPLOYED_SPLIT if DEPLOYED_SPLIT in predictions.available() else "random"
     p = predictions.load(deployable, DEPLOYED_DISTILBERT)
     scores = dict(zip(p.test_ids, p.test_scores, strict=True))
-    public = [i for i in p.test_ids if i in index]  # `with_inbox` also tests inbox and 2026 phishing emails
-    if deployable == "with_inbox":
+    public = [i for i in p.test_ids if i in index]  # the private splits also test inbox and 2026 phishing emails
+    if deployable != "random":
         public = json.loads(Path("data/private/test_inbox/split.json").read_text())["slices"]["public_test"]
     y_test = np.array([index[i] for i in public])
     values: dict = {
@@ -58,9 +62,11 @@ def measure() -> dict:
         "recall_at_1pct_fpr": metrics.recall_at_fpr(y_test, np.array([scores[i] for i in public]), 0.01),
     }
     inbox_report = Path("reports/with_inbox.json")
-    if inbox_report.exists():
-        cascade = json.loads(inbox_report.read_text())["after"]["cascade"]
+    if inbox_report.exists() and deployable != "random":
+        cascade = json.loads(inbox_report.read_text())[SOURCES[deployable][1]]["cascade"]
         values["inbox_false_alarm_rate"] = cascade["inbox_fpr"]["share"]
+        if "privacymail_fpr" in cascade:
+            values["privacymail_false_alarm_rate"] = cascade["privacymail_fpr"]["share"]
 
     analyst_report = json.loads(Path("reports/analyst.json").read_text())
     versions = {"analyst": analyst_report.get("prompt_version")}

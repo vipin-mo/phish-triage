@@ -4,8 +4,9 @@
 
 > **Status: in progress.** Started October 2026. The data pipeline, baselines, DistilBERT, the LLM comparison,
 > the cascade and the safe LLM analyst step are done. Trained on public data alone, the models flagged almost all
-> of my real inbox mail; trained with part of it, the deployed cascade flags 4.0% (below). It now runs on AWS
-> Lambda behind an API; the Gmail add-on is next.
+> of my real inbox mail. Trained with part of it, the cascade flagged 4.0% of it, but 76.5% of 18,682 newsletters
+> from 944 other websites; trained with part of those too, the deployed cascade flags 2.0% of my inbox and 0.9% of
+> newsletters from websites it never saw (below). It runs on AWS Lambda behind an API; the Gmail add-on is next.
 > Numbers are added only once they are measured.
 
 phish-triage scores emails for phishing and explains why.
@@ -130,10 +131,11 @@ runs used the `random` split's DistilBERT, reading the plain-text part, from bef
   (1 for the final verdict, 5 for the action and summary agreeing). These ratings are of prompt version 4 on the
   data from before the fixes; I haven't rated version 5 yet.
 - **The CI eval gate** checks these numbers on every push ([reports/gate.json](reports/gate.json)) and fails if
-  they were measured on an older prompt. It also checks the model I deploy (the one trained with part of my inbox):
-  recall at 1% false alarms on the public test (0.998, at least 0.98) and false alarms on my inbox's unseen senders
-  (4.0%, at most 5%, a limit I set before the run). All Phase 4 Claude runs cost $1.06 together; the re-run after
-  the fixes was $0.27 of that.
+  they were measured on an older prompt. It also checks the model I deploy (trained with part of my inbox and of
+  PrivacyMail): recall at 1% false alarms on the public test (0.994, at least 0.98), false alarms on my inbox's
+  unseen senders (2.0%, at most 5%, a limit I set before the run) and on PrivacyMail websites kept out of training
+  (0.9%, at most 5%, added after the inbox model passed the inbox limit and failed on PrivacyMail). All Phase 4
+  Claude runs cost $1.06 together; the re-run after the fixes was $0.27 of that.
 
 ## What my private test inbox showed
 
@@ -177,13 +179,42 @@ phishing emails, and 249 emails from 26 other senders became the test. Neither m
   on the public test, is suspect. Three are: the number of links (0.961, public 0.507), the number of link domains
   (0.918, public 0.525) and a DKIM signature from the sender's own domain (0.918, public 0.582). My inbox's
   legitimate mail is all newsletters and notifications from large senders, so "many links, signed by its own
-  domain" means legitimate there. They don't decide anything in the deployed cascade, though: refitted without
+  domain" means legitimate there. They don't decide anything in this cascade, though: refitted without
   them, it flags exactly the same emails, because on this mail DistilBERT, which reads only the text, decides.
 - **The weak spot is phishing that looks like a newsletter.** Of the phishing in the tests that is DKIM-signed by
   its own domain and has at least 12 links (the inbox's median), the cascade catches 25 of 31 (80.6%), against
   99.0% of the 2026 phishing overall. Trained on public data only it caught all 31, while flagging 99% of my
   inbox: this is what training with the inbox costs. With 31 emails the interval is wide (64.5–93.5%).
-- The inbox test is small: 249 emails, mostly Gmail's Updates (214) and Promotions (31).
+- The inbox test is small: 249 emails from 26 senders, mostly Gmail's Updates (214) and Promotions (31). The next
+  section shows the 4.0% didn't carry over to other senders.
+
+## What 18,682 other newsletters showed
+
+From [reports/privacymail.md](reports/privacymail.md) and the *newsletters* rows of
+[reports/with_inbox.md](reports/with_inbox.md). [PrivacyMail](https://zenodo.org/records/6509751) (Maass, Schwär and
+Hollick, 2019) collected the newsletters of websites its users signed up to, 2019–2022. Access is on request, and
+its owner allows models trained on it to be used and published; the newsletters themselves can't be shared. They
+stay on my laptop and are never sent to an LLM; only counts and rates are published, and website names are hashed.
+I kept English mail only, removed duplicates within each website and took at most 25 emails per website.
+
+- **The inbox model didn't carry over.** Run one email at a time, as the service runs it, the cascade then deployed
+  flagged 76.5% of 18,682 newsletters from 944 websites (73.9% averaged per website), against 4.0% on my inbox's
+  unseen senders. The public-data models flag 98.5–99.9%. I checked that it wasn't the language filter or the
+  collector's own addresses reaching the models. DistilBERT decides 97.6% of these; it had learned the kind of mail
+  my inbox's senders send, not newsletters in general.
+- **Trained with part of it, the cascade flags 0.9%** of 3,738 newsletters from 189 websites kept out of training
+  (2.0% averaged per website). I split by website, as with the inbox's senders: at most 10 emails per website in
+  training (4,778) and validation (1,595), all of a test website's (at most 25) in the test. The held-out websites
+  were collected the same way as the training ones, so this is the easier of the two tests.
+- **My inbox is the harder test, and it improved too:** 2.0% (5 of 249) of the unseen senders' mail flagged, 6.4%
+  averaged per sender (4.0% and 16.1% before). None of PrivacyMail comes from my inbox.
+- **It costs phishing recall.** The cascade catches 97.4% of the public test's phishing (98.4% before) at 0.14% false
+  alarms (0.36%), 97.6% of the 2026 phishing (99.0%, 22 more missed) and 23 of the 31 newsletter-like phishing
+  emails (25). The newsletters in validation make the threshold stricter; at a fixed 1% false-alarm rate on the
+  public test, DistilBERT catches 99.4% (99.8% before). At 1 phishing email in 100, a flagged email would now be
+  phishing 33% of the time, against 20%.
+- This is the model deployed now. I traded about 1.4 points of recall for false alarms on newsletters going from
+  76.5% to 0.9%, since a filter that flags most newsletters wouldn't be used.
 
 
 ## What the deployment showed
@@ -201,9 +232,9 @@ explanation queue and worker exist but are switched off.
   timed out. Two changes fixed it for use: the deploy loads the model once before it finishes, and a ping every 5
   minutes keeps one copy loaded. Reading the domain-popularity list was 8 s of a cold start; the bundle now ships
   the finished lookup table (under 1 s).
-- **The package is checked against its report:** it must reproduce the inbox and public-test numbers one email at
-  a time, or it isn't written ([reports/bundle.md](reports/bundle.md)). That check found the int8 batch problem
-  (Known issues).
+- **The package is checked against its report:** it must reproduce the inbox, PrivacyMail and public-test numbers
+  one email at a time, or it isn't written ([reports/bundle.md](reports/bundle.md)). That check found the int8
+  batch problem (Known issues).
 - **The AWS Free plan blocks GitHub's keyless sign-in (OIDC):** AWS denies `iam:*Provider*` on Free plan accounts.
   Rather than store AWS keys in GitHub, I deploy from my laptop with an MFA session (`make deploy-*`). The CI
   deploy workflow and roles are written and switch on with one variable on an account that allows OIDC.
@@ -213,9 +244,9 @@ explanation queue and worker exist but are switched off.
 
 ## Known issues
 
-All but the last two are fixed. The first two were found while rating the analyst's answers by hand, the next five
-afterwards, on my test inbox and while packaging the model, all in November 2026; every number above was re-measured after the fixes, except
-the Claude runs, as noted.
+All but the last two are fixed. The first two were found while rating the analyst's answers by hand, the next six
+afterwards, on my test inbox, while packaging the model and on PrivacyMail, all in November 2026; every number
+above was re-measured after the fixes, except the Claude runs, as noted.
 
 - **Masking rewrote links (fixed).** Replacing the Apache list names with `project` ran over the whole body and
   HTML, including URLs and addresses. It rewrote a URL or address in 7,978 of the 13,541 legitimate emails the
@@ -247,9 +278,12 @@ the Claude runs, as noted.
   with its own report. The service now runs DistilBERT as ONNX fp32 (under 0.000001 apart), the reports for the
   deployed model use fp32 scores, and packaging stops unless the package reproduces the report
   ([reports/bundle.md](reports/bundle.md)). The `random` split's comparison tables still show int8 as measured.
-- **Phishing that looks like a newsletter (open).** The deployed cascade catches 25 of 31 such emails (above).
-  It is a data problem: the only bulk-looking legitimate mail it learned from is my inbox, and there are few
-  phishing emails of that kind to learn from. No public dataset I found fills both sides (see
+- **The inbox model learned my inbox's senders (fixed).** Trained with my inbox, the cascade flagged 4.0% of its
+  unseen senders' mail but 76.5% of PrivacyMail's newsletters. Trained with part of PrivacyMail too, it flags 0.9%
+  of newsletters from held-out websites and 2.0% of my inbox, and the gate now checks both (above).
+- **Phishing that looks like a newsletter (open).** The deployed cascade catches 23 of 31 such emails (25 before
+  the newsletters were added). It is a data problem: the newsletters gave it plenty of bulk-looking legitimate
+  mail, but there are few phishing emails of that kind to learn from, and no public dataset I found has them (see
   [docs/DATA.md](docs/DATA.md)); the report tracks this number for every model I train.
 - **The analyst and injection results are from before these fixes (open).** They used the earlier classifier and
   input; I re-run them with the deployed model (about $0.27) before the Gmail add-on.

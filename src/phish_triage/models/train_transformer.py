@@ -8,9 +8,10 @@ scores to data/predictions/ as `distilbert_<strategy>`. Runs are logged to MLflo
 `uv run --group train mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db`).
 
 The `random` split's head model is exported to ONNX, quantized to int8, and measured for size, CPU latency and the
-accuracy change from quantizing (reports/onnx.json, reports/onnx.md). The private `with_inbox` split (`random` plus
-part of my test inbox, see `data/inbox.py`) is trained and exported the same way, to artifacts/distilbert_with_inbox/
-and reports/onnx_with_inbox.*, only when asked for by name; its records never leave data/private/.
+accuracy change from quantizing (reports/onnx.json, reports/onnx.md). The private splits, `with_inbox` (`random`
+plus part of my test inbox, `data/inbox.py`) and `with_newsletters` (that plus PrivacyMail newsletters,
+`data/privacymail.py`), are trained and exported the same way, to artifacts/distilbert_<split>/ and
+reports/onnx_<split>.*, only when asked for by name; their records never leave data/private/.
 """
 
 from __future__ import annotations
@@ -23,7 +24,7 @@ from pathlib import Path
 
 import numpy as np
 
-from phish_triage.data import inbox
+from phish_triage.data import inbox, privacymail
 from phish_triage.data.splits import SPLITS_DIR
 from phish_triage.evaluation import metrics, predictions
 from phish_triage.models import transformer
@@ -38,7 +39,7 @@ SPLITS = (
     "old_era",
 )
 EXPORT_SPLIT = "random"
-PRIVATE_SPLITS = (inbox.SPLIT,)  # trained only when named
+PRIVATE_SPLITS = (inbox.SPLIT, privacymail.NEWSLETTER_SPLIT)  # trained only when named
 ARTIFACTS_DIR = Path("artifacts")
 REPORTS_DIR = Path("reports")
 MLFLOW_URI = "sqlite:///mlruns/mlflow.db"
@@ -152,7 +153,9 @@ def _quality(y: np.ndarray, scores: np.ndarray) -> dict:
 
 
 def onnx_markdown(r: dict, split: str = EXPORT_SPLIT) -> str:
-    command = "make train-transformer" if split == EXPORT_SPLIT else "make train-with-inbox"
+    command = {EXPORT_SPLIT: "make train-transformer", privacymail.NEWSLETTER_SPLIT: "make train-with-newsletters"}.get(
+        split, "make train-with-inbox"
+    )
     lines = [
         "# DistilBERT: PyTorch vs ONNX vs ONNX int8",
         "",
@@ -206,8 +209,10 @@ def main(argv: list[str] | None = None) -> int:
     mlflow.set_tracking_uri(MLFLOW_URI)
     mlflow.set_experiment("distilbert")
     splits = json.loads((SPLITS_DIR / "splits.json").read_text())
-    if set(args.splits) & set(PRIVATE_SPLITS):
+    if inbox.SPLIT in args.splits:
         splits[inbox.SPLIT] = inbox.load_split()[0]
+    if privacymail.NEWSLETTER_SPLIT in args.splits:
+        splits[privacymail.NEWSLETTER_SPLIT] = privacymail.load_split()[0]
     tokenizer = transformer.load_tokenizer()
     config = transformer.TrainConfig(strategy=args.strategy, epochs=args.epochs)
     for name in args.splits or list(SPLITS):

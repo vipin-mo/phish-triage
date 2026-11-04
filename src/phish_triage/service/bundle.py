@@ -1,9 +1,12 @@
 """The deployable model bundle: everything the service loads, in one folder, checked against the evaluation.
 
-    python -m phish_triage.service.bundle    # or `make bundle` (after `make train-with-inbox`)
+    python -m phish_triage.service.bundle    # or `make bundle` (after `make train-with-newsletters`)
 
-The deployed cascade is the `with_inbox` split's (reports/with_inbox.md): the stacked model (TF-IDF text score +
-gradient-boosted trees on the structured features) decides what it is sure about, DistilBERT int8 the rest. The
+The deployed cascade is the `with_newsletters` split's (reports/with_inbox.md, the *newsletters* setup): my inbox
+and PrivacyMail newsletters added to the public training data. It replaced the `with_inbox` split's, which flagged
+76.5% of PrivacyMail's newsletters (reports/privacymail.md); `--split with_inbox` still builds that one. The stacked
+model (TF-IDF text score + gradient-boosted trees on the structured features) decides what it is sure about,
+DistilBERT the rest. The
 evaluation scripts fit the stacked model in memory and never save it, so this fits it once more on the same
 training data (every step is seeded, so it is the same model) and writes, to artifacts/bundle/<version>/:
 
@@ -17,8 +20,9 @@ training data (every step is seeded, so it is the same model) and writes, to art
   of every file, checked on load.
 
 Before writing `bundle.json`, the bundle is loaded the way the service loads it and run on the evaluation's test
-emails; it must flag exactly as many of the inbox's test senders' emails and catch exactly as many public-test
-phishing emails as reports/with_inbox.json says, or the export stops.
+emails; it must flag exactly as many of the inbox's test senders' emails (and of the PrivacyMail websites held out
+of training) and catch exactly as many public-test phishing emails as reports/with_inbox.json says, or the export
+stops.
 
 **Why fp32, not int8.** The int8 model was made with dynamic quantization, which picks its scales from the whole
 batch, so an email's score depends on the emails scored with it. The evaluation scored in batches and the service
@@ -27,8 +31,9 @@ score either way and matches the PyTorch scores the evaluation uses. Lambda runs
 10 GB), so int8's smaller size, the reason it existed, isn't needed. The export measures both and writes
 reports/bundle.md.
 
-The bundle is trained partly on my private inbox, so it is never committed and never published; it goes to a
-private S3 bucket (Phase 5).
+The bundle is trained partly on my private inbox and on PrivacyMail, so it is never committed and never published;
+it goes to a private S3 bucket and image registry (Phase 5). PrivacyMail's owner allows models trained on it to be
+used and published; only the newsletters themselves can't be shared.
 """
 
 from __future__ import annotations
@@ -45,7 +50,12 @@ import numpy as np
 
 BUNDLE_ROOT = Path("artifacts/bundle")
 BUNDLE_FILE = "bundle.json"
-DISTILBERT_SOURCE = Path("artifacts/distilbert_with_inbox")
+DEPLOYED_SPLIT = "with_newsletters"
+# split -> (its DistilBERT, its setup in reports/with_inbox.json, which the bundle must reproduce)
+SOURCES = {
+    "with_inbox": (Path("artifacts/distilbert_with_inbox"), "after"),
+    "with_newsletters": (Path("artifacts/distilbert_with_newsletters"), "newsletters"),
+}
 FILES = ("stacked.joblib", "distilbert.onnx", "tokenizer.json", "domain_ranks.json")
 REPORT = Path("reports/bundle.md")
 TARGET_FPR = 0.01
@@ -68,7 +78,18 @@ def verify(folder: Path) -> dict:
     return config
 
 
-def export(root: Path = BUNDLE_ROOT) -> Path:
+def load_split(name: str) -> tuple[dict[str, list[str]], dict]:
+    """The split and its test slices; `with_newsletters` adds the held-out PrivacyMail websites to the inbox's."""
+    from phish_triage.data import inbox, privacymail
+
+    split, slices = inbox.load_split()
+    if name == privacymail.NEWSLETTER_SPLIT:
+        split, extra = privacymail.load_split()
+        slices = slices | extra
+    return split, slices
+
+
+def export(split_name: str = DEPLOYED_SPLIT, root: Path = BUNDLE_ROOT) -> Path:
     import joblib
     import onnxruntime
     import sklearn
@@ -81,8 +102,9 @@ def export(root: Path = BUNDLE_ROOT) -> Path:
     from phish_triage.models.baselines import email_text, fit_all
     from phish_triage.service import triage
 
-    split, slices = inbox.load_split()
-    eval_ids = list(dict.fromkeys(slices["public_test"] + slices["inbox_test"]))
+    source, setup = SOURCES[split_name]
+    split, slices = load_split(split_name)
+    eval_ids = list(dict.fromkeys(slices["public_test"] + slices["inbox_test"] + slices.get("privacymail_test", [])))
     ids = set(split["train"]) | set(split["val"]) | set(eval_ids)
     records = inbox.read_split_records(ids)
     ranks = default_ranks()
@@ -94,9 +116,9 @@ def export(root: Path = BUNDLE_ROOT) -> Path:
     train, val = part(split["train"]), part(split["val"])
     fitted = fit_all(*train, *val)
     stacked_val = fitted.scores(val[0], val[1])["stacked"]
-    distilbert = predictions.load(inbox.SPLIT, "distilbert_head")
+    distilbert = predictions.load(split_name, "distilbert_head")
     if distilbert.val_ids != split["val"]:
-        raise SystemExit("saved DistilBERT predictions don't match the with_inbox validation split; re-run training")
+        raise SystemExit(f"saved DistilBERT predictions don't match the {split_name} validation split; re-run training")
     cutoffs = choose_cutoffs(val[2], stacked_val)
     threshold = metrics.threshold_at_fpr(val[2], distilbert.val_scores, TARGET_FPR)
 
@@ -104,28 +126,31 @@ def export(root: Path = BUNDLE_ROOT) -> Path:
     shutil.rmtree(staging, ignore_errors=True)
     staging.mkdir(parents=True)
     joblib.dump({"text": fitted.text, "stacked": fitted.stacked}, staging / "stacked.joblib")
-    shutil.copyfile(DISTILBERT_SOURCE / "model.onnx", staging / "distilbert.onnx")
-    shutil.copyfile(DISTILBERT_SOURCE / "pytorch" / "tokenizer.json", staging / "tokenizer.json")
+    shutil.copyfile(source / "model.onnx", staging / "distilbert.onnx")
+    shutil.copyfile(source / "pytorch" / "tokenizer.json", staging / "tokenizer.json")
     ranks.save(staging / "domain_ranks.json")
     hashes = {name: sha256(staging / name) for name in FILES}
     # The name changes whenever any file does, so a rebuilt bundle never replaces one that is deployed.
     content = hashlib.sha256(json.dumps(hashes, sort_keys=True).encode()).hexdigest()[:8]
-    version = f"with-inbox-{datetime.now(UTC):%Y%m%d}-{content}"
+    version = f"{split_name.replace('_', '-')}-{datetime.now(UTC):%Y%m%d}-{content}"
     folder = root / version
     if folder.exists():
         shutil.rmtree(staging)
         raise SystemExit(f"{folder} already exists with the same content")
     staging.rename(folder)
 
-    report = json.loads(Path("reports/with_inbox.json").read_text())["after"]["cascade"]
+    report = json.loads(Path("reports/with_inbox.json").read_text())[setup]["cascade"]
     expected = {
         "inbox_test_flagged": report["inbox_fpr"]["flagged"],
         "public_recall": report["public_recall"],
     }
+    if "privacymail_test" in slices:
+        expected["privacymail_test_flagged"] = report["privacymail_fpr"]["flagged"]
     config = {
         "version": version,
         "created": datetime.now(UTC).isoformat(timespec="seconds"),
-        "split": inbox.SPLIT,
+        "split": split_name,
+        "report_setup": setup,
         "stage1_cutoffs": {"low": cutoffs.low, "high": cutoffs.high},
         "distilbert_threshold": threshold,
         "distilbert_strategy": "head",
@@ -138,15 +163,14 @@ def export(root: Path = BUNDLE_ROOT) -> Path:
 
     measured = parity(folder, records, slices)
     print(f"parity: {measured} (expected {expected})", file=sys.stderr)
-    if measured["inbox_test_flagged"] != expected["inbox_test_flagged"] or not np.isclose(
-        measured["public_recall"], expected["public_recall"]
-    ):
+    counts_match = all(measured[k] == v for k, v in expected.items() if k.endswith("_flagged"))
+    if not counts_match or not np.isclose(measured["public_recall"], expected["public_recall"]):
         (folder / BUNDLE_FILE).unlink()
         raise SystemExit("the bundle doesn't reproduce reports/with_inbox.json; bundle.json removed")
     texts = [email_text(records[i]) for i in slices["inbox_test"]]
     batch = {
         "fp32": batch_dependence(folder / "distilbert.onnx", folder / "tokenizer.json", texts),
-        "int8": batch_dependence(DISTILBERT_SOURCE / "model.int8.onnx", folder / "tokenizer.json", texts),
+        "int8": batch_dependence(source / "model.int8.onnx", folder / "tokenizer.json", texts),
     }
     REPORT.write_text(to_markdown(config, measured, batch, len(texts)))
     return folder
@@ -166,12 +190,20 @@ def batch_dependence(model: Path, tokenizer: Path, texts: list[str]) -> float:
 
 def to_markdown(config: dict, measured: dict, batch: dict[str, float], n: int) -> str:
     cut = config["stage1_cutoffs"]
+    expected = config["expected"]
+    privacymail = (
+        f", {measured['privacymail_test_flagged']} of the held-out PrivacyMail websites' newsletters flagged "
+        f"(report: {expected['privacymail_test_flagged']})"
+        if "privacymail_test_flagged" in expected
+        else ""
+    )
     return "\n".join(
         [
             "# The deployable bundle",
             "",
             f"Generated by `make bundle`. Version `{config['version']}`, trained on the `{config['split']}` split. The "
-            "bundle itself is private (it is trained partly on my inbox); this page has only its settings and checks.",
+            "bundle itself is private (it is trained partly on my inbox and on PrivacyMail); this page has only its "
+            "settings and checks.",
             "",
             "| Setting | Value |",
             "|---|---|",
@@ -182,10 +214,10 @@ def to_markdown(config: dict, measured: dict, batch: dict[str, float], n: int) -
             f"| Libraries | scikit-learn {config['libraries']['scikit-learn']}, onnxruntime "
             f"{config['libraries']['onnxruntime']} |",
             "",
-            "**Parity with reports/with_inbox.md**, run the way the service runs it (one email at a time): "
-            f"{measured['inbox_test_flagged']} of the inbox test senders' emails flagged (report: "
-            f"{config['expected']['inbox_test_flagged']}), public-test recall {measured['public_recall']:.4f} "
-            f"(report: {config['expected']['public_recall']:.4f}).",
+            f"**Parity with reports/with_inbox.md** (the *{config['report_setup']}* setup), run the way the service "
+            f"runs it (one email at a time): {measured['inbox_test_flagged']} of the inbox test senders' emails "
+            f"flagged (report: {expected['inbox_test_flagged']}){privacymail}, public-test recall "
+            f"{measured['public_recall']:.4f} (report: {expected['public_recall']:.4f}).",
             "",
             f"**Score change between one email alone and in a batch of 32** (largest, over the {n} inbox test emails): "
             f"ONNX fp32 {batch['fp32']:.1e}, ONNX int8 {batch['int8']:.3f}. That is why the service uses fp32.",
@@ -201,24 +233,31 @@ def parity(folder: Path, records: dict, slices: dict) -> dict:
     scanner = Scanner(folder, threads=4)
     cascade = lambda i: scanner.scan_record(records[i]).cascade_phish  # noqa: E731
     public_phish = [i for i in slices["public_test"] if records[i]["label"] == "phish"]
-    return {
+    measured = {
         "inbox_test_flagged": sum(cascade(i) for i in slices["inbox_test"]),
         "public_recall": float(np.mean([cascade(i) for i in public_phish])),
     }
+    if "privacymail_test" in slices:
+        measured["privacymail_test_flagged"] = sum(cascade(i) for i in slices["privacymail_test"])
+    return measured
 
 
-def latest(root: Path = BUNDLE_ROOT) -> Path:
-    """The newest complete bundle, by its `created` time (names end in a content hash, so they don't sort by age)."""
+def latest(root: Path = BUNDLE_ROOT, split: str | None = None) -> Path:
+    """The newest complete bundle (of `split`, if given), by its `created` time (names end in a content hash, so
+    they don't sort by age)."""
     found = [p for p in root.glob("*") if (p / BUNDLE_FILE).exists()]
+    if split:
+        found = [p for p in found if json.loads((p / BUNDLE_FILE).read_text())["split"] == split]
     if not found:
-        raise SystemExit(f"no bundle in {root}; run `make bundle`")
+        raise SystemExit(f"no {split or ''} bundle in {root}; run `make bundle`")
     return max(found, key=lambda p: json.loads((p / BUNDLE_FILE).read_text())["created"])
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.parse_args(argv)
-    folder = export()
+    parser.add_argument("--split", choices=sorted(SOURCES), default=DEPLOYED_SPLIT)
+    args = parser.parse_args(argv)
+    folder = export(args.split)
     print(folder)
     return 0
 

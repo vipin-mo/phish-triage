@@ -31,13 +31,19 @@ To avoid that, this project uses:
 The Apache lists are `announce@apache.org`, `users@httpd`, `users@tomcat`, `user@cassandra` and
 `dev@community`: announcements, user support and project discussion from different communities.
 
+**Private data (never committed, never sent to an LLM):**
+
+| Source | Why | License |
+|---|---|---|
+| A private test inbox (a new Gmail account subscribed to newsletters, shops and job sites) | Realistic notification-style legitimate mail. Never committed or sent to an LLM; only counts and metrics are published. Part of it, split by sender, is in the `with_inbox` training split (`data/inbox.py`) | private |
+| [PrivacyMail](https://zenodo.org/records/6509751) (Maass, Schwär and Hollick, 2019), about 500,000 newsletters from 1,423 websites, 2019–2022 | Commercial newsletters from many senders: a false-alarm test, then part of the `with_newsletters` training split, split by website (`data/privacymail.py`). Read from the zip without unpacking; never committed or sent to an LLM; only counts and metrics are published, website names hashed | on request; the owner allows models trained on it to be used and published, not the newsletters themselves |
+
 **Planned, not yet added:**
 
 | Source | Why | License |
 |---|---|---|
 | [Greco et al., Kaggle](https://www.kaggle.com/datasets/francescogreco97/human-llm-generated-phishing-legitimate-emails) | LLM-written phishing, robustness test only | CC BY-NC-SA 4.0 |
 | A second legitimate source (e.g. another public mailing-list archive) | Cross-source test for the legitimate class | to be checked |
-| A private test inbox (a new Gmail account subscribed to newsletters, shops and job sites) | Realistic notification-style legitimate mail. Never committed or sent to an LLM; only counts and metrics are published. Part of it, split by sender, is in the `with_inbox` training split (`data/inbox.py`) | private |
 
 **Reference data (not emails):**
 
@@ -58,6 +64,8 @@ The Apache lists are `announce@apache.org`, `users@httpd`, `users@tomcat`, `user
 - Jose Nazario, phishing corpus, <https://monkey.org/~jose/phishing/> (CC-BY-4.0).
 - rf-peixoto, Phishing Pot, <https://github.com/rf-peixoto/phishing_pot> (CC BY-NC 4.0).
 - The Apache Software Foundation, public mailing-list archives, <https://lists.apache.org/>.
+- Maass, Schwär and Hollick, PrivacyMail newsletter dataset (APF 2019), <https://zenodo.org/records/6509751>
+  (access on request; not redistributed).
 - The Apache SpamAssassin project, public corpus, <https://spamassassin.apache.org/old/publiccorpus/>.
 - Naser Abdullah Alam, Phishing Email Dataset, Kaggle, built from Champa et al., "Phishing Email Curated
   Datasets", Zenodo 8339691 (CC-BY-4.0).
@@ -213,6 +221,7 @@ legitimate emails, so the date alone says nothing about the label. That gives 9,
 | `old_era` | Nazario 2004–2014 vs SpamAssassin 2002, confounded on purpose | 5,961 | 1,277 | 1,277 |
 | `spam` | Spam as a hard negative (test only) | | | 1,509 |
 | `with_inbox` (private) | `random` plus part of my test inbox, split by sender, and as many 2026 phishing emails | 13,946 | 3,104 | 4,695 |
+| `with_newsletters` (private, deployed) | `with_inbox` plus PrivacyMail newsletters, split by website (at most 10 per website in train and val, at most 25 in test) | 18,724 | 4,699 | 8,433 |
 
 Every main-pool split is half phishing and half legitimate. In Phase 2 I compute precision at a realistic base
 rate from the measured rates, instead of changing the split.
@@ -274,15 +283,18 @@ What this shows:
   that makes the task; the private test inbox measures the gap: the models flag 96.8–99.8% of its 1,677
   legitimate emails ([reports/test_inbox.md](../reports/test_inbox.md)). With part of the inbox in training,
   split by sender, the cascade flags 4.0% of the emails from 26 unseen senders
-  ([reports/with_inbox.md](../reports/with_inbox.md)).
+  ([reports/with_inbox.md](../reports/with_inbox.md)), but 76.5% of 18,682 PrivacyMail newsletters from 944
+  websites ([reports/privacymail.md](../reports/privacymail.md)): 26 senders were too few. With part of PrivacyMail
+  in training too, split by website, it flags 0.9% of newsletters from 189 held-out websites and 2.0% of the
+  inbox's unseen senders.
 - **My inbox's legitimate mail is all bulk mail from large senders,** so on it the number of links and an
   own-domain DKIM signature mark legitimate mail (ROC AUC 0.92–0.96 on their own, against 0.51–0.58 on the public
   test). The cascade decides the same without them; what it misses more is phishing that reads like a
-  newsletter: 25 of 31 caught. No public dataset fills that gap: the one large corpus of commercial newsletters I
-  found ([PrivacyMail](https://zenodo.org/records/6509751), about 500,000 `.eml` files) is available only on
-  request, collected over two years before 2022 with German over-represented, and legitimate newsletters alone would push the model
-  further toward "looks like a newsletter = legitimate". It would need newsletter-like phishing from the same
-  years to help.
+  newsletter: 25 of 31 caught, and 23 of 31 with the PrivacyMail newsletters in training. The newsletters fill
+  the legitimate side; I found no public source of newsletter-like phishing for the other side.
+- **PrivacyMail is not a random sample of anyone's inbox.** Its users chose which websites to sign up to, only 944
+  of its 1,423 websites sent English mail I could use (I keep only English), and it ends in 2022, so the
+  held-out-websites test is the easier one and my inbox the harder one.
 - **List mail is not always legitimate.** Two Apache list posts turned out to be phishing (found as label
   conflicts), so a few spam or phishing posts that got past the lists' filters may still be labelled
   legitimate.
