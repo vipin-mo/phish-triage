@@ -264,6 +264,12 @@ for a background design were removed, since a queue would have had to hold the e
   are cleaned up first; the tables can't be deleted by a plan; and the scan function can only read API keys. The
   slowness alarm fired on both deploys with nobody waiting, because it watched the function's run time, which
   counts the warm-up pings and the 60 s first load on a new image; it now watches the API's latency instead.
+- **A new version reaches traffic through a canary.** Each image is a numbered Lambda version behind a `live` alias.
+  CodeDeploy first runs a smoke check on the new version (a hand-made phishing email must come back phish and a
+  clean newsletter safe), then sends it 10% of traffic for 10 minutes, then all of it, and rolls back if the error,
+  server-error or slowness alarm fires. With my traffic a 10% share may see no request at all, which is why the
+  smoke check runs first. In shadow mode (`make deploy-image SHADOW=<bundle>`) the image also carries an earlier
+  bundle that scores every new scan, and only both verdicts and scores are logged.
 - Expected cost at my use: under $1 a month (mostly image storage), within the Free plan's credits. The Free plan
   ends on 2027-04-27 and the account closes with it unless I upgrade, taking every resource with it; before then I
   either upgrade or export the feedback and API keys and destroy the service.
@@ -332,7 +338,7 @@ in November 2026. Every number above was re-measured after the fixes, except my 
 - [x] **Phase 3** — DistilBERT ([ONNX int8](reports/onnx.md)), LLM comparison, cascade ([results](docs/RESULTS.md))
 - [x] **Phase 4** — grounded LLM analyst step ([results](reports/analyst.md)), prompt-injection tests ([round 1](reports/injection.md), [round 2](reports/injection_round2.md)), CI eval gate
 - [ ] **Phase 5** — serverless AWS deployment: [service and bundle](reports/bundle.md), Lambda + API Gateway + DynamoDB in [Terraform](infra/), deployed from my laptop with MFA (OIDC CI/CD blocked by the Free plan); cost table and dashboard screenshots to come
-- [ ] **Phase 6** — explanations on demand, [Gmail add-on](addon/) (built, installing), feedback loop, canary, drift check
+- [ ] **Phase 6** — explanations on demand, [Gmail add-on](addon/) (in use), canary and shadow mode; drift check and the retraining loop to come
 - [ ] **Phase 7** — load test, robustness report, write-up
 
 ## Development

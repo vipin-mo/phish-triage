@@ -137,13 +137,17 @@ api-key:  ## create an API key for the deployed service (OWNER=name)
 # make deploy-plan shows what will change; make deploy-apply applies exactly that plan and checks that the model in
 # infra/bundle-version is the one loaded. Only a clean, merged `main` is deployed; DEV=1 builds a dev-tagged test image.
 REGISTRY = $(ACCOUNT).dkr.ecr.us-east-2.amazonaws.com
-IMAGE_TAG = $$(if [ -n "$(DEV)" ]; then echo "dev-$$(git rev-parse --short HEAD)-$$(date +%Y%m%d%H%M%S)"; else git rev-parse HEAD; fi)
+# An image with a shadow bundle (SHADOW=<bundle version>) holds more than the commit, so its tag says which.
+SHADOW_TAG = $(if $(SHADOW),-shadow-$(lastword $(subst -, ,$(SHADOW))),)
+IMAGE_TAG = $$(if [ -n "$(DEV)" ]; then echo "dev-$$(git rev-parse --short HEAD)-$$(date +%Y%m%d%H%M%S)"; else git rev-parse HEAD; fi)$(SHADOW_TAG)
 # Where alarms are emailed; never committed. An empty one would remove the email subscription, so plans refuse it.
 ALERT_EMAIL ?= $(shell cat ~/.config/phish-triage/alert-email 2>/dev/null)
 
-deploy-image:  ## build the arm64 Lambda image with the bundle and push it to the private registry (DEV=1: a test image)
+deploy-image:  ## build the arm64 Lambda image with the bundle and push it to the private registry (DEV=1: a test image; SHADOW=<bundle version>: shadow mode)
 	@if [ -z "$(DEV)" ]; then uv run python scripts/deploy_checks.py clean-main; fi
-	mkdir -p build && rm -rf build/bundle build/image-tag && cp -R "artifacts/bundle/$$(cat infra/bundle-version)" build/bundle
+	mkdir -p build && rm -rf build/bundle build/image-tag build/smoke build/shadow && cp -R "artifacts/bundle/$$(cat infra/bundle-version)" build/bundle
+	mkdir -p build/smoke build/shadow && cp tests/fixtures/spoofed_brand.eml tests/fixtures/clean_newsletter.eml build/smoke/
+	@if [ -n "$(SHADOW)" ]; then cp -R "artifacts/bundle/$(SHADOW)/." build/shadow/; else touch build/shadow/.none; fi
 	uv export --no-default-groups --group service --no-hashes --no-emit-project --format requirements-txt -q > build/requirements.txt
 	tag=$(IMAGE_TAG) && \
 	if aws ecr describe-images --profile $(AWS_PROFILE_NAME) --region us-east-2 --repository-name phish-triage --image-ids imageTag="$$tag" >/dev/null 2>&1; then \
@@ -160,10 +164,11 @@ deploy-plan:  ## plan infra/service for the image in build/image-tag (alarm emai
 	$(AWS_ENV) && terraform -chdir=infra/service init -input=false -backend-config="bucket=phish-triage-tfstate-$(ACCOUNT)" && \
 	terraform -chdir=infra/service plan -input=false -out=service.tfplan -var "image_tag=$$(cat build/image-tag)" -var "alert_email=$(ALERT_EMAIL)"
 
-deploy-apply:  ## apply the saved service plan, load the model once (warm-up), then check it's the model in infra/bundle-version
+deploy-apply:  ## apply the saved service plan, canary the new version (smoke check, 10% for 10 min), then check the loaded model
 	$(AWS_ENV) && terraform -chdir=infra/service apply -input=false service.tfplan && \
 	aws lambda wait function-updated-v2 --function-name phish-triage-scan && \
-	aws lambda invoke --function-name phish-triage-scan --cli-binary-format raw-in-base64-out --cli-read-timeout 150 \
+	uv run python scripts/canary.py && \
+	aws lambda invoke --function-name phish-triage-scan --qualifier live --cli-binary-format raw-in-base64-out --cli-read-timeout 150 \
 	  --payload '{"source": "aws.events"}' build/warm.json > build/invoke.json && echo "warm-up: $$(cat build/warm.json)" && \
 	curl -fsS --retry 5 --retry-delay 10 --max-time 60 "$$(terraform -chdir=infra/service output -raw api_url)/v1/health" > build/health.json && \
 	cat build/health.json && echo && uv run python scripts/deploy_checks.py loaded build/invoke.json build/warm.json build/health.json

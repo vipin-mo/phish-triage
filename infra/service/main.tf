@@ -140,6 +140,7 @@ resource "aws_lambda_function" "scan" {
   # next request is fast, instead of starting over each time. `make deploy-apply` warms it right after a deploy.
   timeout                        = 120
   reserved_concurrent_executions = var.scan_concurrency
+  publish                        = true # each image is a numbered version; CodeDeploy moves the `live` alias to it
   environment {
     variables = {
       PHISH_TABLE_PREFIX     = local.name
@@ -156,6 +157,17 @@ resource "aws_lambda_function" "scan" {
   }
 }
 
+# Traffic reaches the function through the `live` alias. Terraform creates it; after that CodeDeploy moves it to each
+# new version (scripts/canary.py, from `make deploy-apply`), so Terraform leaves where it points alone.
+resource "aws_lambda_alias" "live" {
+  name             = "live"
+  function_name    = aws_lambda_function.scan.function_name
+  function_version = aws_lambda_function.scan.version
+  lifecycle {
+    ignore_changes = [function_version, routing_config]
+  }
+}
+
 # A ping every 5 minutes keeps one copy of the function loaded, so a scan seldom waits for a cold start.
 resource "aws_cloudwatch_event_rule" "warm" {
   name                = "${local.name}-warm"
@@ -165,13 +177,14 @@ resource "aws_cloudwatch_event_rule" "warm" {
 
 resource "aws_cloudwatch_event_target" "warm" {
   rule = aws_cloudwatch_event_rule.warm.name
-  arn  = aws_lambda_function.scan.arn
+  arn  = aws_lambda_alias.live.arn
 }
 
 # The ping is the only asynchronous call: a failed one isn't retried (twice, by default), which would load the model
 # three times per ping while something is broken, at 3 GB each.
 resource "aws_lambda_function_event_invoke_config" "scan" {
   function_name          = aws_lambda_function.scan.function_name
+  qualifier              = aws_lambda_alias.live.name
   maximum_retry_attempts = 0
 }
 
@@ -179,6 +192,7 @@ resource "aws_lambda_permission" "warm" {
   statement_id  = "AllowWarmUpPing"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.scan.function_name
+  qualifier     = aws_lambda_alias.live.name
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.warm.arn
 }
@@ -193,7 +207,7 @@ resource "aws_apigatewayv2_api" "http" {
 resource "aws_apigatewayv2_integration" "scan" {
   api_id                 = aws_apigatewayv2_api.http.id
   integration_type       = "AWS_PROXY"
-  integration_uri        = aws_lambda_function.scan.invoke_arn
+  integration_uri        = aws_lambda_alias.live.invoke_arn
   payload_format_version = "2.0"
   timeout_milliseconds   = 29000
 }
@@ -232,6 +246,7 @@ resource "aws_lambda_permission" "api" {
   statement_id  = "AllowApiGateway"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.scan.function_name
+  qualifier     = aws_lambda_alias.live.name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.http.execution_arn}/*/*"
 }
@@ -244,6 +259,100 @@ resource "aws_secretsmanager_secret" "anthropic" {
   name                    = "${local.name}/anthropic-api-key"
   description             = "Anthropic API key for on-demand explanations"
   recovery_window_in_days = 7
+}
+
+# --- Canary: CodeDeploy moves `live` 10% for 10 minutes, after a smoke check, and rolls back on the alarms ---
+
+resource "aws_iam_role" "codedeploy" {
+  name = "${local.name}-svc-codedeploy"
+  assume_role_policy = jsonencode({
+    Version   = "2012-10-17"
+    Statement = [{ Effect = "Allow", Action = "sts:AssumeRole", Principal = { Service = "codedeploy.amazonaws.com" } }]
+  })
+}
+
+# AWS's policy for Lambda deployments: update aliases, read alarms, and invoke hooks named CodeDeployHook_*.
+resource "aws_iam_role_policy_attachment" "codedeploy" {
+  role       = aws_iam_role.codedeploy.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRoleForLambda"
+}
+
+resource "aws_codedeploy_app" "scan" {
+  name             = local.name
+  compute_platform = "Lambda"
+}
+
+resource "aws_codedeploy_deployment_group" "scan" {
+  app_name               = aws_codedeploy_app.scan.name
+  deployment_group_name  = "${local.name}-scan"
+  service_role_arn       = aws_iam_role.codedeploy.arn
+  deployment_config_name = "CodeDeployDefault.LambdaCanary10Percent10Minutes"
+  deployment_style {
+    deployment_option = "WITH_TRAFFIC_CONTROL"
+    deployment_type   = "BLUE_GREEN"
+  }
+  alarm_configuration {
+    enabled = true
+    alarms = [
+      aws_cloudwatch_metric_alarm.a["scan-errors"].alarm_name,
+      aws_cloudwatch_metric_alarm.a["api-5xx"].alarm_name,
+      aws_cloudwatch_metric_alarm.scan_p95.alarm_name,
+    ]
+  }
+  auto_rollback_configuration {
+    enabled = true
+    events  = ["DEPLOYMENT_FAILURE", "DEPLOYMENT_STOP_ON_ALARM"]
+  }
+}
+
+# The BeforeAllowTraffic hook (`lambda_handler.before_traffic`): the same image, a small function that runs the smoke
+# check on the new version and passes or fails the deployment. Its name must start with CodeDeployHook_ for AWS's
+# policy above to invoke it.
+resource "aws_iam_role" "smoke" {
+  name               = "${local.name}-svc-smoke"
+  assume_role_policy = data.aws_iam_policy_document.lambda_trust.json
+}
+
+data "aws_iam_policy_document" "smoke" {
+  statement {
+    actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = ["${aws_cloudwatch_log_group.smoke.arn}:*"]
+  }
+  statement {
+    actions   = ["codedeploy:GetDeployment", "codedeploy:PutLifecycleEventHookExecutionStatus"]
+    resources = ["*"] # the deployment id is only known when the hook runs
+  }
+  statement {
+    actions   = ["lambda:InvokeFunction"]
+    resources = ["${aws_lambda_function.scan.arn}:*"] # a numbered version of the scan function
+  }
+}
+
+resource "aws_iam_role_policy" "smoke" {
+  role   = aws_iam_role.smoke.id
+  policy = data.aws_iam_policy_document.smoke.json
+}
+
+resource "aws_cloudwatch_log_group" "smoke" {
+  name              = "/aws/lambda/CodeDeployHook_${local.name}-smoke"
+  retention_in_days = 14
+}
+
+resource "aws_lambda_function" "smoke" {
+  function_name = "CodeDeployHook_${local.name}-smoke"
+  role          = aws_iam_role.smoke.arn
+  package_type  = "Image"
+  image_uri     = local.image_uri
+  architectures = ["arm64"]
+  memory_size   = 512
+  timeout       = 300 # the new version's first model load takes up to a minute
+  image_config {
+    command = ["phish_triage.service.lambda_handler.before_traffic"]
+  }
+  logging_config {
+    log_format = "Text"
+    log_group  = aws_cloudwatch_log_group.smoke.name
+  }
 }
 
 # --- Alarms and a dashboard ---
@@ -364,3 +473,4 @@ resource "aws_cloudwatch_dashboard" "main" {
 
 output "api_url" { value = aws_apigatewayv2_api.http.api_endpoint }
 output "scan_function" { value = aws_lambda_function.scan.function_name }
+output "scan_version" { value = aws_lambda_function.scan.version }
