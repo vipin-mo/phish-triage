@@ -4,7 +4,8 @@
 
 > **Status: in progress.** Started October 2026. The data pipeline, baselines, DistilBERT, the LLM comparison,
 > the cascade and the safe LLM analyst step are done. Trained on public data alone, the models flagged almost all
-> of my real inbox mail; trained with part of it, the deployable cascade flags 4.0% (below). Deployment is next.
+> of my real inbox mail; trained with part of it, the deployed cascade flags 4.0% (below). It now runs on AWS
+> Lambda behind an API; the Gmail add-on is next.
 > Numbers are added only once they are measured.
 
 phish-triage scores emails for phishing and explains why.
@@ -185,6 +186,31 @@ phishing emails, and 249 emails from 26 other senders became the test. Neither m
 - The inbox test is small: 249 emails, mostly Gmail's Updates (214) and Promotions (31).
 
 
+## What the deployment showed
+
+The service runs on AWS (us-east-2): a container-image Lambda (arm64, 3 GB) behind an API Gateway HTTP API, with
+DynamoDB for API keys (hashed), verdicts and feedback, all in Terraform ([infra/](infra/)). It stores no email:
+a verdict, a score and the email's SHA-256 (see [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md), rule 8). The
+explanation queue and worker exist but are switched off.
+
+- **A scan takes about 0.2 s** end to end from my laptop once the function is loaded (0.18–0.26 s for 10 new
+  emails), and returns the same scores as the local run on the same test emails. The same email again is answered
+  from its stored verdict.
+- **Loading the model is the slow part:** about 20 s on a cold start, and 60 s the first time a new image runs,
+  while Lambda fetches the 600 MB image. API Gateway stops waiting at 29 s, so the first requests after a deploy
+  timed out. Two changes fixed it for use: the deploy loads the model once before it finishes, and a ping every 5
+  minutes keeps one copy loaded. Reading the domain-popularity list was 8 s of a cold start; the bundle now ships
+  the finished lookup table (under 1 s).
+- **The package is checked against its report:** it must reproduce the inbox and public-test numbers one email at
+  a time, or it isn't written ([reports/bundle.md](reports/bundle.md)). That check found the int8 batch problem
+  (Known issues).
+- **The AWS Free plan blocks GitHub's keyless sign-in (OIDC):** AWS denies `iam:*Provider*` on Free plan accounts.
+  Rather than store AWS keys in GitHub, I deploy from my laptop with an MFA session (`make deploy-*`). The CI
+  deploy workflow and roles are written and switch on with one variable on an account that allows OIDC.
+- **A privacy gap the live test found:** the sender check's warnings name the sender's domain, and the stored
+  verdict kept them. The service now returns and stores a fixed sentence per kind of warning instead.
+- Expected cost at my use: under $1 a month (mostly image storage), within the Free plan's credits.
+
 ## Known issues
 
 All but the last two are fixed. The first two were found while rating the analyst's answers by hand, the next five
@@ -235,7 +261,7 @@ the Claude runs, as noted.
 - [x] **Phase 2** — [features and sender check](docs/FEATURES.md), [baseline models](reports/baselines.md), metrics module, [course reproduction](reports/course_reproduction.md)
 - [x] **Phase 3** — DistilBERT ([ONNX int8](reports/onnx.md)), LLM comparison, cascade ([results](docs/RESULTS.md))
 - [x] **Phase 4** — grounded LLM analyst step ([results](reports/analyst.md)), prompt-injection tests ([round 1](reports/injection.md), [round 2](reports/injection_round2.md)), CI eval gate
-- [ ] **Phase 5** — serverless AWS deployment (Terraform, OIDC CI/CD)
+- [ ] **Phase 5** — serverless AWS deployment: [service and bundle](reports/bundle.md), Lambda + API Gateway + DynamoDB in [Terraform](infra/), deployed from my laptop with MFA (OIDC CI/CD blocked by the Free plan); cost table and dashboard screenshots to come
 - [ ] **Phase 6** — Gmail add-on, feedback loop, canary, drift check
 - [ ] **Phase 7** — load test, robustness report, write-up
 
@@ -257,6 +283,13 @@ score, `make train-transformer` fine-tunes DistilBERT (needs `uv sync --group tr
 [docs/RESULTS.md](docs/RESULTS.md) from saved predictions. `make eval-analyst` and `make eval-injection` show
 their Claude cost and only call the API with `CONFIRM=--confirm`; `make gate` turns their results into
 [reports/gate.json](reports/gate.json), which CI checks without calling any API.
+
+`make bundle` packages the deployed model and checks it against its report, and `make serve` runs the API locally
+on it. Deploying needs an MFA session (`aws sts get-caller-identity --profile phish-triage`) and Docker:
+`infra/bootstrap.sh` (once) and `make tf-foundation-plan` / `tf-foundation-apply` create the state bucket, image
+registry and model bucket; then `make upload-bundle`, `make deploy-image`, `make deploy-plan` (shows the change) and
+`make deploy-apply` (applies exactly that plan, loads the model and checks `/v1/health`). `make api-key OWNER=...`
+creates a key, shown once.
 
 ## License
 

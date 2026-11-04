@@ -5,7 +5,7 @@ same verdict without scanning it again, and feedback can name the scan it is abo
 but can't be turned back into it.
 
 API keys are random 32-byte tokens, so a plain SHA-256 is enough to store them: there is nothing to guess, unlike
-a password. `MemoryStore` is for tests and local runs; the DynamoDB version comes with the AWS setup.
+a password. `MemoryStore` is for tests and local runs; `store_dynamo.DynamoStore` is what runs on AWS.
 """
 
 from __future__ import annotations

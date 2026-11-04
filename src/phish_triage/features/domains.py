@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import csv
 import ipaddress
+import json
 import math
 import re
 from functools import lru_cache
@@ -275,6 +276,14 @@ class DomainRanks:
                     break
                 ranks.setdefault(registered_domain(domain), int(rank))
         return cls(ranks)
+
+    def save(self, path: Path) -> None:
+        """The finished lookup (registered domain -> rank), so a cold start doesn't run tldextract on 1M rows."""
+        path.write_text(json.dumps(self.ranks, separators=(",", ":")))
+
+    @classmethod
+    def load_saved(cls, path: Path) -> DomainRanks:
+        return cls(json.loads(path.read_text()))
 
     def log_rank(self, domain: str) -> float:
         """log10 of the domain's rank; `UNRANKED_LOG_RANK` when it is not in the list."""

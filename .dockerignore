@@ -1,0 +1,6 @@
+# Only what infra/lambda.Dockerfile copies; never the data, the private inbox or other artifacts.
+*
+!build/requirements.txt
+!build/bundle/**
+!src/phish_triage/**
+**/__pycache__
