@@ -36,9 +36,15 @@ variable "p95_alarm_ms" {
 }
 
 variable "explanations_enabled" {
-  description = "Turns on the queue trigger of the explanation worker. Off until Phase 6"
+  description = "POST /v1/explain calls Anthropic (on demand, nothing stored); needs the key in Secrets Manager"
   type        = bool
-  default     = false
+  default     = true
+}
+
+variable "daily_llm_usd" {
+  description = "The most all keys together may spend on explanations in a day (checked in code, service/api.py)"
+  type        = number
+  default     = 0.5
 }
 
 variable "alert_email" {

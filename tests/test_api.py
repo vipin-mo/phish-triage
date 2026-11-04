@@ -35,7 +35,7 @@ def test_scan_needs_a_key_and_returns_a_verdict(client):
     assert c.post("/v1/scan", content=EMAIL).status_code == 401
     assert c.post("/v1/scan", content=EMAIL, headers={"x-api-key": "pt_wrong"}).status_code == 401
     r = c.post("/v1/scan", content=EMAIL, headers={"x-api-key": key})
-    assert r.status_code == 200 and r.json()["verdict"] == "phish" and r.json()["explanation_id"] is None
+    assert r.status_code == 200 and r.json()["verdict"] == "phish" and "phishing_above" in r.json()
     assert r.json()["scan_id"] == scan_id(EMAIL) and r.headers["x-request-id"]
     assert key not in json.dumps(store.keys)  # only the hash is kept
 
@@ -90,9 +90,46 @@ def test_feedback_must_name_a_scan_of_this_key(client):
 
 def test_explanations_say_they_are_off(client):
     c, key, _, _ = client
-    r = c.get("/v1/explanations/abc", headers={"x-api-key": key})
+    r = c.post("/v1/explain", content=EMAIL, headers={"x-api-key": key})
     assert r.status_code == 404 and "switched off" in r.json()["detail"]
     assert c.get("/v1/health").json()["explanations"] == "off"
+
+
+class FakeExplainer:
+    def __init__(self, cost=0.002):
+        self.calls, self.cost = 0, cost
+
+    def explain(self, raw, verdict, ranks=None):
+        from phish_triage.service.explain import Explanation
+
+        self.calls += 1
+        return Explanation({"scan_id": verdict["scan_id"], "verdict": "phish", "summary": "s"}, self.cost)
+
+
+def test_an_explanation_is_on_demand_limited_per_key_and_by_the_days_budget(monkeypatch):
+    monkeypatch.setenv("PHISH_DAILY_LLM_USD", "0.005")
+    store, explainer = MemoryStore(), FakeExplainer(cost=0.002)
+    key = store.add_key("tester")
+    c = TestClient(api.create_app(FakeScanner, store, explanations=True, explainer_factory=lambda: explainer))
+    first = c.post("/v1/explain", content=EMAIL, headers={"x-api-key": key})
+    assert first.status_code == 200 and first.json()["scan_id"] == scan_id(EMAIL) and explainer.calls == 1
+    assert "ZQX-secret-body" not in json.dumps(list(store.verdicts.values()))  # the email is never stored
+    c.post("/v1/explain", content=EMAIL, headers={"x-api-key": key})
+    c.post("/v1/explain", content=EMAIL, headers={"x-api-key": key})  # $0.006 spent: over $0.005
+    over = c.post("/v1/explain", content=EMAIL, headers={"x-api-key": key})
+    assert over.status_code == 429 and "budget" in over.json()["detail"] and explainer.calls == 3
+    assert c.post("/v1/scan", content=EMAIL, headers={"x-api-key": key}).status_code == 200  # scans still work
+    assert c.post("/v1/explain", content=b"", headers={"x-api-key": key}).status_code == 400
+    assert c.post("/v1/explain", content=EMAIL).status_code == 401
+
+
+def test_explanations_per_key_per_day(monkeypatch):
+    store, explainer = MemoryStore(), FakeExplainer(cost=0.0)
+    key = store.add_key("tester")
+    monkeypatch.setattr(api, "EXPLAIN_PER_DAY", 2)
+    c = TestClient(api.create_app(FakeScanner, store, explanations=True, explainer_factory=lambda: explainer))
+    codes = [c.post("/v1/explain", content=EMAIL, headers={"x-api-key": key}).status_code for _ in range(3)]
+    assert codes == [200, 200, 429] and explainer.calls == 2
 
 
 def test_rate_limit_per_key(client, monkeypatch):

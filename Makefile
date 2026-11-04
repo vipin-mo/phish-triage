@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox privacymail-counts private-collectors data-privacymail train-with-newsletters eval-privacymail gate bundle serve aws-bootstrap tf-foundation-plan tf-foundation-apply upload-bundle api-key deploy-image deploy-plan deploy-apply
+.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox privacymail-counts private-collectors data-privacymail train-with-newsletters eval-privacymail gate bundle serve aws-bootstrap tf-foundation-plan tf-foundation-apply upload-bundle put-anthropic-key api-key deploy-image deploy-plan deploy-apply
 
 help:  ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -116,6 +116,9 @@ tf-foundation-apply:  ## apply the saved foundation plan
 
 upload-bundle:  ## copy the bundle named in infra/bundle-version to the private model bucket
 	aws s3 sync --profile $(AWS_PROFILE_NAME) --only-show-errors "artifacts/bundle/$$(cat infra/bundle-version)/" "s3://phish-triage-models-$(ACCOUNT)/bundles/$$(cat infra/bundle-version)/"
+
+put-anthropic-key:  ## store the Anthropic key from .env in the service's secret (never printed)
+	$(AWS_ENV) && uv run python scripts/put_anthropic_key.py
 
 api-key:  ## create an API key for the deployed service (OWNER=name)
 	$(AWS_ENV) && uv run python -m phish_triage.service.keys create --owner $(OWNER)
