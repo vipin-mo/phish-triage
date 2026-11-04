@@ -1,5 +1,7 @@
 from phish_triage.evaluation.gate import THRESHOLDS, check
 
+REPORTS = ("analyst", "injection", "injection_round2")
+BUNDLE = "with-newsletters-20261104-abcdef12"
 GOOD = {
     "recall_at_1pct_fpr": 0.999,
     "inbox_false_alarm_rate": 0.03,
@@ -9,24 +11,46 @@ GOOD = {
     "ungrounded_indicators_shown": 0,
     "injection_verdict_flip_rate": 0.0,
     "injection_model_flip_rate": 0.0,
-    "prompt_versions": {"analyst": 3, "injection": 3, "injection_round2": 3},
+    "injection_variants": 360,
+    "prompt_versions": dict.fromkeys(REPORTS, 3),
+    "llm_models": dict.fromkeys(REPORTS, "claude-test"),
+    "llm_classifiers": dict.fromkeys(REPORTS, BUNDLE),
 }
+KEYS = {"prompt_versions", "llm_models", "llm_classifiers"}
+
+
+def run(values: dict, prompt_version: int = 3, bundle: str = BUNDLE) -> list[str]:
+    return check(values, prompt_version=prompt_version, llm_model="claude-test", bundle_version=bundle)
 
 
 def test_gate_passes_good_numbers_and_names_every_failure():
-    assert check(GOOD, prompt_version=3) == []
+    assert run(GOOD) == []
     bad = {**GOOD, "recall_at_1pct_fpr": 0.9, "injection_verdict_flip_rate": 0.01, "inbox_false_alarm_rate": 0.2}
-    failures = check(bad, prompt_version=3)
+    failures = run(bad)
     assert len(failures) == 3 and failures[0].startswith("recall_at_1pct_fpr")
     assert any(f.startswith("inbox_false_alarm_rate") for f in failures)
-    newsletters = check({**GOOD, "privacymail_false_alarm_rate": 0.765}, prompt_version=3)
+    newsletters = run({**GOOD, "privacymail_false_alarm_rate": 0.765})
     assert newsletters == ["privacymail_false_alarm_rate = 0.765 (max 0.05)"]
     missing = {k: v for k, v in GOOD.items() if k != "schema_valid_rate"}
-    assert check(missing, prompt_version=3) == ["schema_valid_rate: missing"]
-    assert set(GOOD) - {"prompt_versions"} == set(THRESHOLDS)
+    assert run(missing) == ["schema_valid_rate: missing"]
+    assert set(GOOD) - KEYS == set(THRESHOLDS)
 
 
 def test_numbers_measured_on_an_older_prompt_fail_the_gate():
-    failures = check(GOOD, prompt_version=4)
+    failures = run(GOOD, prompt_version=4)
     assert len(failures) == 3 and all(f.startswith("stale") for f in failures)
-    assert check({k: v for k, v in GOOD.items() if k != "prompt_versions"}, prompt_version=3)[0].startswith("stale")
+    assert run({k: v for k, v in GOOD.items() if k != "prompt_versions"})[0].startswith("stale")
+
+
+def test_another_claude_model_or_bundle_fails_the_gate():
+    assert check(GOOD, prompt_version=3, llm_model="claude-other", bundle_version=BUNDLE)[0].startswith("stale")
+    behind_old = {**GOOD, "llm_classifiers": {**GOOD["llm_classifiers"], "injection": "with-inbox-20261104-1"}}
+    assert len(run(behind_old)) == 1
+    assert any("not a with_newsletters bundle" in f for f in run(GOOD, bundle="with-inbox-20261104-1"))
+
+
+def test_a_missing_injection_round_or_a_nan_fails_instead_of_passing():
+    one_round = {**GOOD, "injection_variants": 240, "prompt_versions": {**GOOD["prompt_versions"], "injection": None}}
+    failures = run(one_round)
+    assert any(f.startswith("injection_variants") for f in failures) and any("stale" in f for f in failures)
+    assert run({**GOOD, "grounding_failure_rate": float("nan")}) == ["grounding_failure_rate = nan (max 0.02)"]

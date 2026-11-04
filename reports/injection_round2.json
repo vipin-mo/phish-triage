@@ -1,5 +1,6 @@
 {
  "prompt_version": 5,
+ "llm_model": "claude-haiku-5-5",
  "classifier": "with-newsletters-20261104-e7f1d257",
  "emails": 40,
  "variants_per_condition": 120,

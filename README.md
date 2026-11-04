@@ -137,12 +137,16 @@ November 2026 after the input fixes and the new model, for $0.26.
   (1 for the final verdict, 5 for the action and summary agreeing). These ratings are of prompt version 4 on the
   data from before the fixes; I haven't rated the latest run's answers yet.
 - **The CI eval gate** checks these numbers on every push ([reports/gate.json](reports/gate.json)) and fails if
-  they were measured on an older prompt. It also checks the model I deploy (trained with part of my inbox and of
-  PrivacyMail): recall at 1% false alarms on the public test (0.994, at least 0.98), false alarms on my inbox's
-  unseen senders (2.0%, at most 5%, a limit I set before the run) and on PrivacyMail websites kept out of training
-  (0.9%, at most 5%, added after the inbox model passed the inbox limit and failed on PrivacyMail). All Phase 4
-  Claude runs cost $1.06 together; the re-run after the fixes was $0.27 of that, and the one behind the deployed
-  model $0.26 more.
+  they were measured on an older prompt, another Claude model or another model bundle than the one in
+  `infra/bundle-version`, or if a report is missing. It also checks the model I deploy (trained with part of my
+  inbox and of PrivacyMail): false alarms on my inbox's unseen senders (2.0%, at most 5%, a limit I set before the
+  run) and on PrivacyMail websites kept out of training (0.9%, at most 5%, added after the inbox model passed the
+  inbox limit and failed on PrivacyMail), and DistilBERT's recall at 1% false alarms on the public test (0.994, at
+  least 0.98). That last one measures how well DistilBERT ranks phishing, at a threshold picked on the test; the
+  service runs the cascade at stricter thresholds picked on validation, where it catches 97.4% at 0.14% false
+  alarms. A code review found the gate's wording implied the second; the gate now reports it next to the first,
+  without a limit, since one set after seeing 0.974 would mean little. All Phase 4 Claude runs cost $1.06
+  together; the re-run after the fixes was $0.27 of that, and the one behind the deployed model $0.26 more.
 
 ## What my private test inbox showed
 
@@ -210,7 +214,7 @@ I kept English mail only, removed duplicates within each website and took at mos
   collector's own addresses reaching the models. DistilBERT decides 97.6% of these; it had learned the kind of mail
   my inbox's senders send, not newsletters in general.
 - **Trained with part of it, the cascade flags 0.9%** of 3,738 newsletters from 189 websites kept out of training
-  (2.0% averaged per website). I split by website, as with the inbox's senders: at most 10 emails per website in
+  (2.0% averaged per website), and the little-text rule sends another 0.9% to review (1.8% together). I split by website, as with the inbox's senders: at most 10 emails per website in
   training (4,778) and validation (1,595), all of a test website's (at most 25) in the test. The held-out websites
   were collected the same way as the training ones, so this is the easier of the two tests.
 - **My inbox is the harder test, and it improved too:** 2.0% (5 of 249) of the unseen senders' mail flagged, 6.4%
@@ -220,8 +224,9 @@ I kept English mail only, removed duplicates within each website and took at mos
   emails (25). The newsletters in validation make the threshold stricter; at a fixed 1% false-alarm rate on the
   public test, DistilBERT catches 99.4% (99.8% before). At 1 phishing email in 100, a flagged email would now be
   phishing 33% of the time, against 20%.
-- This is the model deployed now. I traded about 1.4 points of recall for false alarms on newsletters going from
-  76.5% to 0.9%, since a filter that flags most newsletters wouldn't be used.
+- This is the model deployed now. I traded 1.0 point of the public test's recall and 1.3 points of the 2026
+  phishing's for false alarms on newsletters going from 76.5% to 0.9%, since a filter that flags most newsletters
+  wouldn't be used.
 
 
 ## What the deployment showed

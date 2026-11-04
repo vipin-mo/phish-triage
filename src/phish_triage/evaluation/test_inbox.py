@@ -43,7 +43,7 @@ from phish_triage.models.baselines import email_text, fit_all
 
 REVIEW_SHEET = PRIVATE_DIR / "review.csv"
 REPORTS_DIR = Path("reports")
-SPLIT = "random"  # the deployable models
+SPLIT = "random"  # the public-data models (this test is what showed they don't carry over to an inbox)
 DISTILBERT = "distilbert_head"  # served as ONNX fp32: int8 scores depend on the batch
 
 CATEGORY_ORDER = ("primary", "updates", "promotions", "purchases", "social", "forums", "other")

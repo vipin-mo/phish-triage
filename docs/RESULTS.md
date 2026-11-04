@@ -104,7 +104,7 @@ On a fixed sample of the `random` test split (1,000 emails, half phishing; Sonne
 
 ## 5. The cascade: how much LLM is needed?
 
-### `random` (the deployable models)
+### `random` (the public-data models)
 
 On 1,000 emails of the `random` test split. A stage decides an email only when it is confident (probability below 5% or above 95%) and, on validation, marking safe lets through at most 0.1% of the phishing that reaches it and flagging hits at most 0.1% of the legitimate mail; everything else goes to the next stage. Latency is the single-email p50 on one CPU thread for each local stage an email passes through, plus the measured LLM call for the share that reaches it. Emails the LLM doesn't answer fall back to DistilBERT.
 

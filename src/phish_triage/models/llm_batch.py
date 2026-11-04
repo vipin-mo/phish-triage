@@ -6,11 +6,17 @@ every batch goes to the spend ledger. A batch that was submitted but not collect
 
 An answer that came back but doesn't match the schema is asked for once more (`retry_invalid`), as the service will
 do; a refusal is kept as it is (`service/analyst.py` sends a refused email to a person).
+
+Saved answers are reused only for the same requests: each batch keeps a fingerprint of what it asked (model, system
+prompt, schema, every email as rendered, with the random per-request tag id taken out), and a batch whose requests
+changed stops instead of reusing answers to different questions.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 import sys
 import time
 from collections.abc import Callable
@@ -45,6 +51,33 @@ def worst_case(params: dict[str, dict], client=None) -> float:
     return worst_case_usd(model, tokens, 0, batch=True) + output_part
 
 
+_TAG_ID = re.compile(r"tag id is ([0-9a-f]+)")
+
+
+def fingerprint(params: dict[str, dict]) -> str:
+    """The same for the same requests, whatever random tag id each one drew."""
+    digest = hashlib.sha256()
+    for custom_id in sorted(params):
+        text = json.dumps(params[custom_id], sort_keys=True)
+        if tag := _TAG_ID.search(text):
+            text = text.replace(tag.group(1), "TAG")
+        digest.update(f"{custom_id}\n{text}\n".encode())
+    return digest.hexdigest()
+
+
+def check_fingerprint(name: str, params: dict[str, dict]) -> None:
+    """Stop if the saved answers were for other requests; a batch saved before fingerprints gets one now."""
+    path = LLM_DIR / f"{name}.fingerprint"
+    current = fingerprint(params)
+    if not path.exists():
+        path.write_text(current + "\n")
+    elif path.read_text().strip() != current:
+        raise SystemExit(
+            f"{name}: the saved answers were for different requests (the model, prompt or rendering changed); "
+            "bump PROMPT_VERSION so this runs again instead of reusing them"
+        )
+
+
 def load_saved(name: str) -> dict[str, dict]:
     saved = LLM_DIR / f"{name}.responses.jsonl"
     rows = [json.loads(line) for line in saved.read_text().splitlines() if line.strip()]
@@ -71,6 +104,7 @@ def run(name: str, params: dict[str, dict], client, poll_seconds: int = 30) -> d
     state = LLM_DIR / f"{name}.batch.json"
     saved = LLM_DIR / f"{name}.responses.jsonl"
     if saved.exists():  # already collected and paid for: never fetch or record it again
+        check_fingerprint(name, params)
         return load_saved(name)
     if state.exists():
         batch_id = json.loads(state.read_text())["batch_id"]
@@ -84,6 +118,7 @@ def run(name: str, params: dict[str, dict], client, poll_seconds: int = 30) -> d
         batch_id = batch.id
         LLM_DIR.mkdir(parents=True, exist_ok=True)
         state.write_text(json.dumps({"batch_id": batch_id, "worst_case_usd": worst}) + "\n")
+        (LLM_DIR / f"{name}.fingerprint").write_text(fingerprint(params) + "\n")
         print(f"{name}: submitted {batch_id} ({len(params)} requests, worst case ${worst:.2f})", file=sys.stderr)
 
     while (batch := client.messages.batches.retrieve(batch_id)).processing_status != "ended":

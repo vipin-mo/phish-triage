@@ -280,7 +280,7 @@ What this shows:
 
 - **Legitimate mail is mailing-list mail.** It is technical discussion and announcements, not the bank,
   shop and job notifications that phishing imitates. The text audit (1.000 after masking) measures how easy
-  that makes the task; the private test inbox measures the gap: the models flag 96.8–99.8% of its 1,677
+  that makes the task; the private test inbox measures the gap: the models flag 96.8–99.9% of its 1,677
   legitimate emails ([reports/test_inbox.md](../reports/test_inbox.md)). With part of the inbox in training,
   split by sender, the cascade flags 4.0% of the emails from 26 unseen senders
   ([reports/with_inbox.md](../reports/with_inbox.md)), but 76.5% of 18,682 PrivacyMail newsletters from 944

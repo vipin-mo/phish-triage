@@ -110,6 +110,7 @@ def evaluate(responses: dict, meaning: dict, classifier: str = "") -> tuple[dict
     n = len(meaning)
     summary = {
         "prompt_version": analyst.PROMPT_VERSION,
+        "llm_model": analyst.MODEL,
         "classifier": classifier,
         "emails": n,
         "schema_valid_rate": (n - invalid) / n,
@@ -290,6 +291,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     client = None
     if args.command == "rescore":  # re-apply the checks to the saved answers; no API calls
+        llm_batch.check_fingerprint(batch, params)
         responses = llm_batch.load_saved(batch)
     elif not args.confirm:
         parser.error("this calls the Claude API and costs money; add --confirm")

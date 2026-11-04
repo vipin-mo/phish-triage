@@ -86,7 +86,19 @@ def load_split(name: str) -> tuple[dict[str, list[str]], dict]:
     if name == privacymail.NEWSLETTER_SPLIT:
         split, extra = privacymail.load_split()
         slices = slices | extra
+    check_public_test_unseen(split["train"] + split["val"])
     return split, slices
+
+
+def check_public_test_unseen(trained_on: list[str]) -> None:
+    """The analyst and injection evaluations test on the current `random` split, but the private splits froze their
+    copy of its training part when they were built: rebuilding splits.json (a masking fix, a re-download) reshuffles
+    it, and its new test emails could be ones the deployed model trained on. Stop instead of measuring on them."""
+    from phish_triage.data.splits import SPLITS_DIR
+
+    test = set(json.loads((SPLITS_DIR / "splits.json").read_text())["random"]["test"])
+    if overlap := len(test & set(trained_on)):
+        raise SystemExit(f"{overlap} `random` test emails are in the deployed split's training data; rebuild it")
 
 
 def export(split_name: str = DEPLOYED_SPLIT, root: Path = BUNDLE_ROOT) -> Path:
