@@ -60,7 +60,7 @@ def test_privacymail_emails_are_never_sent_to_an_llm():
 
 def test_the_newsletter_split_keeps_test_websites_out_of_training():
     sizes = {site: 30 if site == "a" else 12 for site in "abcdefghij"}
-    records = [{"id": f"{site}-{k}", "website": site} for site, n in sizes.items() for k in range(n)]
+    records = [_newsletter(f"{site}-{k}", site, f"{site}.example") for site, n in sizes.items() for k in range(n)]
     base = {"train": ["p1"], "val": ["p2"], "test": ["p3"]}
     split, slices = pm.build_split(records, base)
     sites = {part: {r["website"] for r in records if r["id"] in set(split[part])} for part in split}
@@ -70,3 +70,22 @@ def test_the_newsletter_split_keeps_test_websites_out_of_training():
     assert max(per_site.values()) == pm.PER_WEBSITE_TRAIN
     assert set(slices["privacymail_test"]) == set(split["test"]) - {"p3"}
     assert all(len(g) == 12 and g not in sizes for g in slices["website"].values())  # names are hashed
+
+
+def _newsletter(email_id: str, website: str, sender_domain: str) -> dict:
+    return {"id": email_id, "website": website, "headers": [["From", f"News <news@{sender_domain}>"]]}
+
+
+def test_a_sender_never_sits_in_training_and_in_a_test_across_websites_and_sources():
+    from phish_triage.data.inbox import sender_group
+
+    # sites "a" and "b" are one company (same sender domain); "c" also mails my inbox, whose test has that sender
+    records = [_newsletter(f"a-{k}", "a", "shop.example") for k in range(20)]
+    records += [_newsletter(f"b-{k}", "b", "mail.shop.example") for k in range(15)]
+    records += [_newsletter(f"c-{k}", "c", "c.example") for k in range(12)]
+    records += [_newsletter(f"{s}-{k}", s, f"{s}.example") for s in "defgh" for k in range(10)]
+    inbox_parts = {sender_group({"headers": [["From", "x@c.example"]]}): "test"}
+    split, _ = pm.build_split(records, {"train": [], "val": [], "test": []}, inbox_parts)
+    part = {i: p for p, ids in split.items() for i in ids}
+    assert part["a-0"] == part["b-0"]  # the same company's websites go to the same part
+    assert all(part[f"c-{k}"] == "test" for k in range(12))  # where the inbox has that sender

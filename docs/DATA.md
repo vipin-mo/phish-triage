@@ -295,6 +295,16 @@ What this shows:
 - **PrivacyMail is not a random sample of anyone's inbox.** Its users chose which websites to sign up to, only 944
   of its 1,423 websites sent English mail I could use (I keep only English), and it ends in 2022, so the
   held-out-websites test is the easier one and my inbox the harder one.
+- **A few test senders were also in training, across the two private sources.** The inbox was split by sender
+  and PrivacyMail by website, separately, so 5 of the 249 inbox test emails (2 of 26 senders) and 43 of the 3,738
+  held-out newsletters (5 sender domains) share a registered sender domain with training. Without them the
+  deployed cascade flags 2.05% (5 of 244) and 0.84% (31 of 3,695), against 2.01% and 0.86%, so the reported numbers
+  hold. No test email is an exact text copy of a training one. The next build of the split groups websites by
+  sender domain and puts a website that shares a sender with the inbox where that sender is.
+- **The private sources' own collection names reached the model input a little.** PrivacyMail's collection
+  domains appear in 0.2% of its emails as the models read them (17 of 10,111), my inbox's address in 0.4% (3 of
+  837), and neither in any public email: too rare to be the shortcut the public collectors were, but masked from
+  the next build (`make private-collectors`, kept in data/private).
 - **List mail is not always legitimate.** Two Apache list posts turned out to be phishing (found as label
   conflicts), so a few spam or phishing posts that got past the lists' filters may still be labelled
   legitimate.

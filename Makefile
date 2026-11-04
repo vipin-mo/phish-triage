@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox privacymail-counts data-privacymail train-with-newsletters eval-privacymail gate bundle serve aws-bootstrap tf-foundation-plan tf-foundation-apply upload-bundle api-key deploy-image deploy-plan deploy-apply
+.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox privacymail-counts private-collectors data-privacymail train-with-newsletters eval-privacymail gate bundle serve aws-bootstrap tf-foundation-plan tf-foundation-apply upload-bundle api-key deploy-image deploy-plan deploy-apply
 
 help:  ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -72,6 +72,9 @@ train-with-inbox:  ## fine-tune DistilBERT on the private `with_inbox` split and
 
 privacymail-counts:  ## count-only look at the PrivacyMail newsletter zip in data/private/privacymail/
 	uv run python -m phish_triage.data.privacymail
+
+private-collectors:  ## write the private sources' collection names to mask (data/private, counts printed only)
+	uv run python -m phish_triage.data.privacymail --collectors
 
 data-privacymail:  ## build the private `with_newsletters` split (with_inbox + PrivacyMail, split by website)
 	uv run python -m phish_triage.data.privacymail --build
