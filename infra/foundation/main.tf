@@ -250,12 +250,22 @@ resource "aws_ecr_repository" "service" {
 resource "aws_ecr_lifecycle_policy" "service" {
   repository = aws_ecr_repository.service.name
   policy = jsonencode({
-    rules = [{
-      rulePriority = 1
-      description  = "keep the last 5 images"
-      selection    = { tagStatus = "any", countType = "imageCountMoreThan", countNumber = 5 }
-      action       = { type = "expire" }
-    }]
+    # Test images (dev-*) go first, so they can't push out the running one; merged commits keep the last 10 (about
+    # 6 GB, $0.60 a month), enough to roll back.
+    rules = [
+      {
+        rulePriority = 1
+        description  = "keep the last 3 test images"
+        selection    = { tagStatus = "tagged", tagPatternList = ["dev-*"], countType = "imageCountMoreThan", countNumber = 3 }
+        action       = { type = "expire" }
+      },
+      {
+        rulePriority = 2
+        description  = "keep the last 10 images"
+        selection    = { tagStatus = "any", countType = "imageCountMoreThan", countNumber = 10 }
+        action       = { type = "expire" }
+      },
+    ]
   })
 }
 

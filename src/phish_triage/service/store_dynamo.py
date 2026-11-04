@@ -13,6 +13,7 @@ import time
 import uuid
 
 RATE_TTL_SECONDS = 300
+VERDICT_DAYS = 90  # a stored verdict (the scan id, never the email) is deleted after this; infra/service sets the TTL
 
 
 class DynamoStore:
@@ -60,6 +61,7 @@ class DynamoStore:
                 "scan_id": {"S": scan},
                 "verdict": {"S": json.dumps(verdict)},
                 "created": {"N": str(int(time.time()))},
+                "expires": {"N": str(int(time.time()) + VERDICT_DAYS * 86_400)},  # DynamoDB deletes it then (TTL)
             },
         )
 
