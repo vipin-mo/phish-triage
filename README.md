@@ -332,7 +332,7 @@ in November 2026. Every number above was re-measured after the fixes, except my 
 - [x] **Phase 3** — DistilBERT ([ONNX int8](reports/onnx.md)), LLM comparison, cascade ([results](docs/RESULTS.md))
 - [x] **Phase 4** — grounded LLM analyst step ([results](reports/analyst.md)), prompt-injection tests ([round 1](reports/injection.md), [round 2](reports/injection_round2.md)), CI eval gate
 - [ ] **Phase 5** — serverless AWS deployment: [service and bundle](reports/bundle.md), Lambda + API Gateway + DynamoDB in [Terraform](infra/), deployed from my laptop with MFA (OIDC CI/CD blocked by the Free plan); cost table and dashboard screenshots to come
-- [ ] **Phase 6** — Gmail add-on, feedback loop, canary, drift check
+- [ ] **Phase 6** — explanations on demand, [Gmail add-on](addon/) (built, installing), feedback loop, canary, drift check
 - [ ] **Phase 7** — load test, robustness report, write-up
 
 ## Development

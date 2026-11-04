@@ -12,10 +12,10 @@ how much work each email gets:
 
 1. a fast linear model (most emails stop here);
 2. a fine-tuned DistilBERT for the uncertain band;
-3. an LLM that writes an analyst summary for the hardest cases only.
+3. an LLM that explains an email when I ask for it (on demand, nothing stored).
 
 Users reach it from a Gmail sidebar add-on, and their feedback (`correct`, `false_alarm`,
-`missed_phish`) feeds retraining. It runs on AWS Lambda, SQS, DynamoDB and S3.
+`missed_phish`) feeds retraining. It runs on AWS Lambda, API Gateway, DynamoDB, Secrets Manager and S3.
 
 ## Assets (what we protect)
 
@@ -78,6 +78,7 @@ Anthropic's or Google's own infrastructure. This project does not try to defend 
 | 12 | **Feedback never trains a model directly.** Only feedback confirmed by the maintainer enters retraining; every retrained model must pass the same eval gate and goes out through a canary with automatic rollback. | Feedback poisoning; bad releases. | Retraining workflow and canary (*planned, Phase 6*). |
 | 13 | **API keys are stored hashed,** and each key is rate-limited separately. | Key theft from the database; one key exhausting capacity. | `service/store.py`, `store_dynamo.py`: SHA-256 of a random 32-byte key; the key is shown once (`make api-key`); per-key counter in DynamoDB — **in place**. |
 | 14 | **Sender authentication (SPF, DKIM, DMARC) is read only from the `Authentication-Results` header added by the receiving provider** (the topmost one, matching that provider's server ID). Copies added by the sender are ignored, and their presence is itself a signal. The service does not repeat these checks with its own DNS lookups (see rule 1). | Forged "pass" results; spoofed senders. | `mask.auth_results` reads only the topmost header (tested with a forged lower copy); masking keeps whether a lower copy claims a pass, so the service shows the warning too (it didn't before November 2026). Matching the provider's server ID and the spoofed-email tests: *planned, Phase 2*. |
+| 15 | **The Gmail add-on reads only the open email, and only when I click.** It asks for the open message only (`gmail.addons.current.message.readonly`, not the mailbox), may call only the API's address (`urlFetchWhitelist`), keeps only that address and my API key in my own user properties, and logs nothing. Scan and feedback send the email or its scan id to my API; only Explain sends it on to Anthropic. | A sidebar that reads more mail than it needs, or sends it elsewhere. | `addon/appsscript.template.json` and `addon/Code.js`; `tests/test_addon.py` checks the scopes, that no address is committed and that nothing is logged — **in place**. |
 
 ## Known limits (accepted risks)
 
