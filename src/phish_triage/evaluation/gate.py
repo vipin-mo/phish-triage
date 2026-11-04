@@ -113,11 +113,21 @@ def measure() -> dict:
 
 
 def check(
-    values: dict, prompt_version: int = PROMPT_VERSION, llm_model: str = MODEL, bundle_version: str | None = None
+    values: dict,
+    prompt_version: int = PROMPT_VERSION,
+    llm_model: str = MODEL,
+    bundle_version: str | None = None,
+    drift_bundle: str | None = None,
 ) -> list[str]:
     if bundle_version is None and BUNDLE_VERSION_FILE.exists():
         bundle_version = BUNDLE_VERSION_FILE.read_text().strip()
+    if drift_bundle is None:
+        from phish_triage.service.drift import REFERENCE
+
+        drift_bundle = json.loads(REFERENCE.read_text())["bundle"] if REFERENCE.exists() else None
     failures = []
+    if drift_bundle != bundle_version:  # the weekly drift check compares with this bundle's own verdicts
+        failures.append(f"stale: the drift reference is for {drift_bundle}, the deployed bundle is {bundle_version}")
     for report, version in (values.get("prompt_versions") or {"all reports": None}).items():
         if version != prompt_version:
             failures.append(f"stale: {report} was measured with prompt version {version}, the code is {prompt_version}")

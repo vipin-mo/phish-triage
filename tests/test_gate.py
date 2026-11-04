@@ -20,7 +20,9 @@ KEYS = {"prompt_versions", "llm_models", "llm_classifiers"}
 
 
 def run(values: dict, prompt_version: int = 3, bundle: str = BUNDLE) -> list[str]:
-    return check(values, prompt_version=prompt_version, llm_model="claude-test", bundle_version=bundle)
+    return check(
+        values, prompt_version=prompt_version, llm_model="claude-test", bundle_version=bundle, drift_bundle=BUNDLE
+    )
 
 
 def test_gate_passes_good_numbers_and_names_every_failure():
@@ -43,7 +45,10 @@ def test_numbers_measured_on_an_older_prompt_fail_the_gate():
 
 
 def test_another_claude_model_or_bundle_fails_the_gate():
-    assert check(GOOD, prompt_version=3, llm_model="claude-other", bundle_version=BUNDLE)[0].startswith("stale")
+    other_model = check(GOOD, prompt_version=3, llm_model="claude-other", bundle_version=BUNDLE, drift_bundle=BUNDLE)
+    assert other_model[0].startswith("stale")
+    old_reference = check(GOOD, prompt_version=3, llm_model="claude-test", bundle_version=BUNDLE, drift_bundle="old")
+    assert old_reference == [f"stale: the drift reference is for old, the deployed bundle is {BUNDLE}"]
     behind_old = {**GOOD, "llm_classifiers": {**GOOD["llm_classifiers"], "injection": "with-inbox-20261104-1"}}
     assert len(run(behind_old)) == 1
     assert any("not a with_newsletters bundle" in f for f in run(GOOD, bundle="with-inbox-20261104-1"))
