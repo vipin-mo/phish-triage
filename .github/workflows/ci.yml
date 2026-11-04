@@ -17,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0  # the raw-data check reads every commit, not just the last one
       - uses: astral-sh/setup-uv@v10.3.3
         with:
           enable-cache: true
@@ -26,7 +28,9 @@ jobs:
           uv run ruff check .
           uv run ruff format --check .
       - name: No raw data in the repo
-        run: uv run python scripts/check_no_raw_data.py
+        run: |
+          uv run python scripts/check_no_raw_data.py
+          uv run python scripts/check_no_raw_data.py --history
       - name: Unit tests
         run: uv run pytest
       - name: Eval gate (committed numbers, no API calls)

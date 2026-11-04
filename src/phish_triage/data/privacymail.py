@@ -135,16 +135,39 @@ def website_group(website: str) -> str:
     return hashlib.sha256(website.encode()).hexdigest()[:12]
 
 
-def build_split(records: list[dict], base: dict[str, list[str]]) -> tuple[dict[str, list[str]], dict]:
+def build_split(
+    records: list[dict], base: dict[str, list[str]], inbox_parts: dict[str, str] | None = None
+) -> tuple[dict[str, list[str]], dict]:
     """`with_newsletters`: the `with_inbox` split plus the newsletters, websites assigned by size in the inbox's
     pattern (train, val, test, train, train). Train and val keep the first `PER_WEBSITE_TRAIN` of each website's
-    selected emails (already in seeded random order); test keeps all of them (at most 25)."""
-    from phish_triage.data.inbox import assign_senders
+    selected emails (already in seeded random order); test keeps all of them (at most 25).
 
+    Websites that send from the same registered domain (one company under two names) are one group, and a group
+    that shares a sender with my inbox goes where that sender went (`inbox_parts`: sender group -> part), so a
+    sender never sits in training and in a test. Before this, 43 of the 3,738 held-out newsletters and 5 of the
+    249 inbox test emails shared a sender domain with training (their false-alarm rates without them: 0.84% and
+    2.05%, against 0.86% and 2.01%)."""
+    from phish_triage.data.inbox import assign_senders, sender_group
+
+    inbox_parts = inbox_parts or {}
     by_site: dict[str, list[str]] = {}
+    senders: dict[str, set[str]] = {}
     for r in records:
-        by_site.setdefault(website_group(r["website"]), []).append(r["id"])
-    part_of = assign_senders({g: len(ids) for g, ids in by_site.items()})
+        site = website_group(r["website"])
+        by_site.setdefault(site, []).append(r["id"])
+        senders.setdefault(site, set()).add(sender_group(r))
+    group = _join_by_sender(senders)  # website -> its group (the first website of the group)
+    members: dict[str, list[str]] = {}
+    for site in sorted(by_site):
+        members.setdefault(group[site], []).append(site)
+    fixed = {}
+    for g, sites in members.items():
+        shared = sorted({inbox_parts[s] for site in sites for s in senders[site] if s in inbox_parts})
+        if shared:  # "test" first if the inbox has the sender in a test and in training
+            fixed[g] = "test" if "test" in shared else shared[0]
+    free = {g: sum(len(by_site[s]) for s in sites) for g, sites in members.items() if g not in fixed}
+    part_of_group = assign_senders(free) | fixed
+    part_of = {site: part_of_group[group[site]] for site in by_site}
     parts: dict[str, list[str]] = {"train": [], "val": [], "test": []}
     for g in sorted(by_site):
         ids = by_site[g] if part_of[g] == "test" else by_site[g][:PER_WEBSITE_TRAIN]
@@ -155,6 +178,27 @@ def build_split(records: list[dict], base: dict[str, list[str]]) -> tuple[dict[s
         "website": {i: g for g, ids in by_site.items() if part_of[g] == "test" for i in ids},
     }
     return split, slices
+
+
+def _join_by_sender(senders: dict[str, set[str]]) -> dict[str, str]:
+    """Union-find: websites that share any sender domain end up with the same root."""
+    root = {site: site for site in senders}
+
+    def find(site: str) -> str:
+        while root[site] != site:
+            root[site] = root[root[site]]
+            site = root[site]
+        return site
+
+    first_with: dict[str, str] = {}
+    for site in sorted(senders):
+        for s in sorted(senders[site]):
+            if s in first_with:
+                a, b = sorted((find(site), find(first_with[s])))
+                root[b] = a
+            else:
+                first_with[s] = site
+    return {site: find(site) for site in senders}
 
 
 def build() -> None:
@@ -168,7 +212,16 @@ def build() -> None:
     with gzip.open(MASKED, "wt", encoding="utf-8") as out:
         for r in records:
             out.write(json.dumps({k: v for k, v in r.items() if k != "website"}, ensure_ascii=False) + "\n")
-    split, slices = build_split(records, inbox.load_split()[0])
+    base, _ = inbox.load_split()
+    inbox_ids = {i for part in base.values() for i in part}
+    inbox_records = inbox.read_split_records(inbox_ids)
+    inbox_parts = {
+        inbox.sender_group(r): part
+        for part, ids in base.items()
+        for i in ids
+        if (r := inbox_records.get(i)) and r.get("source") == "test_inbox" and r["label"] == "legit"
+    }
+    split, slices = build_split(records, base, inbox_parts)
     SPLIT_FILE.write_text(json.dumps({NEWSLETTER_SPLIT: split, "slices": slices}) + "\n")
     added = {part: len(split[part]) - len(inbox.load_split()[0][part]) for part in split}
     sites = len(set(slices["website"].values()))
@@ -186,11 +239,52 @@ def load_split() -> tuple[dict[str, list[str]], dict]:
     return saved[NEWSLETTER_SPLIT], saved["slices"]
 
 
+def write_private_collectors(path: Path | None = None, sample: int = 3000) -> None:
+    """The collection names to mask (`data/mask.py`): PrivacyMail's top recipient domains, which together cover its
+    mail, and my test inbox's own address (its local part and the parts of it). Written to data/private only; prints
+    counts, never the names."""
+    import json
+    import mailbox
+    import re as _re
+    from email import message_from_bytes
+    from email.utils import getaddresses
+
+    from phish_triage.data import inbox
+    from phish_triage.data.mask import PRIVATE_COLLECTORS
+    from phish_triage.features.domains import registered_domain
+
+    def recipients(msg) -> list[str]:
+        found = getaddresses(msg.get_all("To", []) + msg.get_all("Delivered-To", []))
+        return [address.lower() for _, address in found if "@" in address]
+
+    with zipfile.ZipFile(find_zip()) as archive:
+        names = sorted(i.filename for i in archive.infolist() if i.filename.lower().endswith(".eml"))
+        domains: Counter = Counter()
+        for name in random.Random(SEED).sample(names, min(sample, len(names))):
+            message = message_from_bytes(archive.read(name)[:20_000])
+            domains.update({registered_domain(a.split("@")[1]) for a in recipients(message)})
+    top = [d for d, _ in domains.most_common(5) if d]
+    addresses: Counter = Counter()
+    for k, message in enumerate(mailbox.mbox(str(inbox.MBOX))):
+        addresses.update(set(recipients(message)))
+        if k >= 1500:
+            break
+    local = addresses.most_common(1)[0][0].split("@")[0] if addresses else ""
+    parts = [local, *(p for p in _re.split(r"[._+-]", local) if len(p) >= 4)] if local else []
+    target = path or PRIVATE_COLLECTORS
+    target.write_text(json.dumps({"domains": top, "names": sorted(set(parts))}) + "\n")
+    print(f"{len(top)} collection domains and {len(set(parts))} inbox name parts written to {target}", file=sys.stderr)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--zip", type=Path, default=None)
     parser.add_argument("--build", action="store_true", help="build the with_newsletters split")
+    parser.add_argument("--collectors", action="store_true", help="write the private collection names to mask")
     args = parser.parse_args(argv)
+    if args.collectors:
+        write_private_collectors()
+        return 0
     if args.build:
         build()
         return 0

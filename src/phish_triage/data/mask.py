@@ -30,8 +30,10 @@ The record's `date` is kept: it is used to build the splits, not as a model feat
 
 from __future__ import annotations
 
+import json
 import re
 from email.utils import getaddresses
+from pathlib import Path
 
 PLACEHOLDER_ADDRESS = "user@example.com"
 PLACEHOLDER_DOMAIN = "example.com"
@@ -75,6 +77,23 @@ COLLECTOR_DOMAINS = (
 )
 COLLECTOR_ADDRESSES = ("phishing@pot",)  # phishing_pot's own redaction of the honeypot address
 COLLECTOR_NAMES = ("jose", "yyyy", "zzzz")  # Nazario's first name and SpamAssassin's redaction markers
+# The private sources' own collection names (PrivacyMail's collection domains, my test inbox's address), counted
+# from their recipient headers by `python -m phish_triage.data.privacymail --collectors`. Kept in a local file so
+# they're never committed; before they were masked they reached the models' input in 0.2% of PrivacyMail's emails
+# and 0.4% of the inbox's, and in no public email.
+PRIVATE_COLLECTORS = Path("data/private/collectors.json")
+
+
+def _private_collectors() -> tuple[tuple[str, ...], tuple[str, ...]]:
+    if not PRIVATE_COLLECTORS.exists():  # CI and the deployed service: nothing private to mask
+        return (), ()
+    saved = json.loads(PRIVATE_COLLECTORS.read_text())
+    return tuple(saved.get("domains", ())), tuple(saved.get("names", ()))
+
+
+_PRIVATE_DOMAINS, _PRIVATE_NAMES = _private_collectors()
+COLLECTOR_DOMAINS += _PRIVATE_DOMAINS
+COLLECTOR_NAMES += _PRIVATE_NAMES
 SOURCE_NAMES = ("apache", "tomcat", "cassandra", "httpd")  # the Apache lists' own names
 SOURCE_DOMAINS = ("apache.org",)  # the legitimate source's own domain; the leakage audit checks it isn't a shortcut
 PLACEHOLDER_PROJECT = "project"
@@ -83,7 +102,7 @@ _DOMAIN_RE = re.compile(
     r"(?<![\w.-])(?:[\w-]+\.)*(?:" + "|".join(re.escape(d) for d in COLLECTOR_DOMAINS) + r")(?![\w-]|\.\w)",
     re.IGNORECASE,
 )
-_NAME_RE = re.compile(r"\b(?:" + "|".join(COLLECTOR_NAMES) + r")\b", re.IGNORECASE)
+_NAME_RE = re.compile(r"\b(?:" + "|".join(map(re.escape, COLLECTOR_NAMES)) + r")\b", re.IGNORECASE)
 _SOURCE_NAME_RE = re.compile(r"(?<![^\W_])(?:" + "|".join(SOURCE_NAMES) + r")(?![^\W_])", re.IGNORECASE)
 # What `mask_source_names(..., keep_domains=True)` leaves alone: URLs, email addresses and domain names. Bounded
 # repeats, so crafted input can't make it backtrack (tests/test_adversarial_inputs.py).

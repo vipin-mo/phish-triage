@@ -331,8 +331,10 @@ make setup   # create .venv, install dev deps, install git hooks
 make check   # lint, raw-data guard, tests (what CI runs)
 ```
 
-Raw email datasets are never committed. A pre-commit hook and a CI check block `.eml`/`.mbox` files and
-anything under `data/`. Instead, `make data` downloads every source, checks it against pinned checksums,
+Raw email datasets are never committed. A pre-commit hook and a CI check block mail, archive, dataset and model
+files (`.eml`, `.mbox`, `.jsonl`, `.onnx`, `.joblib`, ...), anything under `data/`, `artifacts/` or `build/`, and
+any file over 1 MB; CI also checks every file any commit ever added, so one added and then deleted can't stay in
+the history. Instead, `make data` downloads every source, checks it against pinned checksums,
 parses it into one record format, masks source fingerprints, removes duplicates and builds every split with
 fixed seeds (see [docs/DATA.md](docs/DATA.md)). `make audit` re-runs the leakage audit, `make eval-baselines`
 trains and reports the baseline models on every split, `make eval-course` reproduces the course project's
