@@ -278,6 +278,10 @@ for a background design were removed, since a queue would have had to hold the e
   legitimate, so the mix alone would read as drift. A week with fewer than 30 scans reports "not enough data",
   which at my use is most weeks. The reference holds only bin counts, and the gate fails if it was made with
   another bundle.
+- **Retraining runs from my laptop.** `make retrain` moves the emails I sent from the add-on out of the bucket (and
+  deletes them there), adds them to the deployed split's training part only, refits stage 1 (DistilBERT stays),
+  evaluates the result on the same held-out tests as every other setup, builds and checks the bundle and the drift
+  reference; the Claude evaluations, the gate and the canary follow, as for any new model.
 - Expected cost at my use: under $1 a month (mostly image storage), within the Free plan's credits. The Free plan
   ends on 2027-04-27 and the account closes with it unless I upgrade, taking every resource with it; before then I
   either upgrade or export the feedback and API keys and destroy the service.

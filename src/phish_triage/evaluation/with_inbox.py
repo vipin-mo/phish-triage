@@ -46,7 +46,7 @@ from pathlib import Path
 
 import numpy as np
 
-from phish_triage.data import inbox, privacymail
+from phish_triage.data import inbox, privacymail, retraining
 from phish_triage.data.splits import SPLITS_DIR
 from phish_triage.evaluation import metrics, predictions
 from phish_triage.evaluation.cascade import run_cascade
@@ -58,7 +58,12 @@ from phish_triage.service.triage import LITTLE_TEXT_WORDS, too_little_text
 
 REPORTS_DIR = Path("reports")
 ARTIFACTS_DIR = Path("artifacts")
-SETUPS = {"before": "random", "after": inbox.SPLIT, "newsletters": privacymail.NEWSLETTER_SPLIT}
+SETUPS = {
+    "before": "random",
+    "after": inbox.SPLIT,
+    "newsletters": privacymail.NEWSLETTER_SPLIT,
+    "retrained": retraining.SPLIT,  # once `make retrain` has built it: stage 1 refitted with the emails I sent
+}
 DISTILBERT = "distilbert_head"  # served as ONNX fp32: int8 scores depend on the batch
 SHORTCUT_POINTS = 0.02
 SUSPECT_AUC, PUBLIC_MAX_AUC = 0.9, 0.7
@@ -69,7 +74,9 @@ MODEL_NAMES = MODELS | {"cascade_review": "Cascade + little-text rule (review co
 def _distilbert(split: str, val_ids: list[str], eval_ids: list[str], records: dict, texts: dict) -> tuple:
     """Validation and evaluation scores: saved predictions where they exist, the exported ONNX fp32 model otherwise."""
     from phish_triage.models.transformer import OnnxClassifier
+    from phish_triage.service.bundle import distilbert_split
 
+    split = distilbert_split(split)  # the retrained setup reuses the newsletters split's DistilBERT
     saved = predictions.load(split, DISTILBERT)
     if saved.val_ids != val_ids:  # the split changed since training: these scores are of another model's data
         raise SystemExit(f"saved DistilBERT predictions don't match the {split} validation split; re-run training")
@@ -180,6 +187,17 @@ def to_markdown(r: dict) -> str:
                 "deployed model flagged 76.5% of them (reports/privacymail.md).",
             ]
             if "newsletters" in present
+            else []
+        ),
+        *(
+            [
+                "",
+                f"*Retrained:* the `with_retraining` split's, which adds the {c['retraining_train']} emails I sent for "
+                f"retraining from the add-on ({c['retraining_phish']} as phishing, {c['retraining_legit']} as "
+                "legitimate) to the newsletters setup's training, and nothing to its validation or test. Only stage 1 "
+                "(the stacked model) is refitted; DistilBERT is the newsletters setup's, so its rows are the same.",
+            ]
+            if "retrained" in present
             else []
         ),
         "",
@@ -293,8 +311,9 @@ def to_markdown(r: dict) -> str:
             "## PrivacyMail: newsletters from websites no model saw",
             "",
             f"{c['privacymail_test']:,} English newsletters from {c['privacymail_test_websites']} websites "
-            "(PrivacyMail, 2019–2022) held out of the `newsletters` setup's training; the other two setups never saw "
-            "PrivacyMail at all. Every email counts as legitimate. Only these aggregates leave the private folder.",
+            "(PrivacyMail, 2019–2022) held out of the `newsletters` setup's training (and the `retrained` one's, when "
+            "present); the before and after setups never saw PrivacyMail at all. Every email counts as legitimate. "
+            "Only these aggregates leave the private folder.",
             "",
             "| Model | "
             + " | ".join(f"{s.capitalize()}: false alarms" for s in present)
@@ -368,6 +387,19 @@ def little_text(records: dict, slices: dict, n_bootstrap: int) -> dict:
     }
 
 
+def retraining_counts(splits: dict, records: dict) -> dict:
+    sent = [
+        records[i]["label"]
+        for i in splits.get("retrained", {}).get("train", [])
+        if records[i]["source"] == "retraining"
+    ]
+    return {
+        "retraining_train": len(sent),
+        "retraining_phish": sent.count("phish"),
+        "retraining_legit": sent.count("legit"),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--bootstrap", type=int, default=metrics.N_BOOTSTRAP)
@@ -377,6 +409,8 @@ def main(argv: list[str] | None = None) -> int:
     if privacymail.SPLIT_FILE.exists():  # the newsletters setup, once `make data-privacymail` has built it
         splits["newsletters"], newsletter_slices = privacymail.load_split()
         slices = slices | newsletter_slices
+        if retraining.SPLIT_FILE.exists():  # the retrained setup, once `make retrain` has built it
+            splits["retrained"] = retraining.load_split()
     eval_ids = list(
         dict.fromkeys(
             slices["public_test"]
@@ -412,6 +446,7 @@ def main(argv: list[str] | None = None) -> int:
                 for part in ("train", "val")
             },
             "privacymail_test_websites": len(set(slices.get("website", {}).values())),
+            **retraining_counts(splits, records),
         }
     }
     for setup in splits:
