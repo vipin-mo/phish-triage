@@ -36,7 +36,7 @@ import numpy as np
 
 from phish_triage.evaluation import metrics, predictions
 from phish_triage.service.analyst import MODEL, PROMPT_VERSION
-from phish_triage.service.bundle import DEPLOYED_SPLIT, SOURCES, distilbert_split
+from phish_triage.service.bundle import DEPLOYED_SPLIT, SOURCES, distilbert_split, split_of_version
 
 # Served as ONNX fp32, which matches these PyTorch scores; int8 scores change with the batch (service/bundle.py).
 DEPLOYED_DISTILBERT = "distilbert_head"
@@ -134,8 +134,8 @@ def check(
     for report, model in (values.get("llm_models") or {"all reports": None}).items():
         if model != llm_model:
             failures.append(f"stale: {report} was measured with {model}, the code uses {llm_model}")
-    if not bundle_version or not bundle_version.startswith(DEPLOYED_SPLIT.replace("_", "-")):
-        failures.append(f"stale: infra/bundle-version is {bundle_version}, not a {DEPLOYED_SPLIT} bundle")
+    if not bundle_version or split_of_version(bundle_version) not in SOURCES:
+        failures.append(f"stale: infra/bundle-version is {bundle_version}, not a bundle of a deployable split")
     for report, classifier in (values.get("llm_classifiers") or {"all reports": None}).items():
         if classifier != bundle_version:
             failures.append(

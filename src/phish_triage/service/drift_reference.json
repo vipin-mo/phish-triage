@@ -1,24 +1,24 @@
 {
- "bundle": "with-newsletters-20261104-e7f1d257",
- "created": "2026-11-04T19:20:42+00:00",
+ "bundle": "with-retraining-20261104-6addaf34",
+ "created": "2026-11-04T22:34:55+00:00",
  "emails": 3987,
  "from": "legitimate mail the bundle never trained on: the inbox's and PrivacyMail's held-out test slices",
  "counts": {
   "score": [
-   179,
-   3233,
-   347,
-   96,
-   34,
-   25,
-   24,
-   18,
+   54,
+   3158,
+   564,
+   90,
+   30,
+   20,
+   23,
+   17,
    22,
    9
   ],
   "stage": [
-   2106,
-   1881
+   2894,
+   1093
   ],
   "sender": [
    2646,
