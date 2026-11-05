@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox privacymail-counts private-collectors data-privacymail train-with-newsletters eval-privacymail retrain-pull retrain retraining-check real-use robustness robustness-analyst load-test drift-reference gate bundle serve aws-bootstrap tf-foundation-plan tf-foundation-apply upload-bundle put-anthropic-key api-key addon deploy-image deploy-plan deploy-apply
+.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox privacymail-counts private-collectors data-privacymail train-with-newsletters eval-privacymail retrain-pull retrain retraining-check real-use robustness robustness-analyst attacks-split train-with-attacks defence-build defence load-test drift-reference gate bundle serve aws-bootstrap tf-foundation-plan tf-foundation-apply upload-bundle put-anthropic-key api-key addon deploy-image deploy-plan deploy-apply
 
 help:  ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -109,6 +109,18 @@ retrain: retrain-pull  ## pull, build `with_retraining`, evaluate, bundle, point
 	$(MAKE) drift-reference
 	@echo "infra/bundle-version: $$(cat infra/bundle-version). Next: the Claude evaluations behind it (they cost money:"
 	@echo "make eval-analyst CONFIRM=--confirm; make eval-injection CONFIRM=--confirm), make gate, then deploy."
+
+attacks-split:  ## the private `with_attacks` split: the deployed split + an attacked copy of each training phishing email
+	uv run --group train python -m phish_triage.data.attacks
+
+train-with-attacks:  ## fine-tune DistilBERT on `with_attacks`, reading with reader 2, and export it (~1 h on an M5)
+	uv run --group train python -m phish_triage.models.train_transformer with_attacks
+
+defence-build:  ## the two candidate bundles of the robustness defence (artifacts/candidates/, not deployable)
+	uv run --group train python -m phish_triage.evaluation.defence build
+
+defence:  ## every defence setup on the clean tests, the attacks and Greco (reports/defence.md; $0, local only)
+	uv run --group train python -m phish_triage.evaluation.defence measure
 
 robustness:  ## evasion tricks + Greco LLM-written phishing on the deployed cascade (reports/robustness.md; $0)
 	uv run --group train python -m phish_triage.evaluation.robustness cascade

@@ -221,7 +221,9 @@ legitimate emails, so the date alone says nothing about the label. That gives 9,
 | `old_era` | Nazario 2004–2014 vs SpamAssassin 2002, confounded on purpose | 5,961 | 1,277 | 1,277 |
 | `spam` | Spam as a hard negative (test only) | | | 1,509 |
 | `with_inbox` (private) | `random` plus part of my test inbox, split by sender, and as many 2026 phishing emails | 13,946 | 3,104 | 4,695 |
-| `with_newsletters` (private, deployed) | `with_inbox` plus PrivacyMail newsletters, split by website (at most 10 per website in train and val, at most 25 in test) | 18,724 | 4,699 | 8,433 |
+| `with_newsletters` (private) | `with_inbox` plus PrivacyMail newsletters, split by website (at most 10 per website in train and val, at most 25 in test) | 18,724 | 4,699 | 8,433 |
+| `with_retraining` (private, deployed) | `with_newsletters` plus the emails I sent from the add-on for retraining, in train only (`data/retraining.py`) | 18,726 | 4,699 | 8,433 |
+| `with_attacks` (private, measured, not deployed) | `with_retraining` plus an attacked copy of each training phishing email (`data/attacks.py`, [reports/defence.md](../reports/defence.md)) | 25,699 | 4,699 | 8,433 |
 
 Every main-pool split is half phishing and half legitimate. In Phase 2 I compute precision at a realistic base
 rate from the measured rates, instead of changing the split.

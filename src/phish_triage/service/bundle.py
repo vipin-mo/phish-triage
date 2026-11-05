@@ -107,14 +107,16 @@ def verify(folder: Path) -> dict:
 
 def load_split(name: str) -> tuple[dict[str, list[str]], dict]:
     """The split and its test slices; `with_newsletters` adds the held-out PrivacyMail websites to the inbox's."""
-    from phish_triage.data import inbox, privacymail, retraining
+    from phish_triage.data import attacks, inbox, privacymail, retraining
 
     split, slices = inbox.load_split()
-    if name in (privacymail.NEWSLETTER_SPLIT, retraining.SPLIT):
+    if name in (privacymail.NEWSLETTER_SPLIT, retraining.SPLIT, attacks.SPLIT):
         split, extra = privacymail.load_split()
         slices = slices | extra
     if name == retraining.SPLIT:
         split = retraining.load_split()
+    if name == attacks.SPLIT:
+        split = attacks.load_split()
     check_public_test_unseen(split["train"] + split["val"])
     return split, slices
 
@@ -131,37 +133,98 @@ def check_public_test_unseen(trained_on: list[str]) -> None:
 
 
 def export(split_name: str = DEPLOYED_SPLIT, root: Path = BUNDLE_ROOT) -> Path:
+    from phish_triage.data import inbox
+    from phish_triage.evaluation import predictions
+    from phish_triage.models.baselines import email_text
+
+    source, setup = SOURCES[split_name]
+    split, slices = load_split(split_name)
+    eval_ids = list(dict.fromkeys(slices["public_test"] + slices["inbox_test"] + slices.get("privacymail_test", [])))
+    records = inbox.read_split_records(set(split["train"]) | set(split["val"]) | set(eval_ids))
+    distilbert = predictions.load(distilbert_split(split_name), "distilbert_head")
+    if distilbert.val_ids != split["val"]:
+        raise SystemExit(f"saved DistilBERT predictions don't match the {split_name} validation split; re-run training")
+    folder, config = _package(split_name, split, records, source, distilbert.val_scores, root)
+
+    report = json.loads(Path("reports/with_inbox.json").read_text())[setup]["cascade"]
+    expected = {
+        "inbox_test_flagged": report["inbox_fpr"]["flagged"],
+        "public_recall": report["public_recall"],
+    }
+    if "privacymail_test" in slices:
+        expected["privacymail_test_flagged"] = report["privacymail_fpr"]["flagged"]
+    config |= {"report_setup": setup, "expected": expected}
+    (folder / BUNDLE_FILE).write_text(json.dumps(config, indent=1) + "\n")
+
+    measured = parity(folder, records, slices)
+    print(f"parity: {measured} (expected {expected})", file=sys.stderr)
+    counts_match = all(measured[k] == v for k, v in expected.items() if k.endswith("_flagged"))
+    if not counts_match or not np.isclose(measured["public_recall"], expected["public_recall"]):
+        (folder / BUNDLE_FILE).unlink()
+        raise SystemExit("the bundle doesn't reproduce reports/with_inbox.json; bundle.json removed")
+    texts = [email_text(records[i]) for i in slices["inbox_test"]]
+    batch = {
+        "fp32": batch_dependence(folder / "distilbert.onnx", folder / "tokenizer.json", texts),
+        "int8": batch_dependence(source / "model.int8.onnx", folder / "tokenizer.json", texts),
+    }
+    REPORT.write_text(to_markdown(config, measured, batch, len(texts)))
+    return folder
+
+
+CANDIDATE_ROOT = Path("artifacts/candidates")
+
+
+def export_candidate(split_name: str, distilbert: Path, name: str, reader: int, root: Path = CANDIDATE_ROOT) -> Path:
+    """A bundle to measure, not to deploy (Phase 7.2's defence): packaged as `export` packages one, with `reader` in
+    its config, in its own folder, and without the parity check (no report setup to reproduce). `distilbert` is a
+    trained model folder; its threshold is set on the split's validation emails, scored here with that model as read
+    by `reader`."""
+    from phish_triage.data import inbox
+    from phish_triage.models.baselines import email_text
+    from phish_triage.models.transformer import OnnxClassifier
+
+    split, _ = load_split(split_name)
+    records = inbox.read_split_records(set(split["train"]) | set(split["val"]))
+    classifier = OnnxClassifier(distilbert / "model.onnx", threads=4)
+    val_scores = classifier.score([email_text(records[i], reader) for i in split["val"]])
+    folder, config = _package(split_name, split, records, distilbert, val_scores, root / name, reader=reader)
+    (folder / BUNDLE_FILE).write_text(json.dumps(config | {"candidate": name}, indent=1) + "\n")
+    return folder
+
+
+def _package(
+    split_name: str,
+    split: dict,
+    records: dict,
+    source: Path,
+    distilbert_val_scores,
+    root: Path,
+    reader: int = 1,
+) -> tuple[Path, dict]:
+    """Fit stage 1 on the split, choose the cutoffs on validation, and write the files; the config isn't saved yet."""
     import joblib
     import onnxruntime
     import sklearn
 
-    from phish_triage.data import inbox
-    from phish_triage.evaluation import metrics, predictions
+    from phish_triage.evaluation import metrics
     from phish_triage.evaluation.cascade import choose_cutoffs
     from phish_triage.features.domains import default_ranks
     from phish_triage.features.extract import matrix
     from phish_triage.models.baselines import email_text, fit_all
     from phish_triage.service import triage
 
-    source, setup = SOURCES[split_name]
-    split, slices = load_split(split_name)
-    eval_ids = list(dict.fromkeys(slices["public_test"] + slices["inbox_test"] + slices.get("privacymail_test", [])))
-    ids = set(split["train"]) | set(split["val"]) | set(eval_ids)
-    records = inbox.read_split_records(ids)
     ranks = default_ranks()
 
     def part(which: list[str]):
         rows = [records[i] for i in which]
-        return [email_text(r) for r in rows], matrix(rows, ranks), np.array([int(r["label"] == "phish") for r in rows])
+        texts = [email_text(r, reader) for r in rows]
+        return texts, matrix(rows, ranks, reader), np.array([int(r["label"] == "phish") for r in rows])
 
     train, val = part(split["train"]), part(split["val"])
     fitted = fit_all(*train, *val)
     stacked_val = fitted.scores(val[0], val[1])["stacked"]
-    distilbert = predictions.load(distilbert_split(split_name), "distilbert_head")
-    if distilbert.val_ids != split["val"]:
-        raise SystemExit(f"saved DistilBERT predictions don't match the {split_name} validation split; re-run training")
     cutoffs = choose_cutoffs(val[2], stacked_val)
-    threshold = metrics.threshold_at_fpr(val[2], distilbert.val_scores, TARGET_FPR)
+    threshold = metrics.threshold_at_fpr(val[2], np.asarray(distilbert_val_scores), TARGET_FPR)
 
     staging = root / "staging"
     shutil.rmtree(staging, ignore_errors=True)
@@ -179,42 +242,20 @@ def export(split_name: str = DEPLOYED_SPLIT, root: Path = BUNDLE_ROOT) -> Path:
         shutil.rmtree(staging)
         raise SystemExit(f"{folder} already exists with the same content")
     staging.rename(folder)
-
-    report = json.loads(Path("reports/with_inbox.json").read_text())[setup]["cascade"]
-    expected = {
-        "inbox_test_flagged": report["inbox_fpr"]["flagged"],
-        "public_recall": report["public_recall"],
-    }
-    if "privacymail_test" in slices:
-        expected["privacymail_test_flagged"] = report["privacymail_fpr"]["flagged"]
     config = {
         "version": version,
         "created": datetime.now(UTC).isoformat(timespec="seconds"),
         "split": split_name,
-        "report_setup": setup,
         "stage1_cutoffs": {"low": cutoffs.low, "high": cutoffs.high},
         "distilbert_threshold": threshold,
         "distilbert_strategy": "head",
         "little_text_words": triage.LITTLE_TEXT_WORDS,
         "libraries": {"scikit-learn": sklearn.__version__, "onnxruntime": onnxruntime.__version__},
-        "expected": expected,
         "sha256": hashes,
     }
-    (folder / BUNDLE_FILE).write_text(json.dumps(config, indent=1) + "\n")
-
-    measured = parity(folder, records, slices)
-    print(f"parity: {measured} (expected {expected})", file=sys.stderr)
-    counts_match = all(measured[k] == v for k, v in expected.items() if k.endswith("_flagged"))
-    if not counts_match or not np.isclose(measured["public_recall"], expected["public_recall"]):
-        (folder / BUNDLE_FILE).unlink()
-        raise SystemExit("the bundle doesn't reproduce reports/with_inbox.json; bundle.json removed")
-    texts = [email_text(records[i]) for i in slices["inbox_test"]]
-    batch = {
-        "fp32": batch_dependence(folder / "distilbert.onnx", folder / "tokenizer.json", texts),
-        "int8": batch_dependence(source / "model.int8.onnx", folder / "tokenizer.json", texts),
-    }
-    REPORT.write_text(to_markdown(config, measured, batch, len(texts)))
-    return folder
+    if reader != 1:  # absent means reader 1, which every deployed bundle so far reads
+        config["reader"] = reader
+    return folder, config
 
 
 def batch_dependence(model: Path, tokenizer: Path, texts: list[str]) -> float:

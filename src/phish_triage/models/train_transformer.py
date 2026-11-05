@@ -24,7 +24,7 @@ from pathlib import Path
 
 import numpy as np
 
-from phish_triage.data import inbox, privacymail
+from phish_triage.data import attacks, inbox, privacymail
 from phish_triage.data.splits import SPLITS_DIR
 from phish_triage.evaluation import metrics, predictions
 from phish_triage.models import transformer
@@ -39,7 +39,8 @@ SPLITS = (
     "old_era",
 )
 EXPORT_SPLIT = "random"
-PRIVATE_SPLITS = (inbox.SPLIT, privacymail.NEWSLETTER_SPLIT)  # trained only when named
+PRIVATE_SPLITS = (inbox.SPLIT, privacymail.NEWSLETTER_SPLIT, attacks.SPLIT)  # trained only when named
+READER = {attacks.SPLIT: 2}  # what the models read (`baselines.email_text`); 1 for every other split
 ARTIFACTS_DIR = Path("artifacts")
 REPORTS_DIR = Path("reports")
 MLFLOW_URI = "sqlite:///mlruns/mlflow.db"
@@ -51,7 +52,7 @@ def run_split(name: str, splits: dict, config: transformer.TrainConfig, tokenize
     records = inbox.read_split_records({i for part in parts.values() for i in part})
     data = {}
     for part, ids in parts.items():
-        texts = [email_text(records[i]) for i in ids]
+        texts = [email_text(records[i], READER.get(name, 1)) for i in ids]
         data[part] = (ids, texts, transformer.encode(tokenizer, texts, config.strategy), _labels(records, ids))
     model_name = f"distilbert_{config.strategy}"
 
@@ -153,9 +154,11 @@ def _quality(y: np.ndarray, scores: np.ndarray) -> dict:
 
 
 def onnx_markdown(r: dict, split: str = EXPORT_SPLIT) -> str:
-    command = {EXPORT_SPLIT: "make train-transformer", privacymail.NEWSLETTER_SPLIT: "make train-with-newsletters"}.get(
-        split, "make train-with-inbox"
-    )
+    command = {
+        EXPORT_SPLIT: "make train-transformer",
+        privacymail.NEWSLETTER_SPLIT: "make train-with-newsletters",
+        attacks.SPLIT: "make train-with-attacks",
+    }.get(split, "make train-with-inbox")
     lines = [
         "# DistilBERT: PyTorch vs ONNX vs ONNX int8",
         "",
@@ -213,6 +216,8 @@ def main(argv: list[str] | None = None) -> int:
         splits[inbox.SPLIT] = inbox.load_split()[0]
     if privacymail.NEWSLETTER_SPLIT in args.splits:
         splits[privacymail.NEWSLETTER_SPLIT] = privacymail.load_split()[0]
+    if attacks.SPLIT in args.splits:
+        splits[attacks.SPLIT] = attacks.load_split()
     tokenizer = transformer.load_tokenizer()
     config = transformer.TrainConfig(strategy=args.strategy, epochs=args.epochs)
     for name in args.splits or list(SPLITS):

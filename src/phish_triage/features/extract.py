@@ -120,15 +120,16 @@ _DOMAIN_IN_TEXT = re.compile(r"\b(?:https?://)?((?:[a-z0-9-]{1,63}\.){1,16}[a-z]
 LINK_TEXT_CHARS = 300
 
 
-def extract(record: dict, ranks: DomainRanks | None = None) -> dict[str, float]:
+def extract(record: dict, ranks: DomainRanks | None = None, reader: int = 1) -> dict[str, float]:
+    """Reader 2 (Phase 7.2) counts the text features on what the text models read (`baselines.email_text`)."""
     features = {**_header_features(record, ranks), **_link_features(record, ranks)}
     features |= _attachment_features(record.get("attachments") or [])
-    features |= _text_features(record)
+    features |= _text_features(record, reader)
     return {name: float(features[name]) for name in FEATURE_NAMES}
 
 
-def matrix(records: list[dict], ranks: DomainRanks | None = None) -> np.ndarray:
-    return np.array([[row[name] for name in FEATURE_NAMES] for row in (extract(r, ranks) for r in records)])
+def matrix(records: list[dict], ranks: DomainRanks | None = None, reader: int = 1) -> np.ndarray:
+    return np.array([[row[name] for name in FEATURE_NAMES] for row in (extract(r, ranks, reader) for r in records)])
 
 
 def _header_features(record: dict, ranks: DomainRanks | None) -> dict[str, float]:
@@ -224,8 +225,13 @@ def _attachment_features(attachments: list[dict]) -> dict[str, float]:
     }
 
 
-def _text_features(record: dict) -> dict[str, float]:
-    text = f"{record.get('subject') or ''}\n{(record.get('text') or '')[:TEXT_CHARS]}"
+def _text_features(record: dict, reader: int = 1) -> dict[str, float]:
+    if reader >= 2:
+        from phish_triage.models.baselines import email_text
+
+        text = email_text(record, reader)
+    else:
+        text = f"{record.get('subject') or ''}\n{(record.get('text') or '')[:TEXT_CHARS]}"
     return {
         "log_words": math.log1p(len(text.split())),
         "urgency_terms": math.log1p(len(URGENCY.findall(text))),

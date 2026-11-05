@@ -66,6 +66,22 @@ HIDING = {  # (what goes before the body, the hidden block)
     "off_screen": ("", '<div style="position:absolute;left:-9999px;top:-9999px">{}</div>'),
     "tiny_text": ("", '<div style="font-size:2px">{}</div>'),
 }
+# Held out (Phase 7.2, part 2): set before the defence was written, and the defence has no rule written for any of
+# them; they test whether it generalizes beyond the tricks above, which it was built against.
+GREEK_LATIN = "aoipvxkABEHIKMNOPTXYZ"
+GREEK = (
+    "\u03b1\u03bf\u03b9\u03c1\u03bd\u03c7\u03ba"  # a o i p v x k
+    "\u0391\u0392\u0395\u0397\u0399\u039a\u039c\u039d\u039f\u03a1\u03a4\u03a7\u03a5\u0396"  # capitals
+)
+GREEK_TWINS = dict(zip(GREEK_LATIN, GREEK, strict=True))
+OTHER_INVISIBLE = ("\u200c", "\u200d", "\u2060", "\u00ad", "\ufeff")  # joiners, word joiner, soft hyphen, BOM
+HELD_OUT_HIDING = {
+    "id_in_style": ("<style>#pre{display:none}</style>", '<div id="pre">{}</div>'),
+    "tag_in_style": ("<style>aside{visibility:hidden}</style>", "<aside>{}</aside>"),
+    "text_indent": ("", '<div style="text-indent:-9999px;overflow:hidden;white-space:nowrap">{}</div>'),
+    "clip": ("", '<div style="position:absolute;clip:rect(0 0 0 0);width:1px;height:1px;overflow:hidden">{}</div>'),
+    "scale_zero": ("", '<div style="transform:scale(0)">{}</div>'),
+}
 # Text that stays as it is: links, addresses, HTML entities; and in HTML, the markup, styles, scripts and comments.
 _PROTECTED = re.compile(rf"{URL_RE.pattern}|[\w.+-]+@[\w-]+(?:\.[\w-]+)+|&#?\w+;", re.IGNORECASE)
 _MARKUP = re.compile(r"<(style|script)\b.*?</\1\s*>|<!--.*?-->|<[^>]*>", re.IGNORECASE | re.DOTALL)
@@ -100,16 +116,21 @@ def _text_attack(record: dict, change) -> dict:
     return r
 
 
-def lookalike_letters(record: dict) -> dict:
-    rng = random.Random(f"{SEED}:{record['id']}:lookalike")
+def lookalike_letters(record: dict, twins: dict[str, str] = TWINS, seed: str = "lookalike") -> dict:
+    rng = random.Random(f"{SEED}:{record['id']}:{seed}")
     swap = lambda text: "".join(  # noqa: E731
-        TWINS[ch] if ch in TWINS and rng.random() < LOOKALIKE_SHARE else ch for ch in text
+        twins[ch] if ch in twins and rng.random() < LOOKALIKE_SHARE else ch for ch in text
     )
     return _text_attack(record, swap)
 
 
-def hidden_characters(record: dict) -> dict:
-    split = lambda m: m.group()[: len(m.group()) // 2] + ZERO_WIDTH + m.group()[len(m.group()) // 2 :]  # noqa: E731
+def hidden_characters(record: dict, marks: tuple[str, ...] = (ZERO_WIDTH,)) -> dict:
+    count = iter(range(10**9))
+
+    def split(m: re.Match) -> str:
+        word, mark = m.group(), marks[next(count) % len(marks)]
+        return word[: len(word) // 2] + mark + word[len(word) // 2 :]
+
     return _text_attack(record, lambda text: _LONG_WORD.sub(split, text))
 
 
@@ -122,14 +143,15 @@ def as_html(text: str) -> str:
     )
 
 
-def hidden_html(record: dict, trick: str, at_end: bool = False) -> dict:
+def hidden_html(record: dict, trick: str, at_end: bool = False, filler: str | None = None) -> dict:
+    """`filler` is the hidden text (the test's harmless paragraph by default; training copies use other text)."""
     r = copy.deepcopy(record)
     html = r.get("html") or ""
     derived = bool(html) and (r.get("text") or "") == html_to_text(html)
     if not html:
         html = as_html(r.get("text") or "")
-    before, block = HIDING[trick]
-    hidden = block.format(html_lib.escape(" ".join([HARMLESS] * HIDDEN_COPIES)))
+    before, block = (HIDING | HELD_OUT_HIDING)[trick]
+    hidden = block.format(html_lib.escape(filler or " ".join([HARMLESS] * HIDDEN_COPIES)))
     lower = html.lower()
     at = lower.find(">", lower.find("<body")) + 1 if "<body" in lower else 0
     if at_end:
@@ -144,14 +166,14 @@ def hidden_html(record: dict, trick: str, at_end: bool = False) -> dict:
     return r
 
 
-def _short(url: str) -> str:
+def _short(url: str, host: str = "bit.ly") -> str:
     core = url.rstrip(TRAILING_PUNCT)
-    return f"https://bit.ly/{hashlib.sha256(core.encode()).hexdigest()[:7]}{url[len(core) :]}"
+    return f"https://{host}/{hashlib.sha256(core.encode()).hexdigest()[:7]}{url[len(core) :]}"
 
 
-def shortened_links(record: dict) -> dict:
+def shortened_links(record: dict, host: str = "bit.ly") -> dict:
     r = copy.deepcopy(record)
-    swap = lambda text: URL_RE.sub(lambda m: _short(m.group()), text)  # noqa: E731
+    swap = lambda text: URL_RE.sub(lambda m: _short(m.group(), host), text)  # noqa: E731
     r["text"] = swap(r.get("text") or "")
     if r.get("html"):
         r["html"] = swap(r["html"])
@@ -159,8 +181,8 @@ def shortened_links(record: dict) -> dict:
     return r
 
 
-def all_four(record: dict) -> dict:
-    return hidden_html(hidden_characters(lookalike_letters(shortened_links(record))), "style_class")
+def all_four(record: dict, filler: str | None = None) -> dict:
+    return hidden_html(hidden_characters(lookalike_letters(shortened_links(record))), "style_class", filler=filler)
 
 
 ATTACKS = {
@@ -172,6 +194,12 @@ ATTACKS = {
     "all_four": all_four,
     # Added after the first run, to explain it: the same trick with the paragraph at the end of the body.
     "hidden_html_style_class_at_end": lambda r: hidden_html(r, "style_class", at_end=True),
+}
+HELD_OUT = {
+    "greek_letters": lambda r: lookalike_letters(r, GREEK_TWINS, "greek"),
+    "other_invisible": lambda r: hidden_characters(r, OTHER_INVISIBLE),
+    **{f"hidden_html_{trick}": (lambda r, t=trick: hidden_html(r, t)) for trick in HELD_OUT_HIDING},
+    "tinyurl_links": lambda r: shortened_links(r, "tinyurl.com"),
 }
 ANALYST_ATTACKS = (
     "clean",
@@ -193,6 +221,14 @@ NAMES = {
     "shortened_links": "Shortened links (bit.ly)",
     "all_four": "All four",
     "hidden_html_style_class_at_end": "Check added after the first run: the `<style>` class, paragraph at the end",
+    "greek_letters": "Held out: Greek look-alike letters (30%)",
+    "other_invisible": "Held out: other invisible characters (joiners, word joiner, soft hyphen, BOM)",
+    "hidden_html_id_in_style": "Held out: hidden by an id in a `<style>` block",
+    "hidden_html_tag_in_style": "Held out: hidden by a tag rule in a `<style>` block",
+    "hidden_html_text_indent": "Held out: `text-indent:-9999px`",
+    "hidden_html_clip": "Held out: `clip:rect(0 0 0 0)` on a 1 px box",
+    "hidden_html_scale_zero": "Held out: `transform:scale(0)`",
+    "tinyurl_links": "Held out: tinyurl links",
 }
 
 
