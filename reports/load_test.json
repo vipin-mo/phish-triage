@@ -1,0 +1,75 @@
+{
+ "date": "2026-11-05",
+ "stages": {
+  "r1": {
+   "requests": 30,
+   "status": {
+    "200": 30
+   },
+   "answered_per_second": 1.0,
+   "p50_ms": 83.8,
+   "p95_ms": 106.6,
+   "max_ms": 181.7,
+   "refused_by_gateway": 0,
+   "refused_by_key_limit": 0
+  },
+  "r2": {
+   "requests": 61,
+   "status": {
+    "200": 61
+   },
+   "answered_per_second": 2.03,
+   "p50_ms": 75.4,
+   "p95_ms": 90.5,
+   "max_ms": 93.6,
+   "refused_by_gateway": 0,
+   "refused_by_key_limit": 0
+  },
+  "r5": {
+   "requests": 151,
+   "status": {
+    "200": 93,
+    "429": 58
+   },
+   "answered_per_second": 3.1,
+   "p50_ms": 71.6,
+   "p95_ms": 84.8,
+   "max_ms": 223.7,
+   "refused_by_gateway": 0,
+   "refused_by_key_limit": 58
+  },
+  "r10": {
+   "requests": 301,
+   "status": {
+    "200": 82,
+    "429": 219
+   },
+   "answered_per_second": 2.73,
+   "p50_ms": 71.4,
+   "p95_ms": 79.1,
+   "max_ms": 108.1,
+   "refused_by_gateway": 134,
+   "refused_by_key_limit": 85
+  }
+ },
+ "gateway": {
+  "requests": 543,
+  "longest_pause_s": 36,
+  "most_in_one_second": 10,
+  "status": {
+   "200, function ran": 266,
+   "429, function ran": 143,
+   "429, refused before the function": 134
+  },
+  "ok_p50_ms": 45.0,
+  "ok_p95_ms": 52.0,
+  "ok_max_ms": 142
+ },
+ "lambda": {
+  "invocations": 410,
+  "throttles": 0,
+  "max_concurrent": 1,
+  "cold_starts": 0,
+  "model_load_s": []
+ }
+}
