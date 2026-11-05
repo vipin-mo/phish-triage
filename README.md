@@ -280,6 +280,11 @@ for a background design were removed, since a queue would have had to hold the e
   legitimate, so the mix alone would read as drift. A week with fewer than 30 scans reports "not enough data",
   which at my use is most weeks. The reference holds only bin counts, and the gate fails if it was made with
   another bundle.
+- **Real use so far** ([reports/real_use.md](reports/real_use.md), counts only): 48 emails from my own Gmail,
+  scanned from the add-on, 5 flagged as phishing and 43 safe; DistilBERT decided 43 and stage 1 the other 5. I sent
+  2 of the flagged ones for retraining as legitimate (the bank and ride-app emails in Known issues), 6 more wait for
+  the next run, and I gave one "correct". That is one person's mail over a few days: it shows where the model goes
+  wrong, not how often.
 - **Retraining runs from my laptop.** `make retrain` moves the emails I sent from the add-on out of the bucket (and
   deletes them there), adds them to the deployed split's training part only, refits stage 1 (DistilBERT stays),
   evaluates the result on the same held-out tests as every other setup, builds and checks the bundle and the drift
@@ -363,7 +368,7 @@ in November 2026. Every number above was re-measured after the fixes, except my 
 - [x] **Phase 3** — DistilBERT ([ONNX int8](reports/onnx.md)), LLM comparison, cascade ([results](docs/RESULTS.md))
 - [x] **Phase 4** — grounded LLM analyst step ([results](reports/analyst.md)), prompt-injection tests ([round 1](reports/injection.md), [round 2](reports/injection_round2.md)), CI eval gate
 - [ ] **Phase 5** — serverless AWS deployment: [service and bundle](reports/bundle.md), Lambda + API Gateway + DynamoDB in [Terraform](infra/), deployed from my laptop with MFA (OIDC CI/CD blocked by the Free plan); cost table and dashboard screenshots to come
-- [ ] **Phase 6** — explanations on demand, [Gmail add-on](addon/) (in use), canary and shadow mode, weekly drift check; the retraining loop to come
+- [x] **Phase 6** — explanations on demand, [Gmail add-on](addon/) (in use), canary and shadow mode, weekly drift check, retraining from emails I send, [real use](reports/real_use.md)
 - [ ] **Phase 7** — load test, robustness report, write-up
 
 ## Development

@@ -1,0 +1,25 @@
+{
+ "as_of": "2026-11-05",
+ "emails_scanned": 48,
+ "test_emails_left_out": 18,
+ "verdicts": {
+  "safe": 43,
+  "phish": 5
+ },
+ "decided_by": {
+  "stacked": 5,
+  "distilbert": 43
+ },
+ "by_model": {
+  "with-newsletters-20261104-e7f1d257": 48
+ },
+ "feedback": {
+  "correct": 1
+ },
+ "sent_for_retraining": {
+  "pulled": {
+   "legit": 2
+  },
+  "waiting_in_bucket": 6
+ }
+}
