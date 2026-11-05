@@ -1,0 +1,26 @@
+{
+ "random": {
+  "model": "public data only",
+  "emails": 2802,
+  "recall_at_1pct_fpr": 0.9992862241256245,
+  "recall_at_0.1pct_fpr": 0.9221984296930764
+ },
+ "with_inbox": {
+  "model": "with part of my test inbox",
+  "emails": 2802,
+  "recall_at_1pct_fpr": 0.9978586723768736,
+  "recall_at_0.1pct_fpr": 0.9486081370449678
+ },
+ "with_newsletters": {
+  "model": "with PrivacyMail newsletters too",
+  "emails": 2802,
+  "recall_at_1pct_fpr": 0.9942897930049964,
+  "recall_at_0.1pct_fpr": 0.953604568165596
+ },
+ "with_normalized": {
+  "model": "the same emails read with reader 2 (in service since 2026-11-05)",
+  "emails": 2802,
+  "recall_at_1pct_fpr": 0.9942897930049964,
+  "recall_at_0.1pct_fpr": 0.9314775160599572
+ }
+}

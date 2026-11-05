@@ -54,8 +54,9 @@ The TF-IDF models and DistilBERT read `baselines.email_text`: the subject and th
 
 **Too little text goes to review** (`service/triage.py`). An email with images or attachments and fewer than 20
 visible words in the body (an image-only or QR-code email, or one whose content is all in an attachment) gives the
-text models nothing to judge, so it goes to human review instead of being marked safe. On the public test that is
-8.9% of the phishing and none of the legitimate mail ([reports/with_inbox.md](../reports/with_inbox.md)).
+text models nothing to judge, so it goes to human review instead of being marked safe. On the public test 8.9% of
+the phishing fits that description and none of the legitimate mail does; the cascade flags most of those emails
+anyway, so the rule adds 0.2–0.4 points of recall ([reports/with_inbox.md](../reports/with_inbox.md)).
 
 **Features that only work on my inbox.** Each feature is also scored on its own on my test inbox: a feature with ROC
 AUC 0.9 or more between the inbox's unseen senders and 2026 phishing, but under 0.7 on the public test, is a
