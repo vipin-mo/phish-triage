@@ -30,6 +30,13 @@ SPLIT = "with_retraining"
 # The same emails read with reader 2 (Phase 7.2): what the models train on changes, the split doesn't.
 NORMALIZED_SPLIT = "with_normalized"
 LABEL_OF = {"phish": "phish", "legit": "legit"}
+# Whose emails may be sent for retraining: the service refuses every other key, and `--pull` takes only these.
+# One owner per line; Terraform reads the same file (infra/service).
+OWNERS_FILE = Path("infra/retraining-owners")
+
+
+def owners() -> tuple[str, ...]:
+    return tuple(line.strip() for line in OWNERS_FILE.read_text().splitlines() if line.strip())
 
 
 def read_masked() -> dict[str, dict]:
@@ -39,8 +46,9 @@ def read_masked() -> dict[str, dict]:
         return {(r := json.loads(line))["id"]: r for line in f if line.strip()}
 
 
-def pull(bucket: str, s3=None) -> dict:
-    """Move the sent emails from the bucket into the private masked file; returns counts only."""
+def pull(bucket: str, s3=None, allowed: tuple[str, ...] | None = None) -> dict:
+    """Move the sent emails of the allowed owners (`infra/retraining-owners`) from the bucket into the private masked
+    file; anyone else's are left where they are and only counted. Returns counts only."""
     from phish_triage.data.mask import mask_record
     from phish_triage.data.parse import parse_email
 
@@ -50,8 +58,11 @@ def pull(bucket: str, s3=None) -> dict:
         s3 = boto3.client("s3")
     kept = read_masked()
     counts = {"in bucket": 0, "added": 0, "already pulled": 0, "phish": 0, "legit": 0}
+    allowed = owners() if allowed is None else allowed
     pages = s3.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix="emails/")
-    keys = [o["Key"] for page in pages for o in page.get("Contents", [])]
+    every = [o["Key"] for page in pages for o in page.get("Contents", [])]
+    keys = [k for k in every if k.split("/")[1] in allowed]
+    counts["other owners' emails, left in the bucket"] = len(every) - len(keys)
     new = []
     for key in keys:
         counts["in bucket"] += 1
@@ -77,21 +88,54 @@ def pull(bucket: str, s3=None) -> dict:
     return counts
 
 
-def build_split(base: dict[str, list[str]], retraining_ids: list[str]) -> dict[str, list[str]]:
+def build_split(
+    base: dict[str, list[str]], retraining_ids: list[str], left_out: set[str] = frozenset()
+) -> dict[str, list[str]]:
     seen = set(base["train"]) | set(base["val"]) | set(base["test"])
-    added = [i for i in sorted(retraining_ids) if i not in seen]
+    added = [i for i in sorted(retraining_ids) if i not in seen and i not in left_out]
     return {"train": base["train"] + added, "val": list(base["val"]), "test": list(base["test"])}
 
 
+def like_a_test_email(records: dict[str, dict], tests: list[dict]) -> set[str]:
+    """The sent emails that share a sender domain with a test email, or copy one (exactly, or at the de-duplication's
+    near-copy similarity): training on them would leak into those tests, which keep senders apart for this reason."""
+    import numpy as np
+
+    from phish_triage.data import dedup
+    from phish_triage.data.inbox import sender_group
+
+    test_senders = {sender_group(r) for r in tests}
+    perms = dedup.permutations()
+    test_items = [dedup.make_item(r, perms) for r in tests]
+    exact = {item.exact_key for item in test_items}
+    signatures = [item.hashvalues for item in test_items if item.hashvalues is not None]
+    out = set()
+    for email_id, record in records.items():
+        item = dedup.make_item(record, perms)
+        near = item.hashvalues is not None and any(
+            float(np.mean(item.hashvalues == sig)) >= dedup.THRESHOLD for sig in signatures
+        )
+        if sender_group(record) in test_senders or item.exact_key in exact or near:
+            out.add(email_id)
+    return out
+
+
 def build() -> dict:
-    from phish_triage.data import privacymail
+    from phish_triage.data import inbox, privacymail
 
     base, _ = privacymail.load_split()
     records = read_masked()
-    split = build_split(base, list(records))
+    tests = list(inbox.read_split_records(set(base["test"])).values())
+    left_out = like_a_test_email(records, tests)
+    split = build_split(base, list(records), left_out)
     SPLIT_FILE.write_text(json.dumps({SPLIT: split}) + "\n")
     labels = [records[i]["label"] for i in split["train"] if i in records]
-    return {"added to train": len(labels), "phish": labels.count("phish"), "legit": labels.count("legit")}
+    return {
+        "added to train": len(labels),
+        "phish": labels.count("phish"),
+        "legit": labels.count("legit"),
+        "left out (a test email's sender, or a copy of one)": len(left_out),
+    }
 
 
 def load_split() -> dict[str, list[str]]:

@@ -203,7 +203,7 @@ IMAGE_TAG = $$(if [ -n "$(DEV)" ]; then echo "dev-$$(git rev-parse --short HEAD)
 ALERT_EMAIL ?= $(shell cat ~/.config/phish-triage/alert-email 2>/dev/null)
 
 deploy-image:  ## build the arm64 Lambda image with the bundle and push it to the private registry (DEV=1: a test image; SHADOW=<bundle version>: shadow mode)
-	@if [ -z "$(DEV)" ]; then uv run python scripts/deploy_checks.py clean-main; fi
+	@if [ -z "$(DEV)" ]; then uv run python scripts/deploy_checks.py clean-main && uv run python -m phish_triage.evaluation.gate --check; fi
 	mkdir -p build && rm -rf build/bundle build/image-tag build/smoke build/shadow && cp -R "artifacts/bundle/$$(cat infra/bundle-version)" build/bundle
 	mkdir -p build/smoke build/shadow && cp tests/fixtures/spoofed_brand.eml tests/fixtures/clean_newsletter.eml build/smoke/
 	@if [ -n "$(SHADOW)" ]; then cp -R "artifacts/bundle/$(SHADOW)/." build/shadow/; else touch build/shadow/.none; fi

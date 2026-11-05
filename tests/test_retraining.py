@@ -30,7 +30,8 @@ def _client(sink, store=None):
     return TestClient(app), key, store
 
 
-def test_an_email_is_kept_only_when_sent_with_a_label():
+def test_an_email_is_kept_only_when_sent_with_a_label(monkeypatch):
+    monkeypatch.setenv("PHISH_RETRAINING_OWNERS", "tester")
     sink = Sink()
     c, key, store = _client(sink)
     assert c.post("/v1/scan", content=EMAIL, headers={"x-api-key": key}).status_code == 200
@@ -49,6 +50,7 @@ def test_an_email_is_kept_only_when_sent_with_a_label():
 
 
 def test_storage_off_and_the_daily_limit(monkeypatch):
+    monkeypatch.setenv("PHISH_RETRAINING_OWNERS", "tester")
     c, key, _ = _client(None)
     assert c.post("/v1/retraining-email?label=legit", content=EMAIL, headers={"x-api-key": key}).status_code == 404
     monkeypatch.setattr(api, "RETRAINING_PER_DAY", 1)
@@ -76,3 +78,15 @@ def test_the_s3_writer_keeps_the_email_its_label_and_the_verdict():
     stored = s3.objects[key]
     assert stored["Body"] == EMAIL and stored["ContentType"] == "message/rfc822"
     assert stored["Metadata"] == {"label": "phish", "scan-verdict": "safe", "model-version": "m1"}
+
+
+def test_only_listed_owners_may_send_emails_for_retraining(monkeypatch):
+    sink = Sink()
+    c, key, _ = _client(sink)
+    monkeypatch.delenv("PHISH_RETRAINING_OWNERS", raising=False)  # unset: nobody
+    assert c.post("/v1/retraining-email?label=legit", content=EMAIL, headers={"x-api-key": key}).status_code == 403
+    monkeypatch.setenv("PHISH_RETRAINING_OWNERS", "someone-else, another")
+    assert c.post("/v1/retraining-email?label=legit", content=EMAIL, headers={"x-api-key": key}).status_code == 403
+    monkeypatch.setenv("PHISH_RETRAINING_OWNERS", "someone-else,tester")
+    assert c.post("/v1/retraining-email?label=legit", content=EMAIL, headers={"x-api-key": key}).status_code == 200
+    assert len(sink.kept) == 1

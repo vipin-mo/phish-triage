@@ -1,16 +1,17 @@
 {
- "prompt_version": 5,
+ "prompt_version": 6,
  "llm_model": "claude-haiku-5-5",
  "classifier": "with-normalized-20261105-8baede93",
  "emails": 200,
  "schema_valid_rate": 1.0,
- "indicators": 648,
- "grounding_failures": 5,
- "grounding_failure_rate": 0.007716049382716049,
- "kept_indicators_citing_a_signal": 371,
+ "indicators": 636,
+ "grounding_failures": 3,
+ "grounding_failure_rate": 0.0047169811320754715,
+ "ungrounded_indicators_shown": 0,
+ "kept_indicators_citing_a_signal": 352,
  "answers_with_a_dropped_indicator": 3,
- "no_action_answers": 62,
- "no_action_with_advice_in_summary": 3,
+ "no_action_answers": 73,
+ "no_action_with_advice_in_summary": 6,
  "errors": {},
  "verdicts": {
   "legit -> safe": 92,
@@ -21,8 +22,8 @@
  "schema_valid_first_try": 1.0,
  "retried": 0,
  "latency_s": {
-  "p50": 2.647009062493453,
-  "p95": 4.803736246156041,
-  "cost_usd": 0.006112205000000001
+  "p50": 2.353142354506417,
+  "p95": 3.568454499350628,
+  "cost_usd": 0.006117105
  }
 }
