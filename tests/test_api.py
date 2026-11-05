@@ -99,7 +99,7 @@ class FakeExplainer:
     def __init__(self, cost=0.002):
         self.calls, self.cost = 0, cost
 
-    def explain(self, raw, verdict, ranks=None):
+    def explain(self, raw, verdict, ranks=None, reader=1):
         from phish_triage.service.explain import Explanation
 
         self.calls += 1
@@ -114,10 +114,11 @@ def test_an_explanation_is_on_demand_limited_per_key_and_by_the_days_budget(monk
     first = c.post("/v1/explain", content=EMAIL, headers={"x-api-key": key})
     assert first.status_code == 200 and first.json()["scan_id"] == scan_id(EMAIL) and explainer.calls == 1
     assert "ZQX-secret-body" not in json.dumps(list(store.verdicts.values()))  # the email is never stored
-    c.post("/v1/explain", content=EMAIL, headers={"x-api-key": key})
-    c.post("/v1/explain", content=EMAIL, headers={"x-api-key": key})  # $0.006 spent: over $0.005
+    c.post("/v1/explain", content=EMAIL, headers={"x-api-key": key})  # $0.004 spent
+    # a third call's worst case no longer fits in $0.005, so it isn't made: the day's spend can't overshoot
     over = c.post("/v1/explain", content=EMAIL, headers={"x-api-key": key})
-    assert over.status_code == 429 and "budget" in over.json()["detail"] and explainer.calls == 3
+    assert over.status_code == 429 and "budget" in over.json()["detail"] and explainer.calls == 2
+    assert store.add_today(api.SPEND_COUNTER, 0) == 4_000  # reservations settled to the real cost
     assert c.post("/v1/scan", content=EMAIL, headers={"x-api-key": key}).status_code == 200  # scans still work
     assert c.post("/v1/explain", content=b"", headers={"x-api-key": key}).status_code == 400
     assert c.post("/v1/explain", content=EMAIL).status_code == 401

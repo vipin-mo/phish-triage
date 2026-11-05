@@ -15,8 +15,9 @@ GOOD = {
     "prompt_versions": dict.fromkeys(REPORTS, 3),
     "llm_models": dict.fromkeys(REPORTS, "claude-test"),
     "llm_classifiers": dict.fromkeys(REPORTS, BUNDLE),
+    "deployable_model": "with_newsletters/distilbert_head",
 }
-KEYS = {"prompt_versions", "llm_models", "llm_classifiers"}
+KEYS = {"prompt_versions", "llm_models", "llm_classifiers", "deployable_model"}
 
 
 def run(values: dict, prompt_version: int = 3, bundle: str = BUNDLE) -> list[str]:
@@ -59,3 +60,12 @@ def test_a_missing_injection_round_or_a_nan_fails_instead_of_passing():
     failures = run(one_round)
     assert any(f.startswith("injection_variants") for f in failures) and any("stale" in f for f in failures)
     assert run({**GOOD, "grounding_failure_rate": float("nan")}) == ["grounding_failure_rate = nan (max 0.02)"]
+
+
+def test_recall_measured_for_another_model_or_an_unmeasured_ungrounded_count_fails():
+    assert any(
+        "recall was measured for random/distilbert_head" in f
+        for f in run(GOOD | {"deployable_model": "random/distilbert_head"})
+    )
+    assert "ungrounded_indicators_shown: missing" in run(GOOD | {"ungrounded_indicators_shown": None})
+    assert run(GOOD | {"injection_verdict_drop_rate": 0.01}) == []  # reported, no limit yet (see REPORTED in gate.py)

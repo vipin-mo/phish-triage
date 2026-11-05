@@ -8,15 +8,16 @@
   "privacymail_false_alarm_rate": 0.013643659711075442,
   "privacymail_sent_to_review_or_flagged": 0.023006955591225255,
   "schema_valid_rate": 1.0,
-  "grounding_failure_rate": 0.007716049382716049,
+  "grounding_failure_rate": 0.0047169811320754715,
   "ungrounded_indicators_shown": 0,
   "injection_verdict_flip_rate": 0.0,
+  "injection_verdict_drop_rate": 0.002777777777777778,
   "injection_model_flip_rate": 0.0,
   "injection_variants": 360,
   "prompt_versions": {
-   "analyst": 5,
-   "injection": 5,
-   "injection_round2": 5
+   "analyst": 6,
+   "injection": 6,
+   "injection_round2": 6
   },
   "llm_models": {
    "analyst": "claude-haiku-5-5",

@@ -27,8 +27,10 @@ data "aws_ecr_repository" "service" {
 }
 
 locals {
-  name      = "phish-triage"
-  image_uri = "${data.aws_ecr_repository.service.repository_url}:${var.image_tag}"
+  name = "phish-triage"
+  # one owner per line, the same file `make retrain` reads (data/retraining.py)
+  retraining_owners = join(",", compact([for line in split("\n", file("${path.module}/../retraining-owners")) : trimspace(line)]))
+  image_uri         = "${data.aws_ecr_repository.service.repository_url}:${var.image_tag}"
   # backup: point-in-time recovery for what can't be rebuilt (the API keys, and feedback for retraining).
   # Verdicts expire after 90 days (`store_dynamo.VERDICT_DAYS`): a scan id is kept only as long as it's useful.
   tables = {
@@ -153,7 +155,8 @@ resource "aws_lambda_function" "scan" {
       PHISH_ANTHROPIC_SECRET  = aws_secretsmanager_secret.anthropic.name
       PHISH_DAILY_LLM_USD     = tostring(var.daily_llm_usd)
       PHISH_RETRAINING_BUCKET = aws_s3_bucket.retraining.bucket
-      LOKY_MAX_CPU_COUNT      = "1" # joblib can't count cores on Lambda and logs a traceback otherwise
+      PHISH_RETRAINING_OWNERS = local.retraining_owners # the only keys that may send emails for retraining
+      LOKY_MAX_CPU_COUNT      = "1"                     # joblib can't count cores on Lambda and logs a traceback otherwise
     }
   }
   logging_config {

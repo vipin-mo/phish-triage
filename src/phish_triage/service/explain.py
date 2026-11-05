@@ -32,13 +32,30 @@ def _valid(raw: str | None) -> bool:
     return analyst.parse_answer(raw) is not None
 
 
+def worst_case_microusd(model: str = analyst.MODEL) -> int:
+    """The most one explanation can cost: two calls (the schema retry), each with the largest prompt the analyst
+    builds (its body, header, link and attachment caps, the system prompt, about 3 characters a token) and the full
+    output allowance. Reserved from the day's budget before the call, so calls running at once can't overshoot it."""
+    from phish_triage.models.llm_classifier import PRICE_PER_MTOK
+
+    prompt_chars = (
+        len(analyst.SYSTEM_DEFENDED)
+        + analyst.MAX_BODY_CHARS
+        + analyst.MAX_FIELD_CHARS * (4 + analyst.MAX_LINKS + analyst.MAX_ATTACHMENTS)
+        + 2_000  # the signals, tags and notes around the email
+    )
+    input_rate, output_rate = PRICE_PER_MTOK[model]
+    per_call = (prompt_chars / 3 * input_rate + analyst.MAX_OUTPUT_TOKENS * output_rate) / 1e6
+    return round(2 * per_call * 1e6) + 1
+
+
 class Explainer:
     def __init__(self, client, model: str = analyst.MODEL):
         self.client = client
         self.model = model
 
-    def explain(self, raw: bytes, verdict: dict, ranks=None) -> Explanation:
-        """`verdict`: the scan's stored verdict for the same email (`/v1/scan`'s answer)."""
+    def explain(self, raw: bytes, verdict: dict, ranks=None, reader: int = 1) -> Explanation:
+        """`verdict`: the scan's stored verdict for the same email (`/v1/scan`'s answer); `reader`: the bundle's."""
         from phish_triage.data.mask import mask_record
         from phish_triage.data.parse import parse_email
         from phish_triage.features.sender import check_sender
@@ -57,6 +74,7 @@ class Explainer:
             classifier_phish=flagged,
             sender=check_sender(record, ranks),
             signals=verdict.get("signals") or [],
+            reader=reader,
         )
         params = analyst.request_params(a, self.model)
         cost, answer, reasons = 0.0, None, []

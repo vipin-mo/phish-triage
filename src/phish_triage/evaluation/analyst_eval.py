@@ -60,6 +60,7 @@ def build(emails: int = EMAILS):
         record = records[email_id]
         a = analyst.render(
             views[email_id],
+            reader=getattr(classify, "reader", 1),
             classifier_score=float(score),
             classifier_phish=flagged,
             sender=check_sender(record),
@@ -72,7 +73,7 @@ def build(emails: int = EMAILS):
 
 def evaluate(responses: dict, meaning: dict, classifier: str = "") -> tuple[dict, list[dict]]:
     rows, verdicts, indicators, dropped, with_drop, invalid, errors = [], Counter(), 0, 0, 0, 0, Counter()
-    from_signals = conflicts = no_action = 0
+    from_signals = conflicts = no_action = ungrounded = 0
     for email_id, m in meaning.items():
         raw = responses.get(email_id, {})
         if raw.get("error"):
@@ -87,6 +88,7 @@ def evaluate(responses: dict, meaning: dict, classifier: str = "") -> tuple[dict
         dropped += r.indicators_dropped
         with_drop += r.indicators_dropped > 0
         from_signals += sum(i.source == "signal" for i in r.output.indicators) if r.output else 0
+        ungrounded += sum(not analyst.grounded(i, m["_input"]) for i in r.output.indicators) if r.output else 0
         no_action += bool(r.output) and r.output.recommended_action == "no_action"
         conflicts += bool(r.output) and analyst.advice_conflict(r.output)
         verdicts[(m["label"], r.verdict)] += 1
@@ -119,6 +121,7 @@ def evaluate(responses: dict, meaning: dict, classifier: str = "") -> tuple[dict
         "indicators": indicators,
         "grounding_failures": dropped,
         "grounding_failure_rate": dropped / indicators if indicators else 0.0,
+        "ungrounded_indicators_shown": ungrounded,  # kept indicators checked again; finish() should leave none
         "kept_indicators_citing_a_signal": from_signals,
         "answers_with_a_dropped_indicator": with_drop,
         "no_action_answers": no_action,

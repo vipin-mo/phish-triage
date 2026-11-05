@@ -40,6 +40,14 @@ MAX_BYTES = 2 * 1024 * 1024
 PER_MINUTE = 60
 EXPLAIN_PER_DAY = 50
 RETRAINING_PER_DAY = 20
+
+
+def retraining_owners() -> set[str]:
+    """The keys' owners allowed to send emails for retraining (`infra/retraining-owners`, set by Terraform); none
+    when unset, so a key nobody listed can't put emails into the training data."""
+    return {o.strip() for o in os.environ.get("PHISH_RETRAINING_OWNERS", "").split(",") if o.strip()}
+
+
 SPEND_COUNTER = "llm-spend-microusd"  # all keys together, in millionths of a dollar
 log = logging.getLogger("phish_triage.api")
 
@@ -200,13 +208,26 @@ def create_app(
         if not explanations:
             raise HTTPException(404, "explanations are switched off")
         raw = await email_of(request)
+        from phish_triage.service.explain import worst_case_microusd
+
+        if store.add_today(SPEND_COUNTER, 0) >= daily_budget_microusd:  # before a key's daily count is used up
+            raise HTTPException(429, "today's LLM budget is used up; the scan verdict still works")
         if store.add_today(f"explain#{owner}", 1) > EXPLAIN_PER_DAY:
             raise HTTPException(429, f"at most {EXPLAIN_PER_DAY} explanations a day per key")
-        if store.add_today(SPEND_COUNTER, 0) >= daily_budget_microusd:
+        # The worst case is reserved first, in one atomic step, and settled to the real cost afterwards: two
+        # explanations running at once can't both pass a check and then both spend.
+        reserved = worst_case_microusd()
+        if store.add_today(SPEND_COUNTER, reserved) > daily_budget_microusd:
+            store.add_today(SPEND_COUNTER, -reserved)
             raise HTTPException(429, "today's LLM budget is used up; the scan verdict still works")
-        verdict = verdict_of(owner, raw)
-        result = explainer().explain(raw, verdict, getattr(scanner(), "ranks", None))
-        store.add_today(SPEND_COUNTER, round(result.cost_usd * 1e6))
+        spent = 0
+        try:
+            verdict = verdict_of(owner, raw)
+            model = scanner()
+            result = explainer().explain(raw, verdict, getattr(model, "ranks", None), getattr(model, "reader", 1))
+            spent = round(result.cost_usd * 1e6)
+        finally:
+            store.add_today(SPEND_COUNTER, spent - reserved)
         request.state.verdict = result.body["verdict"]
         return result.body
 
@@ -215,6 +236,8 @@ def create_app(
         from phish_triage.service.retraining import KEEP_DAYS, LABELS
 
         owner = owner_of(request)
+        if owner not in retraining_owners():
+            raise HTTPException(403, "this key can't send emails for retraining")
         if label not in LABELS:
             raise HTTPException(422, f"label must be one of {', '.join(LABELS)}")
         if (sink := retraining()) is None:

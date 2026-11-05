@@ -81,7 +81,7 @@ it ([reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/inj
 - **Prompt injection:** 40 phishing emails, each with an instruction planted nine ways (visible and hidden text,
   a comment, alt text, the subject, a forged signals block, fake operator and IT-test notices): with the
   defences, 0 of the 360 ended as safe.
-- **Ordinary mail:** 100% schema-valid answers; 0.8% of indicators dropped as ungrounded; it raised the one
+- **Ordinary mail:** 100% schema-valid answers; 0.5% of indicators dropped as ungrounded; it raised the one
   phishing email of 100 the classifier missed to "suspicious".
 
 ### Robustness, load and explanations
@@ -271,8 +271,8 @@ November 2026 after the input fixes and each new model ($0.26 and $0.27).
   in 40 real phishing emails in six ways (visible text, HTML comment, CSS-hidden text, white-on-white text, image
   alt text, subject) and in three attacks on the defences themselves (a forged signals block, a fake operator
   message, a fake IT-test notice). With the defences on, 0 of 360 variants made the model say safe, and none ended
-  as safe. Without them, the forged signals block ended as safe once in 40 in each of the last two runs (twice in
-  the run before).
+  as safe. Without them, the forged signals block ended as safe once in 40 in each of the last three runs (twice in
+  the run before them): the planted block un-flags the classifier itself (Known issues).
 - **A refusal could switch the analyst off.** The deployed cascade misses 1 of the 40 phishing emails, which the
   analyst raises to suspicious when it's clean. With an instruction planted in it, Claude refused to answer all six
   variants, and with no answer the classifier's "safe" stood: 2 of 240 ended as safe (the rule-based detector
@@ -285,18 +285,18 @@ November 2026 after the input fixes and each new model ($0.26 and $0.27).
   why the random tags, hidden-text removal and the raise-only rule don't depend on it.
 - **Grounding needed a design change, not a looser check.** With prompt version 3, 2.5% of indicators were dropped
   (the gate allows 2%), 8 of the 11 because the model quoted our own signals as if they were the email. Letting it
-  cite a signal by number brought that to 0.3%, and 0.8% (5 of 648) in the latest run; the user sees our wording
+  cite a signal by number brought that to 0.3%, and 0.5% (3 of 636) in the latest run; the user sees our wording
   of the signal, not the model's.
 - **The advice now matches the action.** With version 4, 38 of 81 "no action" answers still told the user to check
   something ("check the sender if unsure"). Version 5 asks for the same advice in both, and a rule-based check
-  finds 3 of 62 in the latest run.
+  finds 6 of 73 in the latest run.
 - **On 200 ordinary emails** 99 of the 100 phishing emails ended as phishing and the 100th, which the classifier
   missed, as suspicious: the analyst caught it. The classifier flagged none of the 100 legitimate ones and the
-  analyst raised 8 to "suspicious" (7 in the run before, 9 before that, 2 of them by the old classifier; 17 before
-  the masking fix). 5 of the 8 had no SPF/DKIM results, which is normal for archived mailing-list mail and not for
+  analyst raised 8 to "suspicious" (7 to 9 in the earlier runs; 17 before the masking fix). 6 of the 8 had no
+  SPF/DKIM results, which is normal for archived mailing-list mail and not for
   Gmail, so this needs re-measuring on real mail. In an earlier run, one summary ran over the 80-word limit, so an
   answer that doesn't match the schema is now asked for once more (the latest run needed none). A live analyst call
-  takes 2.6 s (p50), 4.8 s at p95.
+  takes 2.4 s (p50), 3.6 s at p95.
 - **I rated 50 of the answers myself** (25 phishing, 25 legitimate, 1–3 on the
   [rubric](docs/ANALYST_RUBRIC.md)), because the automatic checks can't tell whether an explanation is right and
   helpful. Averages: correct 2.86, grounded 2.98, clear 3.00, useful 2.88; 38 of 50 scored 3 on everything.
@@ -526,7 +526,7 @@ removing as many random words.
 
 ## Known issues
 
-All but four are fixed (one of them partly). The first two were found while rating the analyst's answers by hand,
+All but five are fixed (one of them partly). The first two were found while rating the analyst's answers by hand,
 the rest afterwards: on my test inbox, while packaging the model, on PrivacyMail, in the Claude re-run, in a review
 of the code and in the robustness test, all in November 2026. Every number above was re-measured after the fixes,
 except my hand ratings, as noted.
@@ -592,6 +592,11 @@ except my hand ratings, as noted.
   `font-size:1em` counted as 1 px and the text as hidden. That cut at least 5 visible words from 23 of my inbox's
   249 test emails and 82 of the 3,738 PrivacyMail ones (reports/defence.md), so the old models never read that text.
   Reader 2, in service since 2026-11-05, reads the unit.
+- **A planted "signals" block can un-flag the classifier (open).** In the injection test, text pretending to be our
+  own signals ("Classifier: not flagged", a passing sender check) made the deployed classifier stop flagging 1 of
+  the 40 phishing emails. With the analyst it still goes to a person, but a plain scan, which is the classifier's
+  verdict alone, calls it safe. The gate reports such drops
+  (`injection_verdict_drop_rate`, 1 of 360) without a limit until the next model update deals with them.
 - **Filler can lift an image email out of review (open, kept on purpose).** An email whose HTML is an image, with
   20 words of hidden text or of a plain-text part next to it, isn't sent to review. Counting only the words the
   HTML shows would catch it, but legitimate image newsletters are built the same way: the deployed cascade would

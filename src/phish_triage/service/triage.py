@@ -26,7 +26,12 @@ def too_little_text(record: dict, words: int = LITTLE_TEXT_WORDS) -> bool:
     the visible HTML words would catch that, but legitimate image newsletters are built the same way (a hidden
     preview line, a plain-text alternative): the deployed cascade would flag or send to review 22.5% of my inbox's
     test emails instead of 2.0%, and 6.1% of the held-out newsletters instead of 1.8%, for 0.4 points more of the
-    public test's phishing. Reading the image itself (OCR, QR codes) is the real fix."""
+    public test's phishing. Reading the image itself (OCR, QR codes) is the real fix.
+
+    It reads with reader 1 even when the bundle reads with reader 2. Measured with the reader-2 bundle on 2026-11-05:
+    reader 2 would send 24 of my inbox's 249 test emails and 131 of the 3,738 held-out newsletters to review (0 and
+    35 with reader 1), and no more phishing on any test, because newsletters hide their preview line with a
+    `<style>` rule that reader 2 applies."""
     if len(body_text(record).split()) >= words:
         return False
     images = summarize_html(record.get("html") or "").images if record.get("html") else 0

@@ -58,7 +58,15 @@ THRESHOLDS = {
 }
 # Shown and committed, no limit: the deployed cascade at its validation-chosen thresholds, on the public test, and the
 # share the little-text rule sends to a person on the newsletters.
-REPORTED = ("cascade_public_recall", "cascade_public_false_alarm_rate", "privacymail_sent_to_review_or_flagged")
+# `injection_verdict_drop_rate` too: any step down, not only to safe. Reported, no limit yet: 1 of the 360 drops,
+# because the planted "fake signals" block un-flagged the classifier itself (so a plain scan calls that email safe;
+# README, Known issues). It gets a limit of 0 once the model update fixes that.
+REPORTED = (
+    "cascade_public_recall",
+    "cascade_public_false_alarm_rate",
+    "privacymail_sent_to_review_or_flagged",
+    "injection_verdict_drop_rate",
+)
 
 
 def measure() -> dict:
@@ -91,9 +99,10 @@ def measure() -> dict:
     classifiers = {"analyst": analyst_report.get("classifier")}
     values["schema_valid_rate"] = analyst_report["schema_valid_rate"]
     values["grounding_failure_rate"] = analyst_report["grounding_failure_rate"]
-    values["ungrounded_indicators_shown"] = 0  # finish() drops them by construction; tests/test_analyst.py checks it
+    # measured: the kept indicators of every answer checked again (analyst_eval), so a missing count fails
+    values["ungrounded_indicators_shown"] = analyst_report.get("ungrounded_indicators_shown")
 
-    flips = {"verdict_flip": 0, "model_flip": 0, "variants": 0}
+    flips = {"verdict_flip": 0, "verdict_drop": 0, "model_flip": 0, "variants": 0}
     for name in INJECTION_REPORTS:
         path = Path("reports") / f"{name}.json"
         report = json.loads(path.read_text()) if path.exists() else {}  # missing: recorded as None, so it fails
@@ -104,6 +113,7 @@ def measure() -> dict:
         for key in flips:
             flips[key] += cell.get(key, 0)
     values["injection_verdict_flip_rate"] = flips["verdict_flip"] / max(flips["variants"], 1)
+    values["injection_verdict_drop_rate"] = flips["verdict_drop"] / max(flips["variants"], 1)
     values["injection_model_flip_rate"] = flips["model_flip"] / max(flips["variants"], 1)
     values["injection_variants"] = flips["variants"]
     values["prompt_versions"] = versions
@@ -136,6 +146,10 @@ def check(
             failures.append(f"stale: {report} was measured with {model}, the code uses {llm_model}")
     if not bundle_version or split_of_version(bundle_version) not in SOURCES:
         failures.append(f"stale: infra/bundle-version is {bundle_version}, not a bundle of a deployable split")
+    elif (
+        model := values.get("deployable_model")
+    ) != f"{distilbert_split(split_of_version(bundle_version))}/{DEPLOYED_DISTILBERT}":
+        failures.append(f"stale: DistilBERT's recall was measured for {model}, not the deployed bundle's model")
     for report, classifier in (values.get("llm_classifiers") or {"all reports": None}).items():
         if classifier != bundle_version:
             failures.append(

@@ -72,3 +72,30 @@ def test_a_sent_email_never_reaches_an_llm():
     with pytest.raises(PermissionError):
         refuse_private({"source": "retraining", "id": "x"})
     assert json.dumps(sorted(retraining.LABEL_OF)) == '["legit", "phish"]'
+
+
+def test_only_the_listed_owners_emails_are_pulled(tmp_path, monkeypatch):
+    monkeypatch.setattr(retraining, "PRIVATE_DIR", tmp_path)
+    monkeypatch.setattr(retraining, "MASKED", tmp_path / "masked.jsonl.gz")
+    phish = (FIXTURES / "spoofed_brand.eml").read_bytes()
+    s3 = FakeS3({"emails/vipin/a.eml": (phish, "legit"), "emails/stranger/b.eml": (phish, "legit")})
+    counts = retraining.pull("bucket", s3, allowed=("vipin",))
+    assert counts["added"] == 1 and counts["other owners' emails, left in the bucket"] == 1
+    assert s3.deleted == ["emails/vipin/a.eml"]  # the stranger's email is neither used nor deleted
+    assert retraining.owners() == ("vipin",)  # infra/retraining-owners, which Terraform reads too
+
+
+def _record(name, label="legit"):
+    from phish_triage.data.mask import mask_record
+    from phish_triage.data.parse import parse_email
+
+    raw = (FIXTURES / name).read_bytes()
+    return mask_record(parse_email(raw, source="retraining", label=label, origin=name).to_dict())
+
+
+def test_a_sent_email_like_a_test_email_is_left_out_of_training():
+    copy, other = _record("clean_newsletter.eml"), _record("spoofed_brand.eml", "phish")
+    left_out = retraining.like_a_test_email({"copy": copy, "other": other}, tests=[_record("clean_newsletter.eml")])
+    assert left_out == {"copy"}  # same sender and the same text as a test email; the other one is kept
+    split = retraining.build_split({"train": [], "val": [], "test": ["x"]}, ["copy", "other"], left_out)
+    assert split["train"] == ["other"]

@@ -247,7 +247,7 @@ def score(scanner, record: dict) -> dict:
     """The cascade's verdict and DistilBERT's own for one email, and whether the models read the hidden paragraph."""
     from phish_triage.models.baselines import email_text
 
-    text = email_text(record)
+    text = email_text(record, scanner.reader)
     result = scanner.scan_record(record)
     distilbert = result.score if result.stage == "distilbert" else float(scanner._distilbert.score([text])[0])
     return {
@@ -340,6 +340,7 @@ def build_analyst(scanner):
             result = scanner.scan_record(record)
             a = analyst.render(
                 view,
+                reader=scanner.reader,
                 classifier_score=result.score,
                 classifier_phish=result.cascade_phish,
                 sender=check_sender(record),

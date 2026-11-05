@@ -42,9 +42,13 @@ MODEL = "claude-haiku-5-5"
 # v1: "at most 80 words" (16% longer); v2: asks for 60 (1.5% longer); v3: asks for 50, random per-request tags;
 # v4: numbered signals that indicators cite by number (v3 quoted the signals as if they were the email: 8 of 11 drops);
 # v5: the summary must agree with recommended_action (v4: "no action" with "check the sender if unsure").
-PROMPT_VERSION = 5
+PROMPT_VERSION = 6
 MAX_BODY_CHARS = 6_000
 MAX_LINKS = 15
+# Each header, link and attachment name shown is cut to this many characters, and at most MAX_ATTACHMENTS names are
+# listed: the body is capped, and without these a crafted email's headers alone could fill the context window.
+MAX_FIELD_CHARS = 500
+MAX_ATTACHMENTS = 20
 MAX_SUMMARY_WORDS = 80  # enforced in code; the prompt asks for at most PROMPT_SUMMARY_WORDS to leave headroom
 PROMPT_SUMMARY_WORDS = 50
 MAX_OUTPUT_TOKENS = 1_024
@@ -189,10 +193,12 @@ def render(
     signals: list[str] | None = None,
     defended: bool = True,
     nonce: str | None = None,
+    reader: int = 1,
 ) -> AnalystInput:
+    """`reader`: the bundle's (`baselines.body_text`), so text its models treat as hidden is hidden here too."""
     refuse_private(record)  # by source and by id (`data/private.py`)
     html = record.get("html") or ""
-    view = visible_html(html) if html else None
+    view = visible_html(html, reader) if html else None
     subject_header = _header(record, "subject") or record.get("subject") or ""
     if defended:
         body = view.text if view else (record.get("text") or "")
@@ -203,12 +209,18 @@ def render(
         body = f"{body}\n{hidden_text}" if hidden_text else body
     links = list(dict.fromkeys(href for href, _ in summarize_html(html).links)) if html else []
     links = links or list(record.get("urls") or [])
-    lines = [f"{name}: {value}" for name in ("From", "Reply-To", "To") if (value := _header(record, name.lower()))]
-    lines.append(f"Subject: {subject_header}")
+    lines = [
+        f"{name}: {value[:MAX_FIELD_CHARS]}"
+        for name in ("From", "Reply-To", "To")
+        if (value := _header(record, name.lower()))
+    ]
+    lines.append(f"Subject: {subject_header[:MAX_FIELD_CHARS]}")
     if links:
-        lines.append("Links (targets): " + " ".join(links[:MAX_LINKS]))
-    if record.get("attachments"):
-        lines.append("Attachments: " + ", ".join(a.get("filename") or "unnamed" for a in record["attachments"]))
+        lines.append("Links (targets): " + " ".join(link[:MAX_FIELD_CHARS] for link in links[:MAX_LINKS]))
+    if attachments := record.get("attachments"):
+        names = [(a.get("filename") or "unnamed")[:MAX_FIELD_CHARS] for a in attachments[:MAX_ATTACHMENTS]]
+        more = f" and {len(attachments) - MAX_ATTACHMENTS} more" if len(attachments) > MAX_ATTACHMENTS else ""
+        lines.append("Attachments: " + ", ".join(names) + more)
     cut = len(body) > MAX_BODY_CHARS
     lines += ["", body[:MAX_BODY_CHARS] + (f"\n[body cut at {MAX_BODY_CHARS:,} characters]" if cut else "")]
     text = unicodedata.normalize("NFKC", "\n".join(lines))
@@ -350,7 +362,10 @@ def final_verdict(
         verdict = "phish"
     elif suggestion == "suspicious":
         verdict = "phish" if classifier_phish else "suspicious"
-    elif classifier_phish or classifier_review:
+    elif classifier_phish:
+        verdict = "phish"
+        reasons.append("the analyst said safe but the classifier flagged it; the analyst can't lower the risk")
+    elif classifier_review:
         verdict = "needs_human_review"
         reasons.append("the analyst said safe but the classifier didn't clear it; the analyst can't lower the risk")
     else:

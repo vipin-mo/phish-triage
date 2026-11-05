@@ -81,11 +81,18 @@ COLLECTOR_NAMES = ("jose", "yyyy", "zzzz")  # Nazario's first name and SpamAssas
 # from their recipient headers by `python -m phish_triage.data.privacymail --collectors`. Kept in a local file so
 # they're never committed; before they were masked they reached the models' input in 0.2% of PrivacyMail's emails
 # and 0.4% of the inbox's, and in no public email.
-PRIVATE_COLLECTORS = Path("data/private/collectors.json")
+# Anchored to the repo, not the working directory: a script started elsewhere must not mask differently.
+PRIVATE_DIR = Path(__file__).resolve().parents[3] / "data" / "private"
+PRIVATE_COLLECTORS = PRIVATE_DIR / "collectors.json"
+
+
+# Private data without its collection names would be masked without them, silently: until November 2026 the private
+# builds were, and 0.18% of the inbox's emails and 0.15% of PrivacyMail's showed one. `mask_record` refuses then.
+_COLLECTORS_MISSING = PRIVATE_DIR.exists() and not PRIVATE_COLLECTORS.exists()
 
 
 def _private_collectors() -> tuple[tuple[str, ...], tuple[str, ...]]:
-    if not PRIVATE_COLLECTORS.exists():  # CI and the deployed service: nothing private to mask
+    if not PRIVATE_COLLECTORS.exists():  # CI and the deployed service have no private data, so nothing to mask
         return (), ()
     saved = json.loads(PRIVATE_COLLECTORS.read_text())
     return tuple(saved.get("domains", ())), tuple(saved.get("names", ()))
@@ -130,6 +137,10 @@ _FOOTER_RES = (
 def mask_record(record: dict, *, source_names: bool = True) -> dict:
     """Return a masked copy of one unified record (see `parse.EmailRecord`); `source_names=False` keeps the
     legitimate source's names (for the analyst step only)."""
+    if _COLLECTORS_MISSING:
+        raise RuntimeError(
+            f"{PRIVATE_COLLECTORS} is missing: run `python -m phish_triage.data.privacymail --collectors` first"
+        )
     names = mask_source_names if source_names else _unchanged
     raw_headers: list[tuple[str, str]] = [tuple(h) for h in record["headers"]]
     is_list_mail = bool({name.lower() for name, _ in raw_headers} & LIST_HEADERS)
@@ -217,6 +228,10 @@ def strip_list_footer(text: str) -> str:
     return text
 
 
+# At scan time the recipient's own domain and first name aren't collection names, so they stay in the text, where
+# training replaced the collectors' (Nazario's `monkey.org`, `jose`) with example.com and user. Measured on the
+# public test's phishing on 2026-11-05: 129 of 1,401 emails mask differently (126 Nazario), and the deployed model
+# flags all 129 either way, so live scans aren't masked further.
 def _replacer(recipients: set[str]):
     addresses = sorted(recipients | set(COLLECTOR_ADDRESSES), key=len, reverse=True)
     address_re = re.compile("|".join(re.escape(a) for a in addresses), re.IGNORECASE) if addresses else None
