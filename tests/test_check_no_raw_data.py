@@ -44,3 +44,14 @@ def test_a_large_extensionless_file_is_blocked(tmp_path):
     assert check.violations(["phishing-2015", "small.py"], tmp_path) == [
         f"phishing-2015: {check.MAX_BYTES + 1:,} bytes is too large for code or a report"
     ]
+
+
+def test_only_the_demo_gif_may_be_larger_and_only_up_to_its_own_limit(tmp_path):
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "demo.gif").write_bytes(b"x" * (check.MAX_BYTES + 1))
+    (tmp_path / "docs" / "other.gif").write_bytes(b"x" * (check.MAX_BYTES + 1))
+    assert check.violations(["docs/demo.gif", "docs/other.gif"], tmp_path) == [
+        f"docs/other.gif: {check.MAX_BYTES + 1:,} bytes is too large for code or a report"
+    ]
+    (tmp_path / "docs" / "demo.gif").write_bytes(b"x" * (check.SIZE_LIMITS["docs/demo.gif"] + 1))
+    assert check.violations(["docs/demo.gif"], tmp_path)
