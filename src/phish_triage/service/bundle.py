@@ -74,8 +74,15 @@ SOURCES = {
     "with_newsletters": (Path("artifacts/distilbert_with_newsletters"), "newsletters"),
     # `make retrain` refits stage 1 only: DistilBERT and its saved scores are the newsletters split's
     "with_retraining": (Path("artifacts/distilbert_with_newsletters"), "retrained"),
+    # the retraining split's emails read with reader 2 (Phase 7.2, reports/defence.md); both stages trained on them
+    "with_normalized": (Path("artifacts/distilbert_with_normalized"), "normalized"),
 }
 DISTILBERT_FROM = {"with_retraining": "with_newsletters"}
+READER = {"with_attacks": 2, "with_normalized": 2}  # what a split's models read (`baselines.email_text`); else 1
+
+
+def reader_of(split: str) -> int:
+    return READER.get(split, 1)
 
 
 def distilbert_split(split: str) -> str:
@@ -144,7 +151,8 @@ def export(split_name: str = DEPLOYED_SPLIT, root: Path = BUNDLE_ROOT) -> Path:
     distilbert = predictions.load(distilbert_split(split_name), "distilbert_head")
     if distilbert.val_ids != split["val"]:
         raise SystemExit(f"saved DistilBERT predictions don't match the {split_name} validation split; re-run training")
-    folder, config = _package(split_name, split, records, source, distilbert.val_scores, root)
+    reader = reader_of(split_name)
+    folder, config = _package(split_name, split, records, source, distilbert.val_scores, root, reader=reader)
 
     report = json.loads(Path("reports/with_inbox.json").read_text())[setup]["cascade"]
     expected = {
@@ -162,7 +170,7 @@ def export(split_name: str = DEPLOYED_SPLIT, root: Path = BUNDLE_ROOT) -> Path:
     if not counts_match or not np.isclose(measured["public_recall"], expected["public_recall"]):
         (folder / BUNDLE_FILE).unlink()
         raise SystemExit("the bundle doesn't reproduce reports/with_inbox.json; bundle.json removed")
-    texts = [email_text(records[i]) for i in slices["inbox_test"]]
+    texts = [email_text(records[i], reader) for i in slices["inbox_test"]]
     batch = {
         "fp32": batch_dependence(folder / "distilbert.onnx", folder / "tokenizer.json", texts),
         "int8": batch_dependence(source / "model.int8.onnx", folder / "tokenizer.json", texts),

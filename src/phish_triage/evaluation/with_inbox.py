@@ -54,6 +54,7 @@ from phish_triage.evaluation.test_inbox import MODELS, fmt_share, share
 from phish_triage.features.domains import default_ranks
 from phish_triage.features.extract import FEATURE_NAMES, matrix
 from phish_triage.models.baselines import email_text, fit_all, without_dates
+from phish_triage.service.bundle import reader_of
 from phish_triage.service.triage import LITTLE_TEXT_WORDS, too_little_text
 
 REPORTS_DIR = Path("reports")
@@ -63,6 +64,7 @@ SETUPS = {
     "after": inbox.SPLIT,
     "newsletters": privacymail.NEWSLETTER_SPLIT,
     "retrained": retraining.SPLIT,  # once `make retrain` has built it: stage 1 refitted with the emails I sent
+    "normalized": retraining.NORMALIZED_SPLIT,  # the retrained setup's emails read with reader 2, both stages trained
 }
 DISTILBERT = "distilbert_head"  # served as ONNX fp32: int8 scores depend on the batch
 SHORTCUT_POINTS = 0.02
@@ -198,6 +200,16 @@ def to_markdown(r: dict) -> str:
                 "(the stacked model) is refitted; DistilBERT is the newsletters setup's, so its rows are the same.",
             ]
             if "retrained" in present
+            else []
+        ),
+        *(
+            [
+                "",
+                "*Normalized:* the retrained setup's emails, read with reader 2 (the robustness defence, "
+                "reports/defence.md: `<style>` blocks applied, off-screen and tiny text hidden, invisible characters "
+                "removed, look-alike letters undone); both stages are trained on them.",
+            ]
+            if "normalized" in present
             else []
         ),
         "",
@@ -411,6 +423,8 @@ def main(argv: list[str] | None = None) -> int:
         slices = slices | newsletter_slices
         if retraining.SPLIT_FILE.exists():  # the retrained setup, once `make retrain` has built it
             splits["retrained"] = retraining.load_split()
+            if retraining.NORMALIZED_SPLIT in predictions.available():  # once `make train-normalized` has run
+                splits["normalized"] = retraining.load_split()
     eval_ids = list(
         dict.fromkeys(
             slices["public_test"]
@@ -425,6 +439,12 @@ def main(argv: list[str] | None = None) -> int:
     ranks = default_ranks()
     texts = {i: email_text(r) for i, r in records.items()}
     features = dict(zip(records, matrix(list(records.values()), ranks), strict=True))
+    read = {1: (texts, features)}
+    if any(reader_of(SETUPS[s]) == 2 for s in splits):  # what reader 2's setups read (`baselines.email_text`)
+        read[2] = (
+            {i: email_text(r, 2) for i, r in records.items()},
+            dict(zip(records, matrix(list(records.values()), ranks, 2), strict=True)),
+        )
     print(f"{len(records)} emails prepared", file=sys.stderr)
     slices = slices | {"newsletter_like_phish": newsletter_like_phish(features, records, slices)}
 
@@ -450,7 +470,8 @@ def main(argv: list[str] | None = None) -> int:
         }
     }
     for setup in splits:
-        flags, dateless = evaluate_setup(splits[setup], eval_ids, records, ranks, texts, features, setup)
+        setup_texts, setup_features = read[reader_of(SETUPS[setup])]
+        flags, dateless = evaluate_setup(splits[setup], eval_ids, records, ranks, setup_texts, setup_features, setup)
         result[setup] = measure(flags, eval_ids, records, slices, args.bootstrap)
         if setup == "after":
             plain = measure(dateless, eval_ids, records, slices, 20)

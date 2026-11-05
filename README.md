@@ -104,8 +104,8 @@ November 2026 after the input fixes and each new model ($0.26 and $0.27).
   in 40 real phishing emails in six ways (visible text, HTML comment, CSS-hidden text, white-on-white text, image
   alt text, subject) and in three attacks on the defences themselves (a forged signals block, a fake operator
   message, a fake IT-test notice). With the defences on, 0 of 360 variants made the model say safe, and none ended
-  as safe. Without them, the forged signals block ended as safe once in 40 in the latest run (twice in the run
-  before).
+  as safe. Without them, the forged signals block ended as safe once in 40 in each of the last two runs (twice in
+  the run before).
 - **A refusal could switch the analyst off.** The deployed cascade misses 1 of the 40 phishing emails, which the
   analyst raises to suspicious when it's clean. With an instruction planted in it, Claude refused to answer all six
   variants, and with no answer the classifier's "safe" stood: 2 of 240 ended as safe (the rule-based detector
@@ -118,18 +118,18 @@ November 2026 after the input fixes and each new model ($0.26 and $0.27).
   why the random tags, hidden-text removal and the raise-only rule don't depend on it.
 - **Grounding needed a design change, not a looser check.** With prompt version 3, 2.5% of indicators were dropped
   (the gate allows 2%), 8 of the 11 because the model quoted our own signals as if they were the email. Letting it
-  cite a signal by number brought that to 0.3%, and 0.5% (3 of 644) in the latest run; the user sees our wording
+  cite a signal by number brought that to 0.3%, and 0.8% (5 of 648) in the latest run; the user sees our wording
   of the signal, not the model's.
 - **The advice now matches the action.** With version 4, 38 of 81 "no action" answers still told the user to check
   something ("check the sender if unsure"). Version 5 asks for the same advice in both, and a rule-based check
-  finds 4 of 70 in the latest run.
+  finds 3 of 62 in the latest run.
 - **On 200 ordinary emails** 99 of the 100 phishing emails ended as phishing and the 100th, which the classifier
   missed, as suspicious: the analyst caught it. The classifier flagged none of the 100 legitimate ones and the
-  analyst raised 7 to "suspicious" (9 before, 2 of them by the old classifier; 17 before the masking fix). 5 of the
-  7 had no SPF/DKIM results, which is normal for archived mailing-list mail and not for Gmail, so this needs
-  re-measuring on real mail. In the run before, one summary ran over the 80-word limit, so an answer that doesn't
-  match the schema is now asked for once more (the latest run needed none). A live analyst call takes 2.4 s (p50),
-  3.5 s at p95.
+  analyst raised 8 to "suspicious" (7 in the run before, 9 before that, 2 of them by the old classifier; 17 before
+  the masking fix). 5 of the 8 had no SPF/DKIM results, which is normal for archived mailing-list mail and not for
+  Gmail, so this needs re-measuring on real mail. In an earlier run, one summary ran over the 80-word limit, so an
+  answer that doesn't match the schema is now asked for once more (the latest run needed none). A live analyst call
+  takes 2.6 s (p50), 4.8 s at p95.
 - **I rated 50 of the answers myself** (25 phishing, 25 legitimate, 1–3 on the
   [rubric](docs/ANALYST_RUBRIC.md)), because the automatic checks can't tell whether an explanation is right and
   helpful. Averages: correct 2.86, grounded 2.98, clear 3.00, useful 2.88; 38 of 50 scored 3 on everything.
@@ -142,11 +142,11 @@ November 2026 after the input fixes and each new model ($0.26 and $0.27).
 - **The CI eval gate** checks these numbers on every push ([reports/gate.json](reports/gate.json)) and fails if
   they were measured on an older prompt, another Claude model or another model bundle than the one in
   `infra/bundle-version`, or if a report is missing. It also checks the model I deploy (trained with part of my
-  inbox and of PrivacyMail): false alarms on my inbox's unseen senders (2.0%, at most 5%, a limit I set before the
-  run) and on PrivacyMail websites kept out of training (0.9%, at most 5%, added after the inbox model passed the
+  inbox and of PrivacyMail): false alarms on my inbox's unseen senders (1.6%, at most 5%, a limit I set before the
+  run) and on PrivacyMail websites kept out of training (1.4%, at most 5%, added after the inbox model passed the
   inbox limit and failed on PrivacyMail), and DistilBERT's recall at 1% false alarms on the public test (0.994, at
   least 0.98). That last one measures how well DistilBERT ranks phishing, at a threshold picked on the test; the
-  service runs the cascade at stricter thresholds picked on validation, where it catches 97.4% at 0.14% false
+  service runs the cascade at stricter thresholds picked on validation, where it catches 97.7% at 0.21% false
   alarms. A code review found the gate's wording implied the second; the gate now reports it next to the first,
   without a limit, since one set after seeing 0.974 would mean little. All Phase 4 Claude runs cost $1.06
   together; the re-run after the fixes was $0.27 of that, the one behind the newsletters model $0.26 more, and
