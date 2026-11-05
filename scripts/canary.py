@@ -19,6 +19,7 @@ import time
 FUNCTION, ALIAS = "phish-triage-scan", "live"
 APP, GROUP, HOOK = "phish-triage", "phish-triage-scan", "CodeDeployHook_phish-triage-smoke"
 DONE = {"Succeeded", "Failed", "Stopped"}
+MAX_MISSES = 10  # status reads in a row that may fail (the first real run lost one to a network error)
 
 
 def appspec(current: str, target: str) -> str:
@@ -66,9 +67,18 @@ def deploy(lambda_client, codedeploy, target: str, poll_seconds: int = 20, sleep
         description=f"{FUNCTION}: version {current} -> {target}",  # the smoke hook reads the target from here
     )["deploymentId"]
     print(f"{deployment}: version {current} -> {target} (smoke check, then 10% for 10 minutes)", flush=True)
-    last = None
+    last, misses = None, 0
     while True:
-        info = codedeploy.get_deployment(deploymentId=deployment)["deploymentInfo"]
+        try:
+            info = codedeploy.get_deployment(deploymentId=deployment)["deploymentInfo"]
+            misses = 0
+        except Exception as exc:  # noqa: BLE001 - a dropped connection: CodeDeploy carries on, so keep watching
+            misses += 1
+            print(f"  (status not read: {type(exc).__name__}; retrying)", flush=True)
+            if misses >= MAX_MISSES:
+                raise
+            sleep(poll_seconds)
+            continue
         if info["status"] != last:
             print(f"  {info['status']}", flush=True)
             last = info["status"]

@@ -138,3 +138,26 @@ def test_the_canary_moves_the_alias_through_codedeploy_with_the_smoke_hook():
     assert canary.deploy(FakeAlias("3"), stopped, "4", sleep=lambda s: None) == "Stopped"
     nothing = FakeDeployments([])
     assert canary.deploy(FakeAlias("4"), nothing, "4") == "Succeeded" and nothing.created is None
+
+
+class FlakyDeployments(FakeDeployments):
+    def __init__(self, states, failures):
+        super().__init__(states)
+        self.failures = failures
+
+    def get_deployment(self, deploymentId):
+        if self.failures:
+            self.failures -= 1
+            raise ConnectionError("network dropped")
+        return super().get_deployment(deploymentId)
+
+
+def test_a_dropped_status_read_is_retried_not_fatal():
+    canary = _canary_script()
+    flaky = FlakyDeployments(["InProgress", "Succeeded"], failures=2)
+    assert canary.deploy(FakeAlias("3"), flaky, "4", sleep=lambda s: None) == "Succeeded"
+    import pytest
+
+    dead = FlakyDeployments([], failures=canary.MAX_MISSES)
+    with pytest.raises(ConnectionError):
+        canary.deploy(FakeAlias("3"), dead, "4", sleep=lambda s: None)
