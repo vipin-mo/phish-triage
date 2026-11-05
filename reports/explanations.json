@@ -1,0 +1,91 @@
+{
+ "bundle": "with-normalized-20261105-8baede93",
+ "reader": 2,
+ "emails": 300,
+ "text_model": {
+  "threshold": 0.5,
+  "lime": {
+   "1": {
+    "explanation_drop": 0.024086787575373924,
+    "random_drop": 0.0009699104661248955,
+    "explanation_below": 0.01,
+    "random_below": 0.0006666666666666668
+   },
+   "3": {
+    "explanation_drop": 0.07819741832073437,
+    "random_drop": 0.003547485816739545,
+    "explanation_below": 0.05,
+    "random_below": 0.0013333333333333335
+   },
+   "5": {
+    "explanation_drop": 0.13519813113503137,
+    "random_drop": 0.009595200475337221,
+    "explanation_below": 0.09333333333333334,
+    "random_below": 0.002
+   },
+   "10": {
+    "explanation_drop": 0.17515305037352624,
+    "random_drop": 0.018976515368008727,
+    "explanation_below": 0.12333333333333334,
+    "random_below": 0.002666666666666667
+   }
+  },
+  "occlusion": {
+   "1": {
+    "explanation_drop": 0.02586727147383817,
+    "random_drop": 0.0009699104661248955,
+    "explanation_below": 0.01,
+    "random_below": 0.0006666666666666668
+   },
+   "3": {
+    "explanation_drop": 0.0814538393734213,
+    "random_drop": 0.003547485816739545,
+    "explanation_below": 0.05,
+    "random_below": 0.0013333333333333335
+   },
+   "5": {
+    "explanation_drop": 0.1390190813276818,
+    "random_drop": 0.009595200475337221,
+    "explanation_below": 0.09666666666666666,
+    "random_below": 0.002
+   },
+   "10": {
+    "explanation_drop": 0.2604742595536637,
+    "random_drop": 0.018976515368008727,
+    "explanation_below": 0.25333333333333335,
+    "random_below": 0.002666666666666667
+   }
+  }
+ },
+ "distilbert": {
+  "threshold": 0.9736931324005127,
+  "threshold_log_odds": 3.611266164311736,
+  "torch_onnx_max_log_odds_difference": 6.67572021484375e-06,
+  "integrated_gradients": {
+   "1": {
+    "explanation_drop": 0.23836191534996032,
+    "random_drop": 0.041275786320368435,
+    "explanation_below": 0.03,
+    "random_below": 0.004666666666666667
+   },
+   "3": {
+    "explanation_drop": 0.6142746174335479,
+    "random_drop": 0.12682377962271368,
+    "explanation_below": 0.056666666666666664,
+    "random_below": 0.015333333333333334
+   },
+   "5": {
+    "explanation_drop": 1.0787867497901122,
+    "random_drop": 0.2550170594652494,
+    "explanation_below": 0.10333333333333333,
+    "random_below": 0.032
+   },
+   "10": {
+    "explanation_drop": 2.158861393680175,
+    "random_drop": 0.5331248314380646,
+    "explanation_below": 0.2,
+    "random_below": 0.07266666666666667
+   }
+  }
+ }
+}

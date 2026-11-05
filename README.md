@@ -342,6 +342,21 @@ deployed model one email at a time ([reports/robustness.md](reports/robustness.m
   cascade retrained on reader 2 alone is the one in service since 2026-11-05 (`with-normalized-20261105-8baede93`,
   through the canary).
 
+## What the explanation check showed
+
+My course project found its shortcuts (`enron`, `vince`, `2004`) by reading LIME's word lists, so I tested whether
+such word lists point at what really drives a score ([reports/explanations.md](reports/explanations.md)): on 300
+public-test phishing emails each model flags, remove the words an explanation ranks highest and score again, against
+removing as many random words.
+
+- **They do.** For stage 1's text model, LIME's top word takes 0.024 off the score, a random one 0.001; its top 5
+  take 0.135, close to the 0.139 of occlusion (each word's own effect when it alone is removed, the best pick one
+  word at a time). At 10 words it falls behind: 0.175 against 0.260. For DistilBERT, the 10 words Integrated
+  Gradients ranks highest cut the log-odds by 2.16, random ones by 0.53.
+- **No handful of words decides the verdict.** Without its 10 top words, 12% of the emails fall to the text model's
+  threshold by LIME's choice (25% by occlusion's, none by random), and 20% to DistilBERT's (7% at random). The
+  score rests on many words, so a word list is evidence of what a model leans on, not the reason for one verdict.
+
 ## Known issues
 
 All but four are fixed (one of them partly). The first two were found while rating the analyst's answers by hand,
@@ -426,7 +441,7 @@ except my hand ratings, as noted.
 - [x] **Phase 4** — grounded LLM analyst step ([results](reports/analyst.md)), prompt-injection tests ([round 1](reports/injection.md), [round 2](reports/injection_round2.md)), CI eval gate
 - [ ] **Phase 5** — serverless AWS deployment: [service and bundle](reports/bundle.md), Lambda + API Gateway + DynamoDB in [Terraform](infra/), deployed from my laptop with MFA (OIDC CI/CD blocked by the Free plan); cost table and dashboard screenshots to come
 - [x] **Phase 6** — explanations on demand, [Gmail add-on](addon/) (in use), canary and shadow mode, weekly drift check, retraining from emails I send, [real use](reports/real_use.md)
-- [ ] **Phase 7** — [load test](reports/load_test.md), [robustness report](reports/robustness.md), [defence](reports/defence.md) (deployed), write-up
+- [ ] **Phase 7** — [load test](reports/load_test.md), [robustness report](reports/robustness.md), [defence](reports/defence.md) (deployed), [explanation check](reports/explanations.md), write-up
 
 ## Development
 
