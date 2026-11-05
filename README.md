@@ -383,10 +383,12 @@ ratings, as noted.
 - **Big brands asking me to act read as phishing (open).** In my own Gmail, a bank's "make your debit card Tap & Pay
   ready" and a ride app's "take our travel survey" were flagged at 0.9998 and 0.9996, though each was DKIM-signed by
   the brand's own domain with every link on it; DistilBERT judges the words, and the cascade doesn't weigh the
-  sender check. Retraining stage 1 can't change that (above). What I'd test next, with the rule set before the run:
-  an email flagged by its text but signed by its own well-known domain, with all its links there, goes to review
-  instead of phish. The newsletter-like phishing in the tests is also signed by its own domains, so it has to be
-  measured first.
+  sender check. Retraining stage 1 can't change that (above). I tested a rule, set before the run
+  ([reports/own_domain.md](reports/own_domain.md)): a flagged email that passes the sender check with its own
+  domain's DKIM signature, raises no warning, comes from a Tranco top-100,000 domain and links only there goes to
+  review instead of phish. It rarely fires, and when it does it is as often phishing as not: with the reader-2
+  candidate it would move 4 of the public and 2026 test phishing emails to review, against 4 false alarms (1 of my
+  inbox's, 3 of PrivacyMail's). So it isn't used.
 - **Phishing that looks like a newsletter (open).** The deployed cascade catches 23 of 31 such emails (25 before
   the newsletters were added). It is a data problem: the newsletters gave it plenty of bulk-looking legitimate
   mail, but there are few phishing emails of that kind to learn from, and no public dataset I found has them (see
