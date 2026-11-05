@@ -252,6 +252,15 @@ for a background design were removed, since a queue would have had to hold the e
   timed out. Two changes fixed it for use: the deploy loads the model once before it finishes, and a ping every 5
   minutes keeps one copy loaded. Reading the domain-popularity list was 8 s of a cold start; the bundle now ships
   the finished lookup table (under 1 s).
+- **Under load the limits hold** ([reports/load_test.md](reports/load_test.md)): k6 sent a hand-made newsletter
+  at 1, 2, 5 and 10 requests a second for 30 s each, 543 requests under their own API key. Every request at 1 and
+  2 a second was answered. Past 60 a minute the key limit answered 429 (143 times), and at 10 a second API Gateway
+  also refused 134 before the function ran. Nothing failed, and one loaded copy of the function kept up, so the cap
+  of 5 copies never came into play. The answered scans took 45 ms at the gateway (p50, p95 52 ms) and 71–84 ms
+  (p50) from my laptop; it is the same short email every time, so this measures the limits, not how long a real
+  email takes. My first try had no rate cap and sent a new request as soon as a refusal came back; a second was
+  spoiled when my laptop stopped for two minutes mid-run. The report now checks the gateway's log for a pause like
+  that and says when a run isn't clean.
 - **The package is checked against its report:** it must reproduce the inbox, PrivacyMail and public-test numbers
   one email at a time, or it isn't written ([reports/bundle.md](reports/bundle.md)). That check found the int8
   batch problem (Known issues).

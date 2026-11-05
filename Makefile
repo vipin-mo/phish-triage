@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox privacymail-counts private-collectors data-privacymail train-with-newsletters eval-privacymail retrain-pull retrain retraining-check real-use drift-reference gate bundle serve aws-bootstrap tf-foundation-plan tf-foundation-apply upload-bundle put-anthropic-key api-key addon deploy-image deploy-plan deploy-apply
+.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox privacymail-counts private-collectors data-privacymail train-with-newsletters eval-privacymail retrain-pull retrain retraining-check real-use load-test drift-reference gate bundle serve aws-bootstrap tf-foundation-plan tf-foundation-apply upload-bundle put-anthropic-key api-key addon deploy-image deploy-plan deploy-apply
 
 help:  ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -109,6 +109,13 @@ retrain: retrain-pull  ## pull, build `with_retraining`, evaluate, bundle, point
 	$(MAKE) drift-reference
 	@echo "infra/bundle-version: $$(cat infra/bundle-version). Next: the Claude evaluations behind it (they cost money:"
 	@echo "make eval-analyst CONFIRM=--confirm; make eval-injection CONFIRM=--confirm), make gate, then deploy."
+
+load-test:  ## k6 against the live scan endpoint (loadtest/scan.js) -> reports/load_test.md; uses the loadtest key
+	@test -s ~/.config/phish-triage/loadtest-key || { echo "no ~/.config/phish-triage/loadtest-key: make api-key OWNER=loadtest"; exit 1; }
+	mkdir -p build && rm -f build/loadtest.jsonl
+	# caffeinate (macOS) keeps the laptop awake: a stall mid-run makes the numbers about my laptop, not the service
+	API_URL="$(ADDON_API_URL)" API_KEY="$$(cat ~/.config/phish-triage/loadtest-key)" $$(command -v caffeinate >/dev/null && echo caffeinate -ims) k6 run --quiet --out json=build/loadtest.jsonl loadtest/scan.js
+	$(AWS_ENV) && uv run python scripts/load_test_report.py build/loadtest.jsonl
 
 real-use:  ## counts of real use from the live tables (reports/real_use.md; needs the MFA session)
 	$(AWS_ENV) && uv run python scripts/real_use.py
