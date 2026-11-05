@@ -1,0 +1,430 @@
+{
+ "setups": {
+  "deployed": {
+   "bundle": "with-retraining-20261104-6addaf34",
+   "reader": 1,
+   "clean": {
+    "public_phish": {
+     "emails": 1401,
+     "flagged": 1364
+    },
+    "public_legit": {
+     "emails": 1401,
+     "flagged": 2
+    },
+    "phish_2026": {
+     "emails": 1644,
+     "flagged": 1605
+    },
+    "newsletter_like_phish": {
+     "emails": 31,
+     "flagged": 23
+    },
+    "inbox_test": {
+     "emails": 249,
+     "flagged": 5
+    },
+    "privacymail_test": {
+     "emails": 3738,
+     "flagged": 32
+    }
+   },
+   "attacks": {
+    "lookalike_letters": {
+     "emails": 1401,
+     "flagged": 1395
+    },
+    "hidden_characters": {
+     "emails": 1401,
+     "flagged": 1362
+    },
+    "hidden_html_display_none": {
+     "emails": 1401,
+     "flagged": 1328
+    },
+    "hidden_html_style_class": {
+     "emails": 1401,
+     "flagged": 237
+    },
+    "hidden_html_off_screen": {
+     "emails": 1401,
+     "flagged": 237
+    },
+    "hidden_html_tiny_text": {
+     "emails": 1401,
+     "flagged": 237
+    },
+    "shortened_links": {
+     "emails": 1401,
+     "flagged": 1362
+    },
+    "all_four": {
+     "emails": 1401,
+     "flagged": 178
+    },
+    "greek_letters": {
+     "emails": 1401,
+     "flagged": 1375
+    },
+    "other_invisible": {
+     "emails": 1401,
+     "flagged": 1362
+    },
+    "hidden_html_id_in_style": {
+     "emails": 1401,
+     "flagged": 237
+    },
+    "hidden_html_tag_in_style": {
+     "emails": 1401,
+     "flagged": 237
+    },
+    "hidden_html_text_indent": {
+     "emails": 1401,
+     "flagged": 237
+    },
+    "hidden_html_clip": {
+     "emails": 1401,
+     "flagged": 237
+    },
+    "hidden_html_scale_zero": {
+     "emails": 1401,
+     "flagged": 237
+    },
+    "tinyurl_links": {
+     "emails": 1401,
+     "flagged": 1361
+    },
+    "greco_llm_phish": {
+     "emails": 1000,
+     "flagged": 888
+    }
+   }
+  },
+  "a_reader2": {
+   "bundle": "with-retraining-20261104-6addaf34",
+   "reader": 2,
+   "clean": {
+    "public_phish": {
+     "emails": 1401,
+     "flagged": 1365
+    },
+    "public_legit": {
+     "emails": 1401,
+     "flagged": 2
+    },
+    "phish_2026": {
+     "emails": 1644,
+     "flagged": 1605
+    },
+    "newsletter_like_phish": {
+     "emails": 31,
+     "flagged": 23
+    },
+    "inbox_test": {
+     "emails": 249,
+     "flagged": 9
+    },
+    "privacymail_test": {
+     "emails": 3738,
+     "flagged": 53
+    }
+   },
+   "attacks": {
+    "lookalike_letters": {
+     "emails": 1401,
+     "flagged": 1364
+    },
+    "hidden_characters": {
+     "emails": 1401,
+     "flagged": 1365
+    },
+    "hidden_html_display_none": {
+     "emails": 1401,
+     "flagged": 1365
+    },
+    "hidden_html_style_class": {
+     "emails": 1401,
+     "flagged": 1344
+    },
+    "hidden_html_off_screen": {
+     "emails": 1401,
+     "flagged": 1365
+    },
+    "hidden_html_tiny_text": {
+     "emails": 1401,
+     "flagged": 1365
+    },
+    "shortened_links": {
+     "emails": 1401,
+     "flagged": 1363
+    },
+    "all_four": {
+     "emails": 1401,
+     "flagged": 1342
+    },
+    "greek_letters": {
+     "emails": 1401,
+     "flagged": 1361
+    },
+    "other_invisible": {
+     "emails": 1401,
+     "flagged": 1365
+    },
+    "hidden_html_id_in_style": {
+     "emails": 1401,
+     "flagged": 1344
+    },
+    "hidden_html_tag_in_style": {
+     "emails": 1401,
+     "flagged": 1344
+    },
+    "hidden_html_text_indent": {
+     "emails": 1401,
+     "flagged": 227
+    },
+    "hidden_html_clip": {
+     "emails": 1401,
+     "flagged": 227
+    },
+    "hidden_html_scale_zero": {
+     "emails": 1401,
+     "flagged": 227
+    },
+    "tinyurl_links": {
+     "emails": 1401,
+     "flagged": 1362
+    },
+    "greco_llm_phish": {
+     "emails": 1000,
+     "flagged": 888
+    }
+   }
+  },
+  "b_stage1": {
+   "bundle": "with-attacks-20261105-97f27de6",
+   "reader": 2,
+   "clean": {
+    "public_phish": {
+     "emails": 1401,
+     "flagged": 1364
+    },
+    "public_legit": {
+     "emails": 1401,
+     "flagged": 2
+    },
+    "phish_2026": {
+     "emails": 1644,
+     "flagged": 1613
+    },
+    "newsletter_like_phish": {
+     "emails": 31,
+     "flagged": 22
+    },
+    "inbox_test": {
+     "emails": 249,
+     "flagged": 8
+    },
+    "privacymail_test": {
+     "emails": 3738,
+     "flagged": 37
+    }
+   },
+   "attacks": {
+    "lookalike_letters": {
+     "emails": 1401,
+     "flagged": 1364
+    },
+    "hidden_characters": {
+     "emails": 1401,
+     "flagged": 1364
+    },
+    "hidden_html_display_none": {
+     "emails": 1401,
+     "flagged": 1364
+    },
+    "hidden_html_style_class": {
+     "emails": 1401,
+     "flagged": 1342
+    },
+    "hidden_html_off_screen": {
+     "emails": 1401,
+     "flagged": 1364
+    },
+    "hidden_html_tiny_text": {
+     "emails": 1401,
+     "flagged": 1364
+    },
+    "shortened_links": {
+     "emails": 1401,
+     "flagged": 1371
+    },
+    "all_four": {
+     "emails": 1401,
+     "flagged": 1350
+    },
+    "greek_letters": {
+     "emails": 1401,
+     "flagged": 1362
+    },
+    "other_invisible": {
+     "emails": 1401,
+     "flagged": 1364
+    },
+    "hidden_html_id_in_style": {
+     "emails": 1401,
+     "flagged": 1342
+    },
+    "hidden_html_tag_in_style": {
+     "emails": 1401,
+     "flagged": 1342
+    },
+    "hidden_html_text_indent": {
+     "emails": 1401,
+     "flagged": 225
+    },
+    "hidden_html_clip": {
+     "emails": 1401,
+     "flagged": 225
+    },
+    "hidden_html_scale_zero": {
+     "emails": 1401,
+     "flagged": 225
+    },
+    "tinyurl_links": {
+     "emails": 1401,
+     "flagged": 1370
+    },
+    "greco_llm_phish": {
+     "emails": 1000,
+     "flagged": 865
+    }
+   }
+  },
+  "c_both": {
+   "bundle": "with-attacks-20261105-094be7ee",
+   "reader": 2,
+   "clean": {
+    "public_phish": {
+     "emails": 1401,
+     "flagged": 1365
+    },
+    "public_legit": {
+     "emails": 1401,
+     "flagged": 3
+    },
+    "phish_2026": {
+     "emails": 1644,
+     "flagged": 1614
+    },
+    "newsletter_like_phish": {
+     "emails": 31,
+     "flagged": 22
+    },
+    "inbox_test": {
+     "emails": 249,
+     "flagged": 8
+    },
+    "privacymail_test": {
+     "emails": 3738,
+     "flagged": 26
+    }
+   },
+   "attacks": {
+    "lookalike_letters": {
+     "emails": 1401,
+     "flagged": 1365
+    },
+    "hidden_characters": {
+     "emails": 1401,
+     "flagged": 1365
+    },
+    "hidden_html_display_none": {
+     "emails": 1401,
+     "flagged": 1365
+    },
+    "hidden_html_style_class": {
+     "emails": 1401,
+     "flagged": 1343
+    },
+    "hidden_html_off_screen": {
+     "emails": 1401,
+     "flagged": 1365
+    },
+    "hidden_html_tiny_text": {
+     "emails": 1401,
+     "flagged": 1365
+    },
+    "shortened_links": {
+     "emails": 1401,
+     "flagged": 1372
+    },
+    "all_four": {
+     "emails": 1401,
+     "flagged": 1351
+    },
+    "greek_letters": {
+     "emails": 1401,
+     "flagged": 1364
+    },
+    "other_invisible": {
+     "emails": 1401,
+     "flagged": 1365
+    },
+    "hidden_html_id_in_style": {
+     "emails": 1401,
+     "flagged": 1343
+    },
+    "hidden_html_tag_in_style": {
+     "emails": 1401,
+     "flagged": 1343
+    },
+    "hidden_html_text_indent": {
+     "emails": 1401,
+     "flagged": 119
+    },
+    "hidden_html_clip": {
+     "emails": 1401,
+     "flagged": 119
+    },
+    "hidden_html_scale_zero": {
+     "emails": 1401,
+     "flagged": 119
+    },
+    "tinyurl_links": {
+     "emails": 1401,
+     "flagged": 1371
+    },
+    "greco_llm_phish": {
+     "emails": 1000,
+     "flagged": 841
+    }
+   }
+  }
+ },
+ "reader_check": {
+  "public_phish": {
+   "emails": 1401,
+   "flagged": 12
+  },
+  "public_legit": {
+   "emails": 1401,
+   "flagged": 0
+  },
+  "phish_2026": {
+   "emails": 1644,
+   "flagged": 13
+  },
+  "newsletter_like_phish": {
+   "emails": 31,
+   "flagged": 1
+  },
+  "inbox_test": {
+   "emails": 249,
+   "flagged": 23
+  },
+  "privacymail_test": {
+   "emails": 3738,
+   "flagged": 82
+  }
+ }
+}

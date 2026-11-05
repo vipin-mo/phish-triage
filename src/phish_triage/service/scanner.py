@@ -67,7 +67,7 @@ class ScanResult:
 
 
 class Scanner:
-    def __init__(self, folder: Path, threads: int = 1):
+    def __init__(self, folder: Path, threads: int = 1, reader: int | None = None):
         timings: dict[str, float] = {}
         started = last = time.perf_counter()
 
@@ -86,6 +86,8 @@ class Scanner:
         step("imports_ms")
         self.config = verify(folder)
         self.version: str = self.config["version"]
+        # What the models read (`baselines.email_text`): the bundle's own, unless an evaluation asks for another
+        self.reader: int = reader or self.config.get("reader", 1)
         self.rules_version = RULES_VERSION
         step("verify_ms")
         models = joblib.load(folder / "stacked.joblib")
@@ -125,8 +127,8 @@ class Scanner:
         from phish_triage.service.analyst import signals_from_features
         from phish_triage.service.triage import LITTLE_TEXT_WORDS, too_little_text
 
-        text = email_text(record)
-        features = extract(record, self._ranks)
+        text = email_text(record, self.reader)
+        features = extract(record, self._ranks, self.reader)
         row = np.array([[features[name] for name in FEATURE_NAMES]], dtype=float)
         text_score = self._lr.predict_proba(self._tfidf.transform([text]))[:, 1]
         stacked = float(self._stacked.predict_proba(np.column_stack([row, text_score]))[0, 1])

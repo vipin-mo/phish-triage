@@ -326,12 +326,24 @@ deployed model one email at a time ([reports/robustness.md](reports/robustness.m
 - **The analyst isn't fooled:** on 20 of these phishing emails, clean and under each attack, it called every one
   phishing except one "suspicious" under hidden HTML ($0.02). It reads 6,000 characters, not 512 tokens. But it runs
   only when I ask for an explanation, so the scan's verdict still has the gap.
+- **A better reader closes most of it; training on attacked copies doesn't help**
+  ([reports/defence.md](reports/defence.md), not deployed). Reader 2 applies `<style>` blocks, hides text moved off-screen or under 4 px, keeps hidden parts out
+  when an HTML-only email shows almost nothing, removes invisible characters and turns look-alike letters in
+  mixed-script words back into Latin. With the deployed models unchanged it catches 95.9–97.4% under the three
+  hiding tricks (16.9% before) and 95.8% under all four (12.7%), and the same for hiding by an id or a tag rule, tricks
+  I set aside before writing it. Hiding it has no rule for (`text-indent`, `clip`, `transform:scale(0)`) still gets
+  through: 16.2%. It costs false alarms with models trained on the old reader: 9 of my inbox's 249 test emails
+  instead of 5, and 1.4% of the PrivacyMail ones instead of 0.9%. Retraining on reader 2 plus an attacked copy of each
+  training phishing email brings PrivacyMail to 0.7% and the 2026 phishing to 98.2%, but my inbox stays at 8, the
+  held-out hiding falls to 8.5%, and Greco's LLM-written phishing to 84.1% (88.8%). The retrain changed two things at
+  once, so it doesn't show which of them did that; a retrain on reader 2 alone is what I'd run next.
 
 ## Known issues
 
-All but four are fixed. The first two were found while rating the analyst's answers by hand, the rest afterwards:
+All but five are fixed. The first two were found while rating the analyst's answers by hand, the rest afterwards:
 on my test inbox, while packaging the model, on PrivacyMail, in the Claude re-run, in a review of the code and in
-the robustness test, all in November 2026. Every number above was re-measured after the fixes, except my hand ratings, as noted.
+the robustness test, all in November 2026. Every number above was re-measured after the fixes, except my hand
+ratings, as noted.
 
 - **Masking rewrote links (fixed).** Replacing the Apache list names with `project` ran over the whole body and
   HTML, including URLs and addresses. It rewrote a URL or address in 7,978 of the 13,541 legitimate emails the
@@ -383,11 +395,15 @@ the robustness test, all in November 2026. Every number above was re-measured af
   the warning that one of them claims a pass the provider didn't give never fired in the service, only on raw
   emails. Masking now keeps whether one did. Stored verdicts also carry a rules version now, so a change like this
   one scans stored emails again, as a new model does.
-- **Hidden HTML gets past the visible-text reader (open).** Text hidden by a `<style>` class, moved off-screen or in
-  2 px type counts as visible, so a hidden paragraph at the top of the body decides what DistilBERT reads (above),
-  and an HTML-only email that shows fewer than 5 words is read with its hidden parts. The fix is the next step:
-  normalize what the models read (these tricks dropped, look-alike letters and invisible characters undone), retrain
-  on attacked copies, and measure again before anything is deployed.
+- **Hidden HTML gets past the visible-text reader (open; reader 2 is measured, not deployed).** Text hidden by a
+  `<style>` class, moved off-screen or in 2 px type counts as visible, so a hidden paragraph at the top of the body
+  decides what DistilBERT reads (above), and an HTML-only email that shows fewer than 5 words is read with its hidden
+  parts. Reader 2 fixes both, but it costs false alarms with the deployed models, and `text-indent`, `clip` and
+  `transform` still hide text from it.
+- **The deployed reader drops ordinary text set in `em` (open; fixed in reader 2).** It reads a CSS font size
+  without its unit, so `font-size:1em` counts as 1 px and the text as hidden. That cut at least 5 visible words from
+  23 of my inbox's 249 test emails and 82 of the 3,738 PrivacyMail ones (reports/defence.md); the deployed models
+  never read that text.
 - **Filler can lift an image email out of review (open, kept on purpose).** An email whose HTML is an image, with
   20 words of hidden text or of a plain-text part next to it, isn't sent to review. Counting only the words the
   HTML shows would catch it, but legitimate image newsletters are built the same way: the deployed cascade would
@@ -404,7 +420,7 @@ the robustness test, all in November 2026. Every number above was re-measured af
 - [x] **Phase 4** — grounded LLM analyst step ([results](reports/analyst.md)), prompt-injection tests ([round 1](reports/injection.md), [round 2](reports/injection_round2.md)), CI eval gate
 - [ ] **Phase 5** — serverless AWS deployment: [service and bundle](reports/bundle.md), Lambda + API Gateway + DynamoDB in [Terraform](infra/), deployed from my laptop with MFA (OIDC CI/CD blocked by the Free plan); cost table and dashboard screenshots to come
 - [x] **Phase 6** — explanations on demand, [Gmail add-on](addon/) (in use), canary and shadow mode, weekly drift check, retraining from emails I send, [real use](reports/real_use.md)
-- [ ] **Phase 7** — [load test](reports/load_test.md), [robustness report](reports/robustness.md) (the defence next), write-up
+- [ ] **Phase 7** — [load test](reports/load_test.md), [robustness report](reports/robustness.md), [defence](reports/defence.md) (measured, not deployed), write-up
 
 ## Development
 

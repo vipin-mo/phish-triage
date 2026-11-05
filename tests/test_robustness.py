@@ -85,7 +85,7 @@ def test_all_four_and_the_attack_list():
     a = rb.all_four(record(PLAIN, urls=["https://login.example.com/verify"]))
     assert all(u.startswith("https://bit.ly/") for u in a["urls"]) and rb.ZERO_WIDTH in a["text"]
     assert ".note{display:none}" in a["html"]
-    assert set(rb.ANALYST_ATTACKS) <= set(rb.ATTACKS) and set(rb.NAMES) == set(rb.ATTACKS)
+    assert set(rb.ANALYST_ATTACKS) <= set(rb.ATTACKS) and set(rb.NAMES) == set(rb.ATTACKS) | set(rb.HELD_OUT)
 
 
 def test_summary_counts_the_same_emails_lost():
@@ -149,3 +149,15 @@ def test_greco_refuses_unexpected_columns(tmp_path):
     path.write_bytes(buffer.getvalue())
     with pytest.raises(ValueError, match="unexpected columns"):
         greco.llm_written(path)
+
+
+def test_held_out_tricks():
+    a = rb.HELD_OUT["greek_letters"](record(PLAIN))
+    assert any(ch in rb.GREEK for ch in a["text"]) and not any(ch in rb.CYRILLIC for ch in a["text"])
+    b = rb.HELD_OUT["other_invisible"](record("Please confirm your password today"))
+    assert len({ch for ch in b["text"] if ch in rb.OTHER_INVISIBLE}) >= 3 and rb.ZERO_WIDTH not in b["text"]
+    c = rb.HELD_OUT["tinyurl_links"](record("Go to https://login.example.com/verify now"))
+    assert c["urls"][0].startswith("https://tinyurl.com/")
+    for trick, (before, _) in rb.HELD_OUT_HIDING.items():
+        d = rb.HELD_OUT[f"hidden_html_{trick}"](record(html=HTML, text="x"))
+        assert d["html"].count(rb.HARMLESS[:20]) == rb.HIDDEN_COPIES and before in d["html"]

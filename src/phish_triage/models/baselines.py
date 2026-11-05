@@ -38,7 +38,9 @@ from sklearn.model_selection import StratifiedKFold, cross_val_predict
 from sklearn.pipeline import FunctionTransformer, Pipeline, make_union
 
 from phish_triage.data.mask import mask_source_names
+from phish_triage.data.parse import html_to_text
 from phish_triage.features.html import visible_html
+from phish_triage.features.normalize import normalize_text
 
 TEXT_CHARS = 20_000  # words: the first 20k characters of the body
 CHAR_NGRAM_CHARS = 3_000  # character n-grams: the first 3k (enough, and much faster)
@@ -63,20 +65,29 @@ def without_dates(text: str) -> str:
     return DATE_WORDS.sub(" ", text)
 
 
-def body_text(record: dict) -> str:
-    """The body a reader sees: the visible HTML text, or the plain-text part when the HTML shows almost nothing."""
+def body_text(record: dict, reader: int = 1) -> str:
+    """The body a reader sees: the visible HTML text, or the plain-text part when the HTML shows almost nothing.
+
+    Reader 2 (Phase 7.2) reads the HTML with `visible_html`'s reader 2; when the HTML shows almost nothing and the
+    email has no plain-text part of its own (the parser made the text from the HTML, hidden parts included), it keeps
+    the little the HTML shows; and it cleans the text with `normalize_text`. Reader 1 is the deployed bundles'."""
     html = record.get("html") or ""
+    clean = normalize_text if reader >= 2 else (lambda text: text)
     if html:
-        visible = visible_html(html).text
-        if len(visible.split()) >= MIN_VISIBLE_WORDS:
+        visible = visible_html(html, reader).text
+        if len(visible.split()) >= MIN_VISIBLE_WORDS or (
+            reader >= 2 and (record.get("text") or "") == html_to_text(html)
+        ):
             # The HTML keeps the source's names in URLs and addresses for the link features; masked here as in the
             # plain-text part, or 5.6% of the legitimate mail would show `apache` to the text models.
-            return mask_source_names(visible)
-    return record.get("text") or ""
+            return clean(mask_source_names(visible))
+    return clean(record.get("text") or "")
 
 
-def email_text(record: dict) -> str:
-    return without_dates(f"{record.get('subject') or ''}\n{body_text(record)[:TEXT_CHARS]}")
+def email_text(record: dict, reader: int = 1) -> str:
+    subject = record.get("subject") or ""
+    subject = normalize_text(subject) if reader >= 2 else subject
+    return without_dates(f"{subject}\n{body_text(record, reader)[:TEXT_CHARS]}")
 
 
 def _first_chars(texts):

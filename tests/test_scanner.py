@@ -41,7 +41,7 @@ class _Distilbert:
 def fake(stacked: float, distilbert: float = 0.0) -> Scanner:
     s = Scanner.__new__(Scanner)
     s.config = {"stage1_cutoffs": {"low": 0.05, "high": 0.95}, "distilbert_threshold": 0.3}
-    s.version = "test"
+    s.version, s.reader = "test", 1
     s._tfidf, s._lr, s._stacked = _Tfidf(), _Proba(0.5), _Proba(stacked)
     s._ranks, s._distilbert = None, _Distilbert(distilbert)
     return s

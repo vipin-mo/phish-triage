@@ -171,12 +171,14 @@ def write_masked(records: list[dict], path: Path = INBOX_MASKED) -> None:
 
 
 def read_split_records(ids: set[str]) -> dict[str, dict]:
-    """Records from the public masked file and, for the private splits, the inbox's and the newsletters'."""
+    """Records from the public masked file and, for the private splits, the inbox's, the newsletters', the emails I
+    sent for retraining and the attacked training copies (`data/attacks.py`)."""
+    from phish_triage.data.attacks import MASKED as ATTACKS_MASKED
     from phish_triage.data.privacymail import MASKED as NEWSLETTERS_MASKED
     from phish_triage.data.retraining import MASKED as RETRAINING_MASKED
 
     found = read_records(MASKED_RECORDS, ids)
-    for private in (INBOX_MASKED, NEWSLETTERS_MASKED, RETRAINING_MASKED):
+    for private in (INBOX_MASKED, NEWSLETTERS_MASKED, RETRAINING_MASKED, ATTACKS_MASKED):
         if private.exists() and ids - found.keys():
             found |= read_records(private, ids - found.keys())
     return found
