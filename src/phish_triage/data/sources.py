@@ -197,3 +197,27 @@ COURSE: dict[str, Source] = {
         credential_file="~/.kaggle/access_token",
     ),
 }
+
+
+# LLM-written phishing for the robustness test (Phase 7): test only, never trained on. Same Kaggle token as above.
+GRECO_DATASET_VERSION = 1
+ROBUSTNESS: dict[str, Source] = {
+    "greco": Source(
+        name="greco",
+        description="Greco et al.'s human- and LLM-written phishing and legitimate emails (version 1): four CSVs, "
+        "human-generated/{phishing,legit}.csv and llm-generated/{phishing,legit}.csv.",
+        license="CC BY-NC-SA 4.0",
+        homepage="https://www.kaggle.com/datasets/francescogreco97/human-llm-generated-phishing-legitimate-emails",
+        attribution="Francesco Greco et al., Human-LLM generated phishing-legitimate emails, Kaggle",
+        fmt="csv-zip",
+        files=(
+            RemoteFile(
+                "https://www.kaggle.com/api/v1/datasets/download/francescogreco97/"
+                f"human-llm-generated-phishing-legitimate-emails?datasetVersionNumber={GRECO_DATASET_VERSION}",
+                f"human-llm-generated-phishing-legitimate-emails-v{GRECO_DATASET_VERSION}.zip",
+                "mixed",
+            ),
+        ),
+        credential_file="~/.kaggle/access_token",
+    ),
+}

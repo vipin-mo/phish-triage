@@ -21,13 +21,13 @@ import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 
-from phish_triage.data.sources import COURSE, REFERENCE, SOURCES, RemoteFile, Source
+from phish_triage.data.sources import COURSE, REFERENCE, ROBUSTNESS, SOURCES, RemoteFile, Source
 
 RAW_DIR = Path("data/raw")
 CHECKSUMS_PATH = Path(__file__).with_name("checksums.json")
 USER_AGENT = "phish-triage-dataset-builder/0.1 (+https://github.com/vipin-mo/phish-triage)"
 RETRIES = 3
-DOWNLOADS: dict[str, Source] = {**SOURCES, **REFERENCE, **COURSE}
+DOWNLOADS: dict[str, Source] = {**SOURCES, **REFERENCE, **COURSE, **ROBUSTNESS}
 
 
 def sha256_file(path: Path) -> str:
