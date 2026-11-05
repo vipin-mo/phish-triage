@@ -1,0 +1,78 @@
+{
+ "deployed": {
+  "bundle": "with-retraining-20261104-6addaf34",
+  "public_phish": {
+   "emails": 1401,
+   "flagged": 1364,
+   "to_review": 2
+  },
+  "public_legit": {
+   "emails": 1401,
+   "flagged": 2,
+   "to_review": 0
+  },
+  "phish_2026": {
+   "emails": 1644,
+   "flagged": 1605,
+   "to_review": 1
+  },
+  "newsletter_like_phish": {
+   "emails": 31,
+   "flagged": 23,
+   "to_review": 1
+  },
+  "inbox_test": {
+   "emails": 249,
+   "flagged": 5,
+   "to_review": 1
+  },
+  "privacymail_test": {
+   "emails": 3738,
+   "flagged": 32,
+   "to_review": 0
+  },
+  "sent_for_retraining": {
+   "emails": 2,
+   "flagged": 2,
+   "to_review": 1
+  }
+ },
+ "d_normalized": {
+  "bundle": "with-normalized-20261105-b7b8e35b",
+  "public_phish": {
+   "emails": 1401,
+   "flagged": 1369,
+   "to_review": 2
+  },
+  "public_legit": {
+   "emails": 1401,
+   "flagged": 3,
+   "to_review": 0
+  },
+  "phish_2026": {
+   "emails": 1644,
+   "flagged": 1616,
+   "to_review": 2
+  },
+  "newsletter_like_phish": {
+   "emails": 31,
+   "flagged": 23,
+   "to_review": 1
+  },
+  "inbox_test": {
+   "emails": 249,
+   "flagged": 4,
+   "to_review": 1
+  },
+  "privacymail_test": {
+   "emails": 3738,
+   "flagged": 51,
+   "to_review": 3
+  },
+  "sent_for_retraining": {
+   "emails": 2,
+   "flagged": 1,
+   "to_review": 0
+  }
+ }
+}

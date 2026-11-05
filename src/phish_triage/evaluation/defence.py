@@ -10,7 +10,9 @@ The setups, each run as the service runs a bundle, one email at a time:
   `baselines.body_text`), its cutoffs and threshold unchanged;
 - **(b) + stage 1 retrained:** stage 1 fitted on `with_attacks` (`data/attacks.py`) with reader 2, and the deployed
   DistilBERT with its threshold set again on the validation emails read with reader 2;
-- **(c) + DistilBERT retrained:** the same stage 1, and a DistilBERT fine-tuned on `with_attacks` with reader 2.
+- **(c) + DistilBERT retrained:** the same stage 1, and a DistilBERT fine-tuned on `with_attacks` with reader 2;
+- **(d) reader 2, retrained without copies:** both stages trained on the deployed split's own emails (`with_normalized`
+  is `with_retraining` read with reader 2), added after (c) to tell its two changes apart.
 
 The tests: the clean ones every model is measured on (the public test's phishing and legitimate mail, the 2026
 phishing, the newsletter-like phishing, my inbox's test senders, PrivacyMail's held-out websites), so the cost of the
@@ -29,16 +31,18 @@ from pathlib import Path
 
 REPORTS_DIR = Path("reports")
 SPLIT = "with_attacks"
-CANDIDATES = {
-    "b_stage1": Path("artifacts/distilbert_with_newsletters"),
-    "c_both": Path("artifacts/distilbert_with_attacks"),
+CANDIDATES = {  # name -> (its split, its DistilBERT)
+    "b_stage1": (SPLIT, Path("artifacts/distilbert_with_newsletters")),
+    "c_both": (SPLIT, Path("artifacts/distilbert_with_attacks")),
+    "d_normalized": ("with_normalized", Path("artifacts/distilbert_with_normalized")),
 }
-SETUPS = ("deployed", "a_reader2", "b_stage1", "c_both")
+SETUPS = ("deployed", "a_reader2", "b_stage1", "c_both", "d_normalized")
 SETUP_NAMES = {
     "deployed": "Deployed",
     "a_reader2": "(a) Reader 2",
     "b_stage1": "(b) + stage 1 retrained",
     "c_both": "(c) + DistilBERT retrained",
+    "d_normalized": "(d) Reader 2, retrained without copies",
 }
 THREADS = 2  # per setup; the four setups run side by side
 
@@ -49,13 +53,13 @@ def build(names: list[str]) -> dict[str, str]:
 
     made = {}
     for name in names:
-        distilbert = CANDIDATES[name]
+        split, distilbert = CANDIDATES[name]
         if not (distilbert / "model.onnx").exists():
-            raise SystemExit(f"{distilbert}/model.onnx is missing (make train-with-attacks)")
+            raise SystemExit(f"{distilbert}/model.onnx is missing (make train-with-attacks or train-normalized)")
         if built := [p.name for p in (CANDIDATE_ROOT / name).glob("*") if p.is_dir()]:
             print(f"{name}: already built ({built[0]})", file=sys.stderr)
             continue
-        made[name] = export_candidate(SPLIT, distilbert, name, reader=2).name
+        made[name] = export_candidate(split, distilbert, name, reader=2).name
         print(f"{name}: {made[name]}", file=sys.stderr)
     return made
 
@@ -191,8 +195,9 @@ def to_markdown(r: dict) -> str:
         "deployed. *Deployed* is the bundle in service (reader 1); *(a)* the same models reading with reader 2; "
         "*(b)* stage 1 retrained on `with_attacks` (the deployed split plus an attacked copy of each training phishing "
         "email) with reader 2; *(c)* DistilBERT retrained on it too. (b) and (c) change two things at once, what the "
-        "models learn from (reader 2's text) and the attacked copies; a retrain on reader 2 without the copies wasn't "
-        "run. The private tests are scored on my laptop; only counts are shown.",
+        "models learn from (reader 2's text) and the attacked copies; *(d)*, added afterwards, retrains both stages on "
+        "the deployed split's own emails read with reader 2, without copies. The private tests are scored on my "
+        "laptop; only counts are shown.",
         "",
         "## The clean tests",
         "",

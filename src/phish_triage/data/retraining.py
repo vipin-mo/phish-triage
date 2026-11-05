@@ -27,6 +27,8 @@ MASKED = PRIVATE_DIR / "masked.jsonl.gz"
 SPLIT_FILE = PRIVATE_DIR / "split.json"
 SOURCE = "retraining"
 SPLIT = "with_retraining"
+# The same emails read with reader 2 (Phase 7.2): what the models train on changes, the split doesn't.
+NORMALIZED_SPLIT = "with_normalized"
 LABEL_OF = {"phish": "phish", "legit": "legit"}
 
 

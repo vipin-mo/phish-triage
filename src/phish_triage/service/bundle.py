@@ -110,10 +110,10 @@ def load_split(name: str) -> tuple[dict[str, list[str]], dict]:
     from phish_triage.data import attacks, inbox, privacymail, retraining
 
     split, slices = inbox.load_split()
-    if name in (privacymail.NEWSLETTER_SPLIT, retraining.SPLIT, attacks.SPLIT):
+    if name in (privacymail.NEWSLETTER_SPLIT, retraining.SPLIT, retraining.NORMALIZED_SPLIT, attacks.SPLIT):
         split, extra = privacymail.load_split()
         slices = slices | extra
-    if name == retraining.SPLIT:
+    if name in (retraining.SPLIT, retraining.NORMALIZED_SPLIT):
         split = retraining.load_split()
     if name == attacks.SPLIT:
         split = attacks.load_split()

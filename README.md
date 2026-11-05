@@ -333,10 +333,12 @@ deployed model one email at a time ([reports/robustness.md](reports/robustness.m
   hiding tricks (16.9% before) and 95.8% under all four (12.7%), and the same for hiding by an id or a tag rule, tricks
   I set aside before writing it. Hiding it has no rule for (`text-indent`, `clip`, `transform:scale(0)`) still gets
   through: 16.2%. It costs false alarms with models trained on the old reader: 9 of my inbox's 249 test emails
-  instead of 5, and 1.4% of the PrivacyMail ones instead of 0.9%. Retraining on reader 2 plus an attacked copy of each
-  training phishing email brings PrivacyMail to 0.7% and the 2026 phishing to 98.2%, but my inbox stays at 8, the
-  held-out hiding falls to 8.5%, and Greco's LLM-written phishing to 84.1% (88.8%). The retrain changed two things at
-  once, so it doesn't show which of them did that; a retrain on reader 2 alone is what I'd run next.
+  instead of 5, and 1.4% of the PrivacyMail ones instead of 0.9%. Retrained on reader 2 (the deployed split's own
+  emails), the cascade catches more phishing than the deployed one: 97.7% of the public test (97.4%), 98.3% of the
+  2026 phishing (97.6%) and 94.0% of Greco's LLM-written phishing (88.8%), and flags 4 of my inbox's 249 test emails
+  (5). But it flags 1.4% of the PrivacyMail newsletters (0.9%), and lets the hiding reader 2 has no rule for through
+  more often: 6.9% caught (16.9%). Adding an attacked copy of each training phishing email didn't earn its place:
+  with the copies, Greco falls to 84.1% and my inbox rises to 8, for 0.7% on PrivacyMail.
 
 ## Known issues
 
@@ -381,10 +383,12 @@ ratings, as noted.
 - **Big brands asking me to act read as phishing (open).** In my own Gmail, a bank's "make your debit card Tap & Pay
   ready" and a ride app's "take our travel survey" were flagged at 0.9998 and 0.9996, though each was DKIM-signed by
   the brand's own domain with every link on it; DistilBERT judges the words, and the cascade doesn't weigh the
-  sender check. Retraining stage 1 can't change that (above). What I'd test next, with the rule set before the run:
-  an email flagged by its text but signed by its own well-known domain, with all its links there, goes to review
-  instead of phish. The newsletter-like phishing in the tests is also signed by its own domains, so it has to be
-  measured first.
+  sender check. Retraining stage 1 can't change that (above). I tested a rule, set before the run
+  ([reports/own_domain.md](reports/own_domain.md)): a flagged email that passes the sender check with its own
+  domain's DKIM signature, raises no warning, comes from a Tranco top-100,000 domain and links only there goes to
+  review instead of phish. It rarely fires, and when it does it is as often phishing as not: with the reader-2
+  candidate it would move 4 of the public and 2026 test phishing emails to review, against 4 false alarms (1 of my
+  inbox's, 3 of PrivacyMail's). So it isn't used.
 - **Phishing that looks like a newsletter (open).** The deployed cascade catches 23 of 31 such emails (25 before
   the newsletters were added). It is a data problem: the newsletters gave it plenty of bulk-looking legitimate
   mail, but there are few phishing emails of that kind to learn from, and no public dataset I found has them (see
@@ -398,8 +402,8 @@ ratings, as noted.
 - **Hidden HTML gets past the visible-text reader (open; reader 2 is measured, not deployed).** Text hidden by a
   `<style>` class, moved off-screen or in 2 px type counts as visible, so a hidden paragraph at the top of the body
   decides what DistilBERT reads (above), and an HTML-only email that shows fewer than 5 words is read with its hidden
-  parts. Reader 2 fixes both, but it costs false alarms with the deployed models, and `text-indent`, `clip` and
-  `transform` still hide text from it.
+  parts. Reader 2 fixes both; a cascade retrained on it flags 1.4% of the PrivacyMail newsletters instead of 0.9%
+  (above), and `text-indent`, `clip` and `transform` still hide text from it.
 - **The deployed reader drops ordinary text set in `em` (open; fixed in reader 2).** It reads a CSS font size
   without its unit, so `font-size:1em` counts as 1 px and the text as hidden. That cut at least 5 visible words from
   23 of my inbox's 249 test emails and 82 of the 3,738 PrivacyMail ones (reports/defence.md); the deployed models
