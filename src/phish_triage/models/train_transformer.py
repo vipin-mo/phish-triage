@@ -24,7 +24,7 @@ from pathlib import Path
 
 import numpy as np
 
-from phish_triage.data import attacks, inbox, privacymail
+from phish_triage.data import attacks, inbox, privacymail, retraining
 from phish_triage.data.splits import SPLITS_DIR
 from phish_triage.evaluation import metrics, predictions
 from phish_triage.models import transformer
@@ -39,8 +39,9 @@ SPLITS = (
     "old_era",
 )
 EXPORT_SPLIT = "random"
-PRIVATE_SPLITS = (inbox.SPLIT, privacymail.NEWSLETTER_SPLIT, attacks.SPLIT)  # trained only when named
-READER = {attacks.SPLIT: 2}  # what the models read (`baselines.email_text`); 1 for every other split
+PRIVATE_SPLITS = (inbox.SPLIT, privacymail.NEWSLETTER_SPLIT, attacks.SPLIT, retraining.NORMALIZED_SPLIT)  # when named
+# what the models read (`baselines.email_text`); 1 for every other split
+READER = {attacks.SPLIT: 2, retraining.NORMALIZED_SPLIT: 2}
 ARTIFACTS_DIR = Path("artifacts")
 REPORTS_DIR = Path("reports")
 MLFLOW_URI = "sqlite:///mlruns/mlflow.db"
@@ -158,6 +159,7 @@ def onnx_markdown(r: dict, split: str = EXPORT_SPLIT) -> str:
         EXPORT_SPLIT: "make train-transformer",
         privacymail.NEWSLETTER_SPLIT: "make train-with-newsletters",
         attacks.SPLIT: "make train-with-attacks",
+        retraining.NORMALIZED_SPLIT: "make train-normalized",
     }.get(split, "make train-with-inbox")
     lines = [
         "# DistilBERT: PyTorch vs ONNX vs ONNX int8",
@@ -218,6 +220,8 @@ def main(argv: list[str] | None = None) -> int:
         splits[privacymail.NEWSLETTER_SPLIT] = privacymail.load_split()[0]
     if attacks.SPLIT in args.splits:
         splits[attacks.SPLIT] = attacks.load_split()
+    if retraining.NORMALIZED_SPLIT in args.splits:
+        splits[retraining.NORMALIZED_SPLIT] = retraining.load_split()
     tokenizer = transformer.load_tokenizer()
     config = transformer.TrainConfig(strategy=args.strategy, epochs=args.epochs)
     for name in args.splits or list(SPLITS):

@@ -399,6 +399,106 @@
      "flagged": 841
     }
    }
+  },
+  "d_normalized": {
+   "bundle": "with-normalized-20261105-b7b8e35b",
+   "reader": 2,
+   "clean": {
+    "public_phish": {
+     "emails": 1401,
+     "flagged": 1369
+    },
+    "public_legit": {
+     "emails": 1401,
+     "flagged": 3
+    },
+    "phish_2026": {
+     "emails": 1644,
+     "flagged": 1616
+    },
+    "newsletter_like_phish": {
+     "emails": 31,
+     "flagged": 23
+    },
+    "inbox_test": {
+     "emails": 249,
+     "flagged": 4
+    },
+    "privacymail_test": {
+     "emails": 3738,
+     "flagged": 51
+    }
+   },
+   "attacks": {
+    "lookalike_letters": {
+     "emails": 1401,
+     "flagged": 1369
+    },
+    "hidden_characters": {
+     "emails": 1401,
+     "flagged": 1369
+    },
+    "hidden_html_display_none": {
+     "emails": 1401,
+     "flagged": 1369
+    },
+    "hidden_html_style_class": {
+     "emails": 1401,
+     "flagged": 1347
+    },
+    "hidden_html_off_screen": {
+     "emails": 1401,
+     "flagged": 1369
+    },
+    "hidden_html_tiny_text": {
+     "emails": 1401,
+     "flagged": 1369
+    },
+    "shortened_links": {
+     "emails": 1401,
+     "flagged": 1373
+    },
+    "all_four": {
+     "emails": 1401,
+     "flagged": 1352
+    },
+    "greek_letters": {
+     "emails": 1401,
+     "flagged": 1369
+    },
+    "other_invisible": {
+     "emails": 1401,
+     "flagged": 1369
+    },
+    "hidden_html_id_in_style": {
+     "emails": 1401,
+     "flagged": 1347
+    },
+    "hidden_html_tag_in_style": {
+     "emails": 1401,
+     "flagged": 1347
+    },
+    "hidden_html_text_indent": {
+     "emails": 1401,
+     "flagged": 96
+    },
+    "hidden_html_clip": {
+     "emails": 1401,
+     "flagged": 96
+    },
+    "hidden_html_scale_zero": {
+     "emails": 1401,
+     "flagged": 96
+    },
+    "tinyurl_links": {
+     "emails": 1401,
+     "flagged": 1372
+    },
+    "greco_llm_phish": {
+     "emails": 1000,
+     "flagged": 940
+    }
+   }
   }
  },
  "reader_check": {

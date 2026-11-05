@@ -1,0 +1,33 @@
+{
+ "torch": {
+  "roc_auc": 0.997523445033237,
+  "recall_at_1pct_fpr": 0.9763546798029556,
+  "recall_at_0.1pct_fpr": 0.819704433497537
+ },
+ "onnx_fp32": {
+  "megabytes": 267.9,
+  "latency_ms_1_thread": {
+   "p50": 22.501604500575922,
+   "p95": 79.16238366597099,
+   "mean": 33.00002014021933,
+   "emails": 300
+  },
+  "max_abs_score_change_vs_torch": 3.039836883544922e-06,
+  "roc_auc": 0.9975234450332369,
+  "recall_at_1pct_fpr": 0.9763546798029556,
+  "recall_at_0.1pct_fpr": 0.819704433497537
+ },
+ "onnx_int8": {
+  "megabytes": 67.4,
+  "latency_ms_1_thread": {
+   "p50": 24.052187989582308,
+   "p95": 87.38776456011692,
+   "mean": 35.517838510665264,
+   "emails": 300
+  },
+  "max_abs_score_change_vs_torch": 0.5989668071269989,
+  "roc_auc": 0.9975528541806093,
+  "recall_at_1pct_fpr": 0.9766830870279146,
+  "recall_at_0.1pct_fpr": 0.8203612479474548
+ }
+}
