@@ -39,11 +39,11 @@ The Apache lists are `announce@apache.org`, `users@httpd`, `users@tomcat`, `user
 | A private test inbox (a new Gmail account subscribed to newsletters, shops and job sites) | Realistic notification-style legitimate mail. Never committed or sent to an LLM; only counts and metrics are published. Part of it, split by sender, is in the `with_inbox` training split (`data/inbox.py`) | private |
 | [PrivacyMail](https://zenodo.org/records/6509751) (Maass, Schwär and Hollick, 2019), about 500,000 newsletters from 1,423 websites, 2019–2022 | Commercial newsletters from many senders: a false-alarm test, then part of the `with_newsletters` training split, split by website (`data/privacymail.py`). Read from the zip without unpacking; never committed or sent to an LLM; only counts and metrics are published, website names hashed | on request; the owner allows models trained on it to be used and published, not the newsletters themselves |
 
-**Planned, not yet added:**
+**Planned, not added:**
 
-| Source | Why | License |
+| Source | Why | Status |
 |---|---|---|
-| A second legitimate source (e.g. another public mailing-list archive) | Cross-source test for the legitimate class | to be checked |
+| A second legitimate source (the plan named the Linux kernel mailing lists) | Cross-source test for the legitimate class | Not added: the public legitimate side is the Apache lists only, so the cross-source splits test new phishing only |
 
 **Reference data (not emails):**
 
@@ -288,8 +288,8 @@ What this shows:
   split by sender, the cascade flags 4.0% of the emails from 26 unseen senders
   ([reports/with_inbox.md](../reports/with_inbox.md)), but 76.5% of 18,682 PrivacyMail newsletters from 944
   websites ([reports/privacymail.md](../reports/privacymail.md)): 26 senders were too few. With part of PrivacyMail
-  in training too, split by website, it flags 0.9% of newsletters from 189 held-out websites and 2.0% of the
-  inbox's unseen senders.
+  in training too, split by website, it flagged 0.9% of newsletters from 189 held-out websites and 2.0% of the
+  inbox's unseen senders; the model in service (the same emails read with reader 2) flags 1.4% and 1.6%.
 - **My inbox's legitimate mail is all bulk mail from large senders,** so on it the number of links and an
   own-domain DKIM signature mark legitimate mail (ROC AUC 0.92–0.96 on their own, against 0.51–0.58 on the public
   test). The cascade decides the same without them; what it misses more is phishing that reads like a
@@ -301,13 +301,16 @@ What this shows:
 - **A few test senders were also in training, across the two private sources.** The inbox was split by sender
   and PrivacyMail by website, separately, so 5 of the 249 inbox test emails (2 of 26 senders) and 43 of the 3,738
   held-out newsletters (5 sender domains) share a registered sender domain with training. Without them the
-  deployed cascade flags 2.05% (5 of 244) and 0.84% (31 of 3,695), against 2.01% and 0.86%, so the reported numbers
-  hold. No test email is an exact text copy of a training one. The next build of the split groups websites by
-  sender domain and puts a website that shares a sender with the inbox where that sender is.
+  newsletters model flagged 2.05% (5 of 244) and 0.84% (31 of 3,695), against 2.01% and 0.86%, so the reported
+  numbers held (not redone for the model in service). No test email is an exact text copy of a training one. A
+  rebuilt split would group websites by sender domain and put a website that shares a sender with the inbox
+  where that sender is; the splits haven't been rebuilt since.
 - **The private sources' own collection names reached the model input a little.** PrivacyMail's collection
   domains appear in 0.2% of its emails as the models read them (17 of 10,111), my inbox's address in 0.4% (3 of
-  837), and neither in any public email: too rare to be the shortcut the public collectors were, but masked from
-  the next build (`make private-collectors`, kept in data/private).
+  837), and neither in any public email: too rare to be the shortcut the public collectors were. The masking for
+  them was written, but never ran on the existing private builds: the list it reads wasn't created until November
+  2026. Counted then, 3 of the inbox's 1,701 emails and 28 of PrivacyMail's 18,682 show one as the models read
+  them. Masking now refuses to run on private data without the list, and the next build uses it.
 - **List mail is not always legitimate.** Two Apache list posts turned out to be phishing (found as label
   conflicts), so a few spam or phishing posts that got past the lists' filters may still be labelled
   legitimate.

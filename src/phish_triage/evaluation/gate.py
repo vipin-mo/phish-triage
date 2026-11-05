@@ -7,8 +7,8 @@ Measuring needs the local data (predictions and the saved Claude answers), which
 measured locally and committed as reports/gate.json; CI re-checks every committed number against the thresholds
 below and fails the build if one is out. A live LLM run happens only by hand (`... run --confirm`).
 
-The deployable classifier is the bundle's split (`service/bundle.py`: `with_newsletters`, trained with part of my
-private test inbox and of PrivacyMail) once its predictions exist; its recall is measured on the public `random`
+The deployable classifier is the split of the bundle in infra/bundle-version (`service/bundle.py`; trained with part
+of my private test inbox and of PrivacyMail) once its predictions exist; its recall is measured on the public `random`
 test, and the cascade's false alarms on the inbox's unseen senders and on the PrivacyMail websites held out of
 training come from reports/with_inbox.json (aggregates only). The PrivacyMail limit was added after the `with_inbox`
 model, which passed the inbox limit at 4.0%, flagged 76.5% of PrivacyMail's newsletters (reports/privacymail.md).

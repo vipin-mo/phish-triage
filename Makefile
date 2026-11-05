@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox privacymail-counts private-collectors data-privacymail train-with-newsletters eval-privacymail retrain-pull retrain retraining-check dashboard-images real-use robustness robustness-analyst attacks-split train-with-attacks train-normalized defence-build defence own-domain explanations load-test drift-reference gate bundle serve aws-bootstrap tf-foundation-plan tf-foundation-apply upload-bundle put-anthropic-key api-key addon deploy-image deploy-plan deploy-apply
+.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox privacymail-counts private-collectors data-privacymail train-with-newsletters eval-privacymail retrain-pull retrain retraining-check distilbert-public dashboard-images real-use robustness robustness-analyst attacks-split train-with-attacks train-normalized defence-build defence own-domain explanations load-test drift-reference gate bundle serve aws-bootstrap tf-foundation-plan tf-foundation-apply upload-bundle put-anthropic-key api-key addon deploy-image deploy-plan deploy-apply
 
 help:  ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -143,6 +143,9 @@ load-test:  ## k6 against the live scan endpoint (loadtest/scan.js) -> reports/l
 	# caffeinate (macOS) keeps the laptop awake: a stall mid-run makes the numbers about my laptop, not the service
 	API_URL="$(ADDON_API_URL)" API_KEY="$$(cat ~/.config/phish-triage/loadtest-key)" $$(command -v caffeinate >/dev/null && echo caffeinate -ims) k6 run --quiet --out json=build/loadtest.jsonl loadtest/scan.js
 	$(AWS_ENV) && uv run python scripts/load_test_report.py build/loadtest.jsonl
+
+distilbert-public:  ## DistilBERT's recall on the public test per trained model, from saved predictions (reports/distilbert_public.md)
+	uv run --group train python scripts/distilbert_public.py
 
 dashboard-images:  ## the CloudWatch dashboard as images for the README (docs/dashboard/; START=... END=... in UTC)
 	$(AWS_ENV) && uv run python scripts/dashboard_images.py "$(or $(START),2026-11-04T00:00:00Z)" "$(or $(END),2026-11-05T18:00:00Z)"
