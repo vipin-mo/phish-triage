@@ -29,6 +29,7 @@ from phish_triage.data.splits import SPLITS_DIR
 from phish_triage.evaluation import metrics, predictions
 from phish_triage.models import transformer
 from phish_triage.models.baselines import email_text
+from phish_triage.service.bundle import reader_of
 
 SPLITS = (
     "random",
@@ -40,8 +41,7 @@ SPLITS = (
 )
 EXPORT_SPLIT = "random"
 PRIVATE_SPLITS = (inbox.SPLIT, privacymail.NEWSLETTER_SPLIT, attacks.SPLIT, retraining.NORMALIZED_SPLIT)  # when named
-# what the models read (`baselines.email_text`); 1 for every other split
-READER = {attacks.SPLIT: 2, retraining.NORMALIZED_SPLIT: 2}
+
 ARTIFACTS_DIR = Path("artifacts")
 REPORTS_DIR = Path("reports")
 MLFLOW_URI = "sqlite:///mlruns/mlflow.db"
@@ -53,7 +53,7 @@ def run_split(name: str, splits: dict, config: transformer.TrainConfig, tokenize
     records = inbox.read_split_records({i for part in parts.values() for i in part})
     data = {}
     for part, ids in parts.items():
-        texts = [email_text(records[i], READER.get(name, 1)) for i in ids]
+        texts = [email_text(records[i], reader_of(name)) for i in ids]
         data[part] = (ids, texts, transformer.encode(tokenizer, texts, config.strategy), _labels(records, ids))
     model_name = f"distilbert_{config.strategy}"
 

@@ -1,13 +1,13 @@
 {
  "prompt_version": 5,
  "llm_model": "claude-haiku-5-5",
- "classifier": "with-retraining-20261104-6addaf34",
+ "classifier": "with-normalized-20261105-8baede93",
  "emails": 40,
  "variants_per_condition": 120,
  "clean_classifier_flagged": 39,
  "clean_defended_verdicts": {
   "phish": 39,
-  "suspicious": 1
+  "needs_human_review": 1
  },
  "by_condition": {
   "undefended": {
@@ -17,9 +17,9 @@
     "verdict_flip": 1,
     "classifier_flip": 1,
     "detected": 0,
-    "schema_invalid": 26,
+    "schema_invalid": 23,
     "refused": 1,
-    "cut_off": 5
+    "cut_off": 2
    },
    "operator_claim": {
     "variants": 40,
@@ -37,7 +37,7 @@
     "verdict_flip": 0,
     "classifier_flip": 0,
     "detected": 0,
-    "schema_invalid": 22,
+    "schema_invalid": 16,
     "refused": 1,
     "cut_off": 4
    },
@@ -45,9 +45,9 @@
     "variants": 120,
     "verdict_flip": 1,
     "classifier_flip": 1,
-    "schema_invalid": 72,
+    "schema_invalid": 63,
     "refused": 3,
-    "cut_off": 22
+    "cut_off": 19
    }
   },
   "defended": {
@@ -57,9 +57,9 @@
     "verdict_flip": 0,
     "classifier_flip": 1,
     "detected": 0,
-    "schema_invalid": 3,
+    "schema_invalid": 2,
     "refused": 0,
-    "cut_off": 3
+    "cut_off": 2
    },
    "operator_claim": {
     "variants": 40,
@@ -67,9 +67,9 @@
     "verdict_flip": 0,
     "classifier_flip": 0,
     "detected": 0,
-    "schema_invalid": 1,
+    "schema_invalid": 2,
     "refused": 1,
-    "cut_off": 0
+    "cut_off": 1
    },
    "it_test_claim": {
     "variants": 40,
@@ -90,5 +90,5 @@
    }
   }
  },
- "retried": 10
+ "retried": 8
 }
