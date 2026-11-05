@@ -1,7 +1,7 @@
 {
   "timeZone": "Etc/UTC",
   "runtimeVersion": "V8",
-  "exceptionLogging": "STACKDRIVER",
+  "exceptionLogging": "NONE",
   "oauthScopes": [
     "https://www.googleapis.com/auth/gmail.addons.execute",
     "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",

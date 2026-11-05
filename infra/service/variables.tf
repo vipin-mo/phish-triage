@@ -52,3 +52,9 @@ variable "alert_email" {
   type        = string
   sensitive   = true # kept out of plan output, so it can't end up in a log or a PR comment
 }
+
+variable "ci_role_boundary" {
+  description = "Give the function roles the permissions boundary the CI deploy role requires (infra/foundation). Off while CI deploys are off; once on, laptop deploys must set it too (CI_BOUNDARY=1 make deploy-plan)."
+  type        = bool
+  default     = false
+}

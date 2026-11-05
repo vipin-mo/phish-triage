@@ -55,3 +55,40 @@ def test_only_the_demo_gif_may_be_larger_and_only_up_to_its_own_limit(tmp_path):
     ]
     (tmp_path / "docs" / "demo.gif").write_bytes(b"x" * (check.SIZE_LIMITS["docs/demo.gif"] + 1))
     assert check.violations(["docs/demo.gif"], tmp_path)
+
+
+def test_secrets_terraform_state_and_plans_are_blocked():
+    blocked = [
+        ".env",
+        ".env.production",
+        "infra/service/terraform.tfstate",
+        "infra/service/terraform.tfstate.backup",
+        "infra/service/service.tfplan",
+        "infra/service/tfplan",
+        "infra/service/prod.tfvars",
+        "infra/service/.terraform/providers/x",
+        "keys/deploy.pem",
+        ".aws/credentials",
+    ]
+    assert len(check.violations(blocked)) == len(blocked)
+    assert check.violations([".env.example", "infra/service/.terraform.lock.hcl", "infra/service/main.tf"]) == []
+
+
+def test_a_file_that_starts_like_an_email_is_blocked_whatever_its_name(tmp_path):
+    (tmp_path / "notes.txt").write_bytes(b"Received: from mx\nMessage-ID: <a@b>\nSubject: hi\n\nbody\n")
+    (tmp_path / "box").write_bytes(b"From someone@example.com Mon Nov  2 10:00:00 2026\nSubject: x\n\nbody\n")
+    (tmp_path / "README.md").write_bytes(b"From the start, the plan was simple.\nSubject: none\n")
+    (tmp_path / "test_parse.py").write_bytes(b'RAW = b"Received: x\\nMessage-ID: y\\nSubject: z\\n"\n')
+    assert check.violations(["notes.txt", "box", "README.md", "test_parse.py"], tmp_path) == [
+        "notes.txt: starts like a raw email",
+        "box: starts like a raw email",
+    ]
+
+
+def test_history_checks_every_version_size_and_content():
+    big = check.MAX_BYTES + 1
+    blobs = {"old.txt": [(10, b"x = 1\n"), (big, b"")], "mail.txt": [(50, b"Received: a\nTo: b\nSubject: c\n")]}
+    assert check.violations(sorted(blobs), blobs=blobs) == [
+        "mail.txt: starts like a raw email",
+        f"old.txt: {big:,} bytes is too large for code or a report",
+    ]
