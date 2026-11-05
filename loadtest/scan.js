@@ -4,7 +4,7 @@
 // stored verdict) and no real email is ever sent. It runs under its own API key (owner `loadtest`, left out of the
 // real-use report). Four stages at fixed request rates, so the number of requests is capped whatever the answers do
 // (the first run had no cap: refused requests came back in milliseconds and each user looped as fast as it could).
-// At most 30 + 60 + 150 + 300 = 540 requests:
+// 30 + 60 + 150 + 300 = 540 requests, and k6 may start one more in a stage, so at most 544:
 //   r1  - 1 a second for 30 s: under every limit
 //   r2  - 2 a second: 60 in 30 s, up to the 60-a-minute key limit
 //   r5  - 5 a second: at API Gateway's throttle
