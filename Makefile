@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox privacymail-counts private-collectors data-privacymail train-with-newsletters eval-privacymail retrain-pull retrain retraining-check real-use robustness robustness-analyst attacks-split train-with-attacks train-normalized defence-build defence own-domain load-test drift-reference gate bundle serve aws-bootstrap tf-foundation-plan tf-foundation-apply upload-bundle put-anthropic-key api-key addon deploy-image deploy-plan deploy-apply
+.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox privacymail-counts private-collectors data-privacymail train-with-newsletters eval-privacymail retrain-pull retrain retraining-check real-use robustness robustness-analyst attacks-split train-with-attacks train-normalized defence-build defence own-domain explanations load-test drift-reference gate bundle serve aws-bootstrap tf-foundation-plan tf-foundation-apply upload-bundle put-anthropic-key api-key addon deploy-image deploy-plan deploy-apply
 
 help:  ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -124,6 +124,9 @@ defence-build:  ## the two candidate bundles of the robustness defence (artifact
 
 defence:  ## every defence setup on the clean tests, the attacks and Greco (reports/defence.md; $0, local only)
 	uv run --group train python -m phish_triage.evaluation.defence measure
+
+explanations:  ## do LIME's and Integrated Gradients' top words drive the score? deletion test (reports/explanations.md; $0)
+	uv run --group train python -m phish_triage.evaluation.explanations
 
 own-domain:  ## the own-domain rule experiment on the deployed bundle and the reader-2 candidate (reports/own_domain.md; $0)
 	uv run --group train python -m phish_triage.evaluation.own_domain

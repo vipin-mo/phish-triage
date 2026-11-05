@@ -327,25 +327,42 @@ deployed model one email at a time ([reports/robustness.md](reports/robustness.m
   phishing except one "suspicious" under hidden HTML ($0.02). It reads 6,000 characters, not 512 tokens. But it runs
   only when I ask for an explanation, so the scan's verdict still has the gap.
 - **A better reader closes most of it; training on attacked copies doesn't help**
-  ([reports/defence.md](reports/defence.md), not deployed). Reader 2 applies `<style>` blocks, hides text moved off-screen or under 4 px, keeps hidden parts out
-  when an HTML-only email shows almost nothing, removes invisible characters and turns look-alike letters in
-  mixed-script words back into Latin. With the deployed models unchanged it catches 95.9–97.4% under the three
-  hiding tricks (16.9% before) and 95.8% under all four (12.7%), and the same for hiding by an id or a tag rule, tricks
-  I set aside before writing it. Hiding it has no rule for (`text-indent`, `clip`, `transform:scale(0)`) still gets
-  through: 16.2%. It costs false alarms with models trained on the old reader: 9 of my inbox's 249 test emails
-  instead of 5, and 1.4% of the PrivacyMail ones instead of 0.9%. Retrained on reader 2 (the deployed split's own
-  emails), the cascade catches more phishing than the deployed one: 97.7% of the public test (97.4%), 98.3% of the
-  2026 phishing (97.6%) and 94.0% of Greco's LLM-written phishing (88.8%), and flags 4 of my inbox's 249 test emails
-  (5). But it flags 1.4% of the PrivacyMail newsletters (0.9%), and lets the hiding reader 2 has no rule for through
-  more often: 6.9% caught (16.9%). Adding an attacked copy of each training phishing email didn't earn its place:
-  with the copies, Greco falls to 84.1% and my inbox rises to 8, for 0.7% on PrivacyMail.
+  ([reports/defence.md](reports/defence.md)). Reader 2 applies `<style>` blocks, hides text moved off-screen or
+  under 4 px, keeps hidden parts out when an HTML-only email shows almost nothing, removes invisible characters and
+  turns look-alike letters in mixed-script words back into Latin. With the old models unchanged it catches
+  95.9–97.4% under the three hiding tricks (16.9% before) and 95.8% under all four (12.7%), and the same for hiding
+  by an id or a tag rule, tricks I set aside before writing it. Hiding it has no rule for (`text-indent`, `clip`,
+  `transform:scale(0)`) still gets through: 16.2%. It costs false alarms with models trained on the old reader: 9 of
+  my inbox's 249 test emails instead of 5, and 1.4% of the PrivacyMail ones instead of 0.9%. Retrained on reader 2
+  (the same training emails), the cascade catches more phishing than the model it replaced: 97.7% of the public test
+  (97.4%), 98.3% of the 2026 phishing (97.6%) and 94.0% of Greco's LLM-written phishing (88.8%), and flags 4 of my
+  inbox's 249 test emails (5). But it flags 1.4% of the PrivacyMail newsletters (0.9%), and lets the hiding reader 2
+  has no rule for through more often: 6.9% caught (16.9%). Adding an attacked copy of each training phishing email
+  didn't earn its place: with the copies, Greco falls to 84.1% and my inbox rises to 8, for 0.7% on PrivacyMail. The
+  cascade retrained on reader 2 alone is the one in service since 2026-11-05 (`with-normalized-20261105-8baede93`,
+  through the canary).
+
+## What the explanation check showed
+
+My course project found its shortcuts (`enron`, `vince`, `2004`) by reading LIME's word lists, so I tested whether
+such word lists point at what really drives a score ([reports/explanations.md](reports/explanations.md)): on 300
+public-test phishing emails each model flags, remove the words an explanation ranks highest and score again, against
+removing as many random words.
+
+- **They do.** For stage 1's text model, LIME's top word takes 0.024 off the score, a random one 0.001; its top 5
+  take 0.135, close to the 0.139 of occlusion (each word's own effect when it alone is removed, the best pick one
+  word at a time). At 10 words it falls behind: 0.175 against 0.260. For DistilBERT, the 10 words Integrated
+  Gradients ranks highest cut the log-odds by 2.16, random ones by 0.53.
+- **No handful of words decides the verdict.** Without its 10 top words, 12% of the emails fall to the text model's
+  threshold by LIME's choice (25% by occlusion's, none by random), and 20% to DistilBERT's (7% at random). The
+  score rests on many words, so a word list is evidence of what a model leans on, not the reason for one verdict.
 
 ## Known issues
 
-All but five are fixed. The first two were found while rating the analyst's answers by hand, the rest afterwards:
-on my test inbox, while packaging the model, on PrivacyMail, in the Claude re-run, in a review of the code and in
-the robustness test, all in November 2026. Every number above was re-measured after the fixes, except my hand
-ratings, as noted.
+All but four are fixed (one of them partly). The first two were found while rating the analyst's answers by hand,
+the rest afterwards: on my test inbox, while packaging the model, on PrivacyMail, in the Claude re-run, in a review
+of the code and in the robustness test, all in November 2026. Every number above was re-measured after the fixes,
+except my hand ratings, as noted.
 
 - **Masking rewrote links (fixed).** Replacing the Apache list names with `project` ran over the whole body and
   HTML, including URLs and addresses. It rewrote a URL or address in 7,978 of the 13,541 legitimate emails the
@@ -399,15 +416,15 @@ ratings, as noted.
   the warning that one of them claims a pass the provider didn't give never fired in the service, only on raw
   emails. Masking now keeps whether one did. Stored verdicts also carry a rules version now, so a change like this
   one scans stored emails again, as a new model does.
-- **Hidden HTML gets past the visible-text reader (open; reader 2 is measured, not deployed).** Text hidden by a
-  `<style>` class, moved off-screen or in 2 px type counts as visible, so a hidden paragraph at the top of the body
-  decides what DistilBERT reads (above), and an HTML-only email that shows fewer than 5 words is read with its hidden
-  parts. Reader 2 fixes both; a cascade retrained on it flags 1.4% of the PrivacyMail newsletters instead of 0.9%
-  (above), and `text-indent`, `clip` and `transform` still hide text from it.
-- **The deployed reader drops ordinary text set in `em` (open; fixed in reader 2).** It reads a CSS font size
-  without its unit, so `font-size:1em` counts as 1 px and the text as hidden. That cut at least 5 visible words from
-  23 of my inbox's 249 test emails and 82 of the 3,738 PrivacyMail ones (reports/defence.md); the deployed models
-  never read that text.
+- **Hidden HTML got past the visible-text reader (partly fixed, deployed 2026-11-05).** Text hidden by a `<style>`
+  class, moved off-screen or in 2 px type counted as visible, so a hidden paragraph at the top of the body decided
+  what DistilBERT read (above), and an HTML-only email that shows fewer than 5 words was read with its hidden parts.
+  Reader 2 fixes both; the cascade retrained on it flags 1.4% of the PrivacyMail newsletters instead of 0.9%
+  (above), and `text-indent`, `clip` and `transform` still hide text from it (open).
+- **The old reader dropped ordinary text set in `em` (fixed).** It read a CSS font size without its unit, so
+  `font-size:1em` counted as 1 px and the text as hidden. That cut at least 5 visible words from 23 of my inbox's
+  249 test emails and 82 of the 3,738 PrivacyMail ones (reports/defence.md), so the old models never read that text.
+  Reader 2, in service since 2026-11-05, reads the unit.
 - **Filler can lift an image email out of review (open, kept on purpose).** An email whose HTML is an image, with
   20 words of hidden text or of a plain-text part next to it, isn't sent to review. Counting only the words the
   HTML shows would catch it, but legitimate image newsletters are built the same way: the deployed cascade would
@@ -424,7 +441,7 @@ ratings, as noted.
 - [x] **Phase 4** — grounded LLM analyst step ([results](reports/analyst.md)), prompt-injection tests ([round 1](reports/injection.md), [round 2](reports/injection_round2.md)), CI eval gate
 - [ ] **Phase 5** — serverless AWS deployment: [service and bundle](reports/bundle.md), Lambda + API Gateway + DynamoDB in [Terraform](infra/), deployed from my laptop with MFA (OIDC CI/CD blocked by the Free plan); cost table and dashboard screenshots to come
 - [x] **Phase 6** — explanations on demand, [Gmail add-on](addon/) (in use), canary and shadow mode, weekly drift check, retraining from emails I send, [real use](reports/real_use.md)
-- [ ] **Phase 7** — [load test](reports/load_test.md), [robustness report](reports/robustness.md), [defence](reports/defence.md) (measured, not deployed), write-up
+- [ ] **Phase 7** — [load test](reports/load_test.md), [robustness report](reports/robustness.md), [defence](reports/defence.md) (deployed), [explanation check](reports/explanations.md), write-up
 
 ## Development
 

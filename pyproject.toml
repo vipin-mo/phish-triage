@@ -38,6 +38,8 @@ service = [
     "tokenizers>=0.23.3",
 ]
 train = [
+    "captum>=0.9.0",
+    "lime>=0.2.0.1",
     "mlflow>=3.17.2",
     "onnx>=1.23.2",
     "torch>=2.15.0",
