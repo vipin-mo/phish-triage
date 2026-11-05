@@ -26,6 +26,7 @@ ALLOWED = {"data/README.md"}
 FIXTURES = "tests/fixtures/"
 MAX_BYTES = 1_000_000  # nothing in the repo is near this; an extensionless corpus file (`phishing-2015`) would be
 SIZE_EXEMPT = {"uv.lock"}
+SIZE_LIMITS = {"docs/demo.gif": 1_500_000}  # the README's demo: a readable 25 s GIF of the add-on doesn't fit in 1 MB
 
 
 def violations(paths: list[str], root: Path | None = None) -> list[str]:
@@ -42,7 +43,7 @@ def violations(paths: list[str], root: Path | None = None) -> list[str]:
             bad.append(f"{raw}: files under {path.parts[0]}/ are never committed")
         elif any(suffix.lower() in BLOCKED_SUFFIXES for suffix in path.suffixes):
             bad.append(f"{raw}: {''.join(path.suffixes)} files look like raw data or a model")
-        elif raw not in SIZE_EXEMPT and (size := _size(root, raw)) > MAX_BYTES:
+        elif raw not in SIZE_EXEMPT and (size := _size(root, raw)) > SIZE_LIMITS.get(raw, MAX_BYTES):
             bad.append(f"{raw}: {size:,} bytes is too large for code or a report")
     return bad
 

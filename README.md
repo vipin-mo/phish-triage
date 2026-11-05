@@ -2,14 +2,8 @@
 
 [![CI](https://github.com/vipin-mo/phish-triage/actions/workflows/ci.yml/badge.svg)](https://github.com/vipin-mo/phish-triage/actions/workflows/ci.yml)
 
-> **Status: in progress.** Started October 2026. The data pipeline, baselines, DistilBERT, the LLM comparison,
-> the cascade and the safe LLM analyst step are done. Trained on public data alone, the models flagged almost all
-> of my real inbox mail. Trained with part of it, the cascade flagged 4.0% of it, but 76.5% of 18,682 newsletters
-> from 944 other websites; trained with part of those too, the deployed cascade flags 2.0% of my inbox and 0.9% of
-> newsletters from websites it never saw (below). It runs on AWS Lambda behind an API; the Gmail add-on is next.
-> Numbers are added only once they are measured.
-
-phish-triage scores emails for phishing and explains why.
+phish-triage scores emails for phishing and explains why. It runs on AWS Lambda behind an API, and I use it from a
+Gmail add-on on my own mail.
 
 It grew out of my course project, where a simple model scored about 98% precision and recall, but its
 explanations showed it was leaning on dataset artifacts: names like `enron` and years like `2004`, not
@@ -17,15 +11,188 @@ phishing signals. This project measures how much those artifacts and duplicate e
 score, and is built so the evaluation can't be fooled the same way:
 
 - **Evaluation that can't cheat:** duplicates removed, a dataset-leakage audit, tests on a different
-  source and on newer phishing, and recall reported at a fixed 1% false-alarm rate.
-- **A three-stage cascade:** a fast linear model handles most emails, a fine-tuned DistilBERT handles
-  the uncertain ones, and an LLM sees only the hardest. Measured: how much LLM is actually needed.
-- **A safe LLM step:** grounded, schema-checked output that can raise risk but never lower it, tested
-  against prompt injection hidden inside phishing emails.
+  source, on newer phishing and on my own inbox, and recall reported at a fixed false-alarm rate.
+- **A two-stage cascade:** a 5 ms stacked model decides most emails and a fine-tuned DistilBERT the uncertain
+  ones. A third stage, Claude, was measured too; on a 1,000-email sample no email was uncertain enough to reach it.
+- **A safe LLM step:** explanations on demand from Claude, grounded, schema-checked, able to raise risk but never
+  lower it, and tested against prompt injection hidden inside phishing emails.
 - **Sender checks:** SPF, DKIM and DMARC results from the receiving mail provider, look-alike domains,
   and mismatched display names, From and Reply-To addresses.
-- **Real use, serverless:** a Gmail sidebar add-on, AWS Lambda + SQS + DynamoDB via Terraform, and
-  canary rollout of new models.
+- **Tested against evasion:** hidden HTML, look-alike letters, invisible characters, shortened links and
+  LLM-written phishing, with a defence measured before it was deployed.
+- **Real use, serverless:** a Gmail sidebar add-on, AWS Lambda + API Gateway + DynamoDB in Terraform, canary
+  rollout of new models, a weekly drift check, and retraining from emails I send.
+
+## Results
+
+The model in service (`with-normalized-20261105-8baede93`, since 2026-11-05), on test emails it never trained on
+([reports/with_inbox.md](reports/with_inbox.md), *normalized*; [reports/defence.md](reports/defence.md), setup d):
+
+| Test | Result |
+|---|---:|
+| Public test phishing (Nazario, phishing_pot; 1,401 emails) | 97.7% caught |
+| Public test legitimate mail (Apache lists; 1,401) | 3 flagged (0.2%) |
+| 2026 phishing (1,644) | 98.3% caught |
+| Phishing that looks like a newsletter (31) | 23 caught |
+| My own inbox, 26 senders it never saw (249 emails) | 4 flagged (1.6%) |
+| Newsletters from 189 websites it never saw (PrivacyMail; 3,738) | 51 flagged (1.4%) |
+| LLM-written phishing (Greco et al.; 1,000) | 94.0% caught |
+| Public test phishing with hidden HTML text (three tricks) | 96.1–97.7% caught (16.9% before the defence) |
+| Precision if 1 email in 100 were phishing (recall as above, false alarms as on my inbox) | 0.38 |
+
+The public test is easier than real mail: its legitimate side is mailing-list discussion, so my inbox and the
+newsletters are the false-alarm numbers that count. The last row is why a flag here means "look closer", not
+"delete".
+
+### The course project, rebuilt
+
+The course model (TF-IDF + logistic regression) on its own data and on this project's
+([reports/course_reproduction.md](reports/course_reproduction.md), [reports/baselines.md](reports/baselines.md)):
+
+| | Course model | This project |
+|---|---|---|
+| Its own random split | 98.4% precision, 98.9% recall (reproduced) | |
+| The same, duplicates removed | 98.1% precision, 99.0% recall | |
+| A source it never saw (train on five, test on the sixth) | 7–24% false alarms; 51% of Nazario's phishing caught | |
+| 2023–2026 phishing, at 1% false alarms | 82.3% caught | 99.0% (text model) |
+
+Duplicates barely mattered. The sources did: most of the course data's "phishing" label was spam (about 89%),
+and each source's style gave the label away, so the score fell apart on a source the model hadn't seen.
+
+### How much LLM is needed
+
+On a fixed 1,000-email sample of the public test, with the public-data models ([docs/RESULTS.md](docs/RESULTS.md)):
+
+| Setup | Recall | False alarms | Decided by stage 1 / DistilBERT / Claude | Sent to a third party | Cost at 1M emails a day | Latency |
+|---|---:|---:|---|---:|---:|---:|
+| Stacked model only | 99.8% | 1.80% | 100% / 0% / 0% | 0% | $0 | 5 ms |
+| DistilBERT only | 100.0% | 0.80% | 0% / 100% / 0% | 0% | $0 | 29 ms |
+| Cascade: stacked → DistilBERT → Claude | 99.6% | 0.00% | 99.7% / 0.3% / 0% | 0% | $0 | 6 ms |
+| Claude Haiku 5.5 on every email | 97.4% | 0.80% | 0% / 0% / 100% | 100% | $167 a day | 1.5 s |
+
+So the service uses the two local stages to decide and Claude only to explain, when I ask.
+
+### The LLM step under attack
+
+The analyst sees the email, our signals and the classifier's verdict, and can raise the verdict but never lower
+it ([reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/injection.md),
+[reports/injection_round2.md](reports/injection_round2.md)):
+
+- **Prompt injection:** 40 phishing emails, each with an instruction planted nine ways (visible and hidden text,
+  a comment, alt text, the subject, a forged signals block, fake operator and IT-test notices): with the
+  defences, 0 of the 360 ended as safe.
+- **Ordinary mail:** 100% schema-valid answers; 0.8% of indicators dropped as ungrounded; it raised the one
+  phishing email of 100 the classifier missed to "suspicious".
+
+### Robustness, load and explanations
+
+- **Evasion** ([reports/robustness.md](reports/robustness.md), [reports/defence.md](reports/defence.md)): hidden
+  HTML text dropped the old model to 16.9%. A better reader (reader 2) and retraining brought it to 96.1–97.7%,
+  and LLM-written phishing from 88.8% to 94.0%. Text hidden with `text-indent`, `clip` or `transform` still gets
+  through (6.9% caught).
+- **Load** ([reports/load_test.md](reports/load_test.md)): 543 requests at up to 10 a second; the rate limits
+  refused the excess, nothing failed, and an answered scan took 45 ms at the gateway (p50).
+- **Explanations** ([reports/explanations.md](reports/explanations.md)): the words LIME and Integrated Gradients
+  rank highest move the score 4–24 times more than random words, but no handful of words decides a verdict.
+- **Real use** ([reports/real_use.md](reports/real_use.md)): 48 of my own emails scanned from the add-on so far;
+  two false alarms (a bank's and a ride app's notices) are the known issue below.
+
+## Demo
+
+![The add-on in my Gmail: scan, Claude's explanation, then reporting a false alarm and sending it for retraining](docs/demo.gif)
+
+The add-on on a real email in my Gmail, sped up where it waits for Claude (25 s). It is one of the false alarms in
+[Known issues](#known-issues): a genuine Xfinity notice the model flags at 0.9993. Claude's explanation keeps the
+verdict (it can raise one, never lower it) and points at what looks wrong, links that go through Adobe's tracking
+domain instead of xfinity.com, without calling the email phishing. I mark it a false alarm and send it for
+retraining as legitimate. The member-tier badge is blurred.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph Gmail["My Gmail"]
+        addon["Add-on (Apps Script)"]
+    end
+    subgraph AWS["AWS, us-east-2 (Terraform)"]
+        api["API Gateway HTTP API<br/>5 requests/s, 60/min per key"]
+        scan["Lambda: scan<br/>stacked model → DistilBERT (ONNX)<br/>sender check, rules"]
+        db[("DynamoDB<br/>hashed keys, verdicts by SHA-256,<br/>feedback, rate counts")]
+        bucket[("S3: emails I send for retraining<br/>(opt-in, deleted after 90 days)")]
+        drift["Lambda: weekly drift check"]
+        alarms["CloudWatch alarms → email"]
+        deploy["CodeDeploy canary<br/>smoke check, 10% for 10 min"]
+    end
+    claude["Claude Haiku 5.5<br/>(explanations on demand)"]
+    laptop["My laptop: training, packaging,<br/>deploys with MFA"]
+
+    addon -- "scan / explain / feedback" --> api --> scan
+    scan --> db
+    scan -- "send for retraining" --> bucket
+    scan -- "POST /v1/explain" --> claude
+    drift --> db
+    scan --> alarms
+    laptop -- "image + plan + apply" --> deploy --> scan
+    laptop -- "make retrain" --> bucket
+```
+
+The service stores no email, only a verdict, a score and the email's SHA-256, unless I send one for retraining
+([docs/THREAT_MODEL.md](docs/THREAT_MODEL.md)). The Anthropic key sits in Secrets Manager, and explanations stop
+at 50 a day per key and $0.50 a day in all.
+
+The service's CloudWatch dashboard from 2026-11-04 00:00 to 2026-11-05 18:00 UTC, each panel rendered by CloudWatch
+(`make dashboard-images`), so no account details are in the pictures:
+
+| | |
+|---|---|
+| ![Scans and errors](docs/dashboard/scans_and_errors.png) | ![API status](docs/dashboard/api_status.png) |
+| ![Scan time](docs/dashboard/scan_time.png) | ![API latency](docs/dashboard/api_latency.png) |
+
+- **The spikes just after midnight on 2026-11-05 are the load tests** ([reports/load_test.md](reports/load_test.md)):
+  most of the requests were refused with 429 by the rate limits (the 4xx line), and the function had no errors.
+- **The scan time's p95 spikes are copies loading the model:** about 20 s on a cold start and up to 100 s the
+  first time a new image runs, while the average stays low.
+- **The API's p95 reached 29 s once,** on the morning of 2026-11-04: a new model's first load took 60 s, and six
+  requests waiting on it got API Gateway's 29 s timeout (503). The deploy now loads the model before it finishes.
+
+## Cost
+
+Measured in AWS Cost Explorer for 2026-10-29 to 2026-11-06 (November's figures are still estimates), and from the
+spend ledger my Claude runs write:
+
+| What | Cost |
+|---|---:|
+| ECR, the container images | $0.010 |
+| Secrets Manager, the Anthropic key | $0.006 |
+| S3: Terraform state, model bundles, emails sent for retraining | $0.002 |
+| DynamoDB | $0.002 |
+| API Gateway | $0.002 |
+| Lambda, CloudWatch, KMS, SNS, Budgets | $0.000 (inside the free tier) |
+| **This project on AWS, nine days** | **$0.02**, paid from the Free plan's credits |
+| Claude Haiku 5.5, every evaluation in this README | $2.99 |
+
+A live explanation costs about $0.001. Most of the money went to measuring, not running: the service itself costs
+cents a month at my use. (The account's total also has $0.69 of disk storage from outside this project.)
+
+## Limits
+
+- **Two sources per class, one person's mail.** The public legitimate mail is mailing-list discussion; my inbox
+  and PrivacyMail stand in for real mail, and the real-use numbers are one person's few days.
+- **Newsletter-like phishing:** 23 of 31 caught. Few public phishing emails look like that, so there is little to
+  learn from.
+- **Big brands asking me to act read as phishing.** A rule sending own-domain-signed mail to review moved as many
+  phishing emails as false alarms, so it isn't used.
+- **Hidden text the reader has no rule for** (`text-indent`, `clip`, `transform`) still gets through.
+- **Images aren't read:** an image-only or QR-code email is judged on its few words (it goes to review when it has
+  almost none).
+- **The AWS Free plan** blocks keyless CI deploys, so I deploy from my laptop with MFA, and the account closes on
+  2027-04-27 unless I upgrade.
+
+The full list, with what was fixed, is under [Known issues](#known-issues).
+
+---
+
+The sections below are the details behind these numbers, in the order I found them.
 
 ## What the data showed so far
 
@@ -302,7 +469,7 @@ for a background design were removed, since a queue would have had to hold the e
   scores every held-out test exactly as before (reports/with_inbox.md, *retrained*), and still flags both emails
   ([reports/retraining_check.md](reports/retraining_check.md)): DistilBERT decides them, and only stage 1 is
   refitted. So the loop works, and it can't fix this kind of false alarm on its own.
-- Expected cost at my use: under $1 a month (mostly image storage), within the Free plan's credits. The Free plan
+- Cost at my use: $0.02 on AWS in the first nine days ([Cost](#cost)), within the Free plan's credits. The Free plan
   ends on 2027-04-27 and the account closes with it unless I upgrade, taking every resource with it; before then I
   either upgrade or export the feedback and API keys and destroy the service.
 
@@ -439,7 +606,7 @@ except my hand ratings, as noted.
 - [x] **Phase 2** — [features and sender check](docs/FEATURES.md), [baseline models](reports/baselines.md), metrics module, [course reproduction](reports/course_reproduction.md)
 - [x] **Phase 3** — DistilBERT ([ONNX int8](reports/onnx.md)), LLM comparison, cascade ([results](docs/RESULTS.md))
 - [x] **Phase 4** — grounded LLM analyst step ([results](reports/analyst.md)), prompt-injection tests ([round 1](reports/injection.md), [round 2](reports/injection_round2.md)), CI eval gate
-- [ ] **Phase 5** — serverless AWS deployment: [service and bundle](reports/bundle.md), Lambda + API Gateway + DynamoDB in [Terraform](infra/), deployed from my laptop with MFA (OIDC CI/CD blocked by the Free plan); cost table and dashboard screenshots to come
+- [x] **Phase 5** — serverless AWS deployment: [service and bundle](reports/bundle.md), Lambda + API Gateway + DynamoDB in [Terraform](infra/), deployed from my laptop with MFA (OIDC CI/CD blocked by the Free plan), [measured cost](#cost), [dashboard](#architecture)
 - [x] **Phase 6** — explanations on demand, [Gmail add-on](addon/) (in use), canary and shadow mode, weekly drift check, retraining from emails I send, [real use](reports/real_use.md)
 - [ ] **Phase 7** — [load test](reports/load_test.md), [robustness report](reports/robustness.md), [defence](reports/defence.md) (deployed), [explanation check](reports/explanations.md), write-up
 
