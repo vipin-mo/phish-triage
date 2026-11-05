@@ -306,11 +306,32 @@ for a background design were removed, since a queue would have had to hold the e
   ends on 2027-04-27 and the account closes with it unless I upgrade, taking every resource with it; before then I
   either upgrade or export the feedback and API keys and destroy the service.
 
+## What the attacks showed
+
+I attacked the public test's 1,401 phishing emails with tricks set before the first run, and scored them with the
+deployed model one email at a time ([reports/robustness.md](reports/robustness.md)):
+
+- **Look-alike letters, zero-width characters and shortened links barely matter.** Recall is 97.4% clean, 97.2%
+  with a zero-width space in every longer word or with every link turned into a bit.ly link, and 99.6% with 30% of
+  the letters that have a Cyrillic twin swapped for it: odd letters make an email look more like phishing, not less.
+- **Hidden HTML is the gap.** A harmless 360-word paragraph hidden at the top of the body with a class from a
+  `<style>` block, moved off-screen, or in 2 px text drops recall to 16.9%, and with the other three tricks to
+  12.7%. The visible-text reader drops inline `display:none` and same-colour text but misses all three, and the
+  paragraph fills DistilBERT's 512 tokens: put at the end of the body instead, it costs 322 of the 1,153 emails
+  where the models read it, not 1,127 of 1,382. Even the inline `display:none` control lost 36 emails, all HTML-only
+  ones that show fewer than 5 visible words, where the models read the parser's plain text, hidden parts included.
+- **LLM-written phishing gets through more often:** 88.8% of Greco et al.'s 1,000 LLM-written phishing emails are
+  flagged, as text alone. Their "legitimate" file can't be used: it is labelled phishing on every row, and about a
+  third of it asks the reader to verify an account at a made-up link.
+- **The analyst isn't fooled:** on 20 of these phishing emails, clean and under each attack, it called every one
+  phishing except one "suspicious" under hidden HTML ($0.02). It reads 6,000 characters, not 512 tokens. But it runs
+  only when I ask for an explanation, so the scan's verdict still has the gap.
+
 ## Known issues
 
-All but three are fixed. The first two were found while rating the analyst's answers by hand, the rest afterwards:
-on my test inbox, while packaging the model, on PrivacyMail, in the Claude re-run and in a review of the code, all
-in November 2026. Every number above was re-measured after the fixes, except my hand ratings, as noted.
+All but four are fixed. The first two were found while rating the analyst's answers by hand, the rest afterwards:
+on my test inbox, while packaging the model, on PrivacyMail, in the Claude re-run, in a review of the code and in
+the robustness test, all in November 2026. Every number above was re-measured after the fixes, except my hand ratings, as noted.
 
 - **Masking rewrote links (fixed).** Replacing the Apache list names with `project` ran over the whole body and
   HTML, including URLs and addresses. It rewrote a URL or address in 7,978 of the 13,541 legitimate emails the
@@ -362,6 +383,11 @@ in November 2026. Every number above was re-measured after the fixes, except my 
   the warning that one of them claims a pass the provider didn't give never fired in the service, only on raw
   emails. Masking now keeps whether one did. Stored verdicts also carry a rules version now, so a change like this
   one scans stored emails again, as a new model does.
+- **Hidden HTML gets past the visible-text reader (open).** Text hidden by a `<style>` class, moved off-screen or in
+  2 px type counts as visible, so a hidden paragraph at the top of the body decides what DistilBERT reads (above),
+  and an HTML-only email that shows fewer than 5 words is read with its hidden parts. The fix is the next step:
+  normalize what the models read (these tricks dropped, look-alike letters and invisible characters undone), retrain
+  on attacked copies, and measure again before anything is deployed.
 - **Filler can lift an image email out of review (open, kept on purpose).** An email whose HTML is an image, with
   20 words of hidden text or of a plain-text part next to it, isn't sent to review. Counting only the words the
   HTML shows would catch it, but legitimate image newsletters are built the same way: the deployed cascade would
@@ -378,7 +404,7 @@ in November 2026. Every number above was re-measured after the fixes, except my 
 - [x] **Phase 4** — grounded LLM analyst step ([results](reports/analyst.md)), prompt-injection tests ([round 1](reports/injection.md), [round 2](reports/injection_round2.md)), CI eval gate
 - [ ] **Phase 5** — serverless AWS deployment: [service and bundle](reports/bundle.md), Lambda + API Gateway + DynamoDB in [Terraform](infra/), deployed from my laptop with MFA (OIDC CI/CD blocked by the Free plan); cost table and dashboard screenshots to come
 - [x] **Phase 6** — explanations on demand, [Gmail add-on](addon/) (in use), canary and shadow mode, weekly drift check, retraining from emails I send, [real use](reports/real_use.md)
-- [ ] **Phase 7** — load test, robustness report, write-up
+- [ ] **Phase 7** — [load test](reports/load_test.md), [robustness report](reports/robustness.md) (the defence next), write-up
 
 ## Development
 

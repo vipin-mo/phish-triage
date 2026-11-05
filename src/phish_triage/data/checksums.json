@@ -709,6 +709,9 @@
  "course": {
   "phishing-email-dataset-v1.zip": "3a21343518a3a5e762d964ef6eced697f3cbde3a6d0ab7c9cbe0c17dc93b98f8"
  },
+ "greco": {
+  "human-llm-generated-phishing-legitimate-emails-v1.zip": "fec7d291249d8f5701303bea690c79f0dd28e2d65bb524d1ad08ff91abea347d"
+ },
  "nazario": {
   "20051114.mbox": "928cbf1c394d01d0b398ded8dc7cbd94dd4ce9cb0d4efdecd12696338c247926",
   "phishing-2015": "7523e62a5e6e4ee8134ab8b1a628e423097a7779e1003b28422864aa34f1c319",

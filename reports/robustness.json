@@ -1,0 +1,122 @@
+{
+ "bundle": "with-retraining-20261104-6addaf34",
+ "public_phish": {
+  "clean": {
+   "emails": 1401,
+   "flagged": 1364,
+   "recall": 0.9735902926481085,
+   "review": 4,
+   "decided_by_stage_1": 2,
+   "distilbert_recall": 0.9735902926481085
+  },
+  "lookalike_letters": {
+   "emails": 1401,
+   "flagged": 1395,
+   "recall": 0.9957173447537473,
+   "review": 0,
+   "decided_by_stage_1": 4,
+   "distilbert_recall": 0.9957173447537473,
+   "lost": 2
+  },
+  "hidden_characters": {
+   "emails": 1401,
+   "flagged": 1362,
+   "recall": 0.9721627408993576,
+   "review": 5,
+   "decided_by_stage_1": 5,
+   "distilbert_recall": 0.9721627408993576,
+   "lost": 2
+  },
+  "hidden_html_display_none": {
+   "emails": 1401,
+   "flagged": 1328,
+   "recall": 0.9478943611705924,
+   "review": 1,
+   "decided_by_stage_1": 4,
+   "distilbert_recall": 0.9478943611705924,
+   "lost": 36,
+   "hidden_read": 47,
+   "lost_with_hidden_read": 36
+  },
+  "hidden_html_style_class": {
+   "emails": 1401,
+   "flagged": 237,
+   "recall": 0.16916488222698073,
+   "review": 0,
+   "decided_by_stage_1": 186,
+   "distilbert_recall": 0.1827266238401142,
+   "lost": 1127,
+   "hidden_read": 1382,
+   "lost_with_hidden_read": 1127
+  },
+  "hidden_html_off_screen": {
+   "emails": 1401,
+   "flagged": 237,
+   "recall": 0.16916488222698073,
+   "review": 0,
+   "decided_by_stage_1": 186,
+   "distilbert_recall": 0.1827266238401142,
+   "lost": 1127,
+   "hidden_read": 1382,
+   "lost_with_hidden_read": 1127
+  },
+  "hidden_html_tiny_text": {
+   "emails": 1401,
+   "flagged": 237,
+   "recall": 0.16916488222698073,
+   "review": 0,
+   "decided_by_stage_1": 186,
+   "distilbert_recall": 0.1827266238401142,
+   "lost": 1127,
+   "hidden_read": 1382,
+   "lost_with_hidden_read": 1127
+  },
+  "shortened_links": {
+   "emails": 1401,
+   "flagged": 1362,
+   "recall": 0.9721627408993576,
+   "review": 5,
+   "decided_by_stage_1": 3,
+   "distilbert_recall": 0.9721627408993576,
+   "lost": 2
+  },
+  "all_four": {
+   "emails": 1401,
+   "flagged": 178,
+   "recall": 0.1270521056388294,
+   "review": 0,
+   "decided_by_stage_1": 202,
+   "distilbert_recall": 0.14489650249821556,
+   "lost": 1187,
+   "hidden_read": 1382,
+   "lost_with_hidden_read": 1187
+  },
+  "hidden_html_style_class_at_end": {
+   "emails": 1401,
+   "flagged": 1042,
+   "recall": 0.7437544610992148,
+   "review": 0,
+   "decided_by_stage_1": 25,
+   "distilbert_recall": 0.7466095645967167,
+   "lost": 322,
+   "hidden_read": 1153,
+   "lost_with_hidden_read": 322
+  }
+ },
+ "greco_llm_phish": {
+  "emails": 1000,
+  "flagged": 888,
+  "recall": 0.888,
+  "review": 0,
+  "decided_by_stage_1": 1,
+  "distilbert_recall": 0.888
+ },
+ "greco_legit_file": {
+  "emails": 998,
+  "flagged": 820,
+  "recall": 0.8216432865731463,
+  "review": 0,
+  "decided_by_stage_1": 0,
+  "distilbert_recall": 0.8216432865731463
+ }
+}

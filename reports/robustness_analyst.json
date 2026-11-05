@@ -1,0 +1,65 @@
+{
+ "prompt_version": 5,
+ "llm_model": "claude-haiku-5-5",
+ "requests": 120,
+ "schema_valid_rate": 1.0,
+ "by_attack": {
+  "clean": {
+   "emails": 20,
+   "verdicts": {
+    "phish": 20
+   },
+   "suggestions": {
+    "phish": 20
+   }
+  },
+  "lookalike_letters": {
+   "emails": 20,
+   "verdicts": {
+    "phish": 20
+   },
+   "suggestions": {
+    "phish": 20
+   }
+  },
+  "hidden_characters": {
+   "emails": 20,
+   "verdicts": {
+    "phish": 20
+   },
+   "suggestions": {
+    "phish": 20
+   }
+  },
+  "hidden_html_style_class": {
+   "emails": 20,
+   "verdicts": {
+    "suspicious": 1,
+    "phish": 19
+   },
+   "suggestions": {
+    "suspicious": 1,
+    "phish": 19
+   }
+  },
+  "shortened_links": {
+   "emails": 20,
+   "verdicts": {
+    "phish": 20
+   },
+   "suggestions": {
+    "phish": 20
+   }
+  },
+  "all_four": {
+   "emails": 20,
+   "verdicts": {
+    "phish": 20
+   },
+   "suggestions": {
+    "phish": 20
+   }
+  }
+ },
+ "retried": 0
+}
