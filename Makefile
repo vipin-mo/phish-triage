@@ -224,7 +224,7 @@ deploy-image:  ## build the arm64 Lambda image with the bundle and push it to th
 	mkdir -p build && rm -rf build/bundle build/image-tag build/smoke build/shadow && cp -R "artifacts/bundle/$$(cat infra/bundle-version)" build/bundle
 	mkdir -p build/smoke build/shadow && cp tests/fixtures/spoofed_brand.eml tests/fixtures/clean_newsletter.eml build/smoke/
 	@if [ -n "$(SHADOW)" ]; then cp -R "artifacts/bundle/$(SHADOW)/." build/shadow/; else touch build/shadow/.none; fi
-	uv export --no-default-groups --group service --no-hashes --no-emit-project --format requirements-txt -q > build/requirements.txt
+	uv export --no-default-groups --group service --no-emit-project --format requirements-txt -q > build/requirements.txt
 	tag=$(IMAGE_TAG) && \
 	if aws ecr describe-images --profile $(AWS_PROFILE_NAME) --region us-east-2 --repository-name phish-triage --image-ids imageTag="$$tag" >/dev/null 2>&1; then \
 	  echo "phish-triage:$$tag is already in the registry (tags are immutable)"; \

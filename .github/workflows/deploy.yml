@@ -2,12 +2,14 @@ name: Deploy
 
 # Pull requests: `terraform plan` for infra/service; the resources that change are posted as a comment (read-only role,
 # no data access; never the plan's text).
-# Merge to main: build the Lambda image, push it, and `terraform apply`, in the `production` environment, which
-# waits for my approval. AWS is reached with OIDC; no AWS keys are stored in GitHub.
-# Repository variables (not secrets, but kept out of the code): AWS_PLAN_ROLE_ARN, AWS_DEPLOY_ROLE_ARN,
-# TF_STATE_BUCKET, MODELS_BUCKET and, optionally, ALERT_EMAIL.
-# The jobs skip themselves while the role variables are unset: the AWS Free plan doesn't allow the OIDC provider
-# (infra/foundation/main.tf), so for now I deploy from my laptop with `make deploy`.
+# Merge to main: the eval gate, build the Lambda image, push it, `terraform apply`, then the same canary as a laptop
+# deploy (smoke check, 10% for 10 minutes, automatic rollback) and the loaded-model check, in the `production`
+# environment, which waits for my approval. AWS is reached with OIDC; no AWS keys are stored in GitHub.
+# Repository secrets, so GitHub masks them in the public logs (variables aren't masked, and a step's header shows its
+# script with them filled in): AWS_PLAN_ROLE_ARN, AWS_DEPLOY_ROLE_ARN, TF_STATE_BUCKET, MODELS_BUCKET, ALERT_EMAIL.
+# The account ID is masked too (`mask-aws-account-id`). The jobs run only when the repository variable CI_DEPLOYS is
+# `on`: the AWS Free plan doesn't allow the OIDC provider (infra/foundation/main.tf), so for now I deploy from my
+# laptop with `make deploy-image`, `make deploy-plan` and `make deploy-apply`.
 
 on:
   pull_request:
@@ -26,33 +28,37 @@ env:
 
 jobs:
   plan:
-    if: vars.AWS_PLAN_ROLE_ARN != '' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    if: vars.CI_DEPLOYS == 'on' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
       pull-requests: write
+    env:
+      TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+      TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+      TF_VAR_ci_role_boundary: "true"
+      TF_VAR_image_tag: ${{ github.event.pull_request.head.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd  # v6.3.0
         with:
-          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_PLAN_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+          mask-aws-account-id: true
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e  # v4.0.1
         with:
           terraform_wrapper: false
-      - name: Format and validate
+      - name: Format, validate and plan
+        # The plan's full text holds the account ID, ARNs and the alarm address, and this repo's logs and comments
+        # are public, so neither shows it, nor any error text (AWS errors name ARNs): only which resources change.
         run: |
           terraform fmt -check -recursive infra
-          terraform -chdir=infra/service init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
-          terraform -chdir=infra/service validate
-      - name: Plan
-        # The plan's full text holds the account ID, ARNs and the alarm address, and this repo's logs and comments
-        # are public, so neither shows it: only which resources change, and how.
-        run: |
-          terraform -chdir=infra/service plan -input=false -lock=false -no-color -out=ci.tfplan \
-            -var "image_tag=${{ github.event.pull_request.head.sha }}" \
-            -var "alert_email=${{ vars.ALERT_EMAIL }}" -var "ci_role_boundary=true" > /dev/null 2>&1 \
+          terraform -chdir=infra/service init -input=false -backend-config="bucket=$TF_STATE_BUCKET" > /dev/null 2>&1 \
+            || { echo "terraform init failed; run make deploy-plan on the laptop to see why"; exit 1; }
+          terraform -chdir=infra/service validate -no-color > /dev/null 2>&1 \
+            || { echo "terraform validate failed; run it on the laptop to see why"; exit 1; }
+          terraform -chdir=infra/service plan -input=false -lock=false -no-color -out=ci.tfplan > /dev/null 2>&1 \
             || { echo "terraform plan failed; run make deploy-plan on the laptop to see why"; exit 1; }
           terraform -chdir=infra/service show -json ci.tfplan \
             | jq -r '.resource_changes[] | select(.change.actions != ["no-op"]) | "\(.change.actions | join("/")) \(.address)"' \
@@ -72,7 +78,7 @@ jobs:
           gh pr comment "${{ github.event.pull_request.number }}" --body-file comment.md
 
   deploy:
-    if: vars.AWS_DEPLOY_ROLE_ARN != '' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: vars.CI_DEPLOYS == 'on' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04-arm
     environment: production
     concurrency:
@@ -81,19 +87,29 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      TF_STATE_BUCKET: ${{ secrets.TF_STATE_BUCKET }}
+      MODELS_BUCKET: ${{ secrets.MODELS_BUCKET }}
+      TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+      TF_VAR_ci_role_boundary: "true"
+      TF_VAR_image_tag: ${{ github.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+      - name: The eval gate (committed numbers, as `make deploy-image` checks them)
+        run: uv run python -m phish_triage.evaluation.gate --check
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd  # v6.3.0
         with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
-      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
+          mask-aws-account-id: true
       - name: Runtime requirements and the model bundle
         run: |
           mkdir -p build/bundle
-          uv export --no-default-groups --group service --no-hashes --no-emit-project --format requirements-txt -q \
+          uv export --no-default-groups --group service --no-emit-project --format requirements-txt -q \
             > build/requirements.txt
-          aws s3 sync --only-show-errors "s3://${{ vars.MODELS_BUCKET }}/bundles/$(cat infra/bundle-version)/" build/bundle/
+          aws s3 sync --only-show-errors "s3://$MODELS_BUCKET/bundles/$(cat infra/bundle-version)/" build/bundle/ \
+            > /dev/null 2>&1 || { echo "the bundle couldn't be fetched"; exit 1; }
           test -f build/bundle/bundle.json
       - id: ecr
         uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd  # v2.1.7
@@ -106,8 +122,9 @@ jobs:
           else
             # Lambda needs a single-platform image manifest, so no provenance or SBOM attestations.
             # Quiet: the image name holds the registry's address, which holds the account ID, and these logs are public.
-            docker build -q --platform linux/arm64 --provenance=false --sbom=false -f infra/lambda.Dockerfile -t "$IMAGE" . > /dev/null
-            docker push -q "$IMAGE" > /dev/null
+            docker build -q --platform linux/arm64 --provenance=false --sbom=false -f infra/lambda.Dockerfile -t "$IMAGE" . \
+              > /dev/null 2>&1 || { echo "docker build failed"; exit 1; }
+            docker push -q "$IMAGE" > /dev/null 2>&1 || { echo "docker push failed"; exit 1; }
           fi
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e  # v4.0.1
         with:
@@ -115,17 +132,19 @@ jobs:
       - name: Apply
         # As with the plan, the output stays out of the public log.
         run: |
-          terraform -chdir=infra/service init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" > /dev/null
-          terraform -chdir=infra/service apply -input=false -auto-approve -no-color \
-            -var "image_tag=${{ github.sha }}" -var "alert_email=${{ vars.ALERT_EMAIL }}" -var "ci_role_boundary=true" \
-            > /dev/null 2>&1 \
+          terraform -chdir=infra/service init -input=false -backend-config="bucket=$TF_STATE_BUCKET" > /dev/null 2>&1 \
+            || { echo "terraform init failed; run make deploy-plan on the laptop to see why"; exit 1; }
+          terraform -chdir=infra/service apply -input=false -auto-approve -no-color > /dev/null 2>&1 \
             || { echo "terraform apply failed; run make deploy-plan on the laptop to see why"; exit 1; }
           echo "applied"
-      - name: Smoke test
+      - name: Canary (smoke check, 10% for 10 minutes, rollback on the alarms) and the loaded-model check
+        # The same steps as `make deploy-apply` after its apply; the API's address is masked as it is read.
         run: |
+          aws lambda wait function-updated-v2 --function-name phish-triage-scan
+          uv run python scripts/canary.py
+          aws lambda invoke --function-name phish-triage-scan --qualifier live --cli-binary-format raw-in-base64-out \
+            --cli-read-timeout 150 --payload '{"source": "aws.events"}' build/warm.json > build/invoke.json
           url=$(terraform -chdir=infra/service output -raw api_url)
-          for attempt in 1 2 3 4 5; do
-            if curl -fsS --max-time 30 -o /dev/null "$url/v1/health"; then echo "healthy"; exit 0; fi
-            sleep 10
-          done
-          exit 1
+          echo "::add-mask::$url"
+          curl -fsS --retry 5 --retry-delay 10 --max-time 60 "$url/v1/health" > build/health.json
+          uv run python scripts/deploy_checks.py loaded build/invoke.json build/warm.json build/health.json
