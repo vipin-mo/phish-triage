@@ -231,7 +231,9 @@ def strip_list_footer(text: str) -> str:
 # At scan time the recipient's own domain and first name aren't collection names, so they stay in the text, where
 # training replaced the collectors' (Nazario's `monkey.org`, `jose`) with example.com and user. Measured on the
 # public test's phishing on 2026-11-05: 129 of 1,401 emails mask differently (126 Nazario), and the deployed model
-# flags all 129 either way, so live scans aren't masked further.
+# flags all 129 either way. The private collection names aren't in the service either (they stay on my laptop):
+# re-masked without them, 19 of my inbox's 249 test emails and 31 of PrivacyMail's 3,738 mask differently, and not
+# one verdict or deciding stage changes (`make masking-check`). So live scans aren't masked further.
 def _replacer(recipients: set[str]):
     addresses = sorted(recipients | set(COLLECTOR_ADDRESSES), key=len, reverse=True)
     address_re = re.compile("|".join(re.escape(a) for a in addresses), re.IGNORECASE) if addresses else None

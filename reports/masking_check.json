@@ -1,0 +1,23 @@
+{
+ "bundle": "with-normalized-20261105-8baede93",
+ "tests": {
+  "inbox_test": {
+   "emails": 249,
+   "masked the same": 230,
+   "masked differently": 19,
+   "flagged as trained": 0,
+   "flagged as the service masks": 0,
+   "verdict differs": 0,
+   "deciding stage differs": 0
+  },
+  "privacymail_test": {
+   "emails": 3738,
+   "masked the same": 3707,
+   "masked differently": 31,
+   "flagged as trained": 3,
+   "flagged as the service masks": 3,
+   "verdict differs": 0,
+   "deciding stage differs": 0
+  }
+ }
+}
