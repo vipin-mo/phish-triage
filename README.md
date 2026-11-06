@@ -44,6 +44,7 @@ differ by about a point):
 | Phishing three months newer than training (a candidate trained on phishing up to July 2026; 354 October emails) | 83.1% caught (98.2% in August) | 78.8–86.6% |
 | Phishing that looks like a newsletter (31) | 23 caught (74%) | 57–86% |
 | My test inbox (a Gmail account I subscribed to newsletters and shops), 26 senders held out of training (249 emails; 2 of the senders share a domain with training, [DATA.md](docs/DATA.md)) | 4 flagged (1.6%; 5.8% averaged per sender) | 0.6–4.1% |
+| My test inbox's later mail from those 26 senders, which no model was chosen on (154 emails from 17 of them) | 6 flagged (3.9%) | 1.8–8.2% |
 | Newsletters from 189 websites held out of training (PrivacyMail; 3,738) | 51 flagged (1.4%), 86 (2.3%) with the ones sent to review | 1.0–1.8% |
 | LLM-written phishing (Greco et al.; 1,000) | 94.0% caught | 92.4–95.3% |
 | Public test phishing with text hidden by the three tricks the reader has rules for | 96.1–97.7% caught (16.9% before the defence) | |
@@ -55,7 +56,9 @@ Four caveats:
 
 - **The tests were used to choose the model.** I scored these same sets for every model I compared, and picked
   the one in service on them, so they are closer to validation numbers than to a fresh test. Differences of a few
-  emails between models are within the noise of one training run. A fresh, untouched test is the next step.
+  emails between models are within the noise of one training run. The one untouched test is my inbox's later mail
+  from its held-out senders ([reports/fresh_inbox.md](reports/fresh_inbox.md)): 3.9% flagged, against 1.6% on
+  the emails the model was chosen on; the intervals overlap, and with it the precision row would be 0.20.
 - **The test inbox is bulk mail,** mostly notifications, newsletters and shops, not personal mail. My real mail
   is the second-to-last row, and 48 emails are far too few for a rate.
 - **The legitimate labels weren't checked by hand.** My inbox's emails count as legitimate because Gmail delivered

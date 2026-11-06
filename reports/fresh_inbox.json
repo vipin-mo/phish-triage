@@ -1,0 +1,56 @@
+{
+ "bundle": "with-normalized-20261105-8baede93",
+ "matching": {
+  "second_export": 3087,
+  "in the first export": 1701,
+  "new": 1386
+ },
+ "groups": {
+  "held-out senders": {
+   "emails": 154,
+   "senders": 17,
+   "flagged": 6,
+   "sent_to_review": 1,
+   "flagged_per_sender_mean": 0.022998673153471913,
+   "categories": {
+    "promotions": 14,
+    "purchases": 3,
+    "updates": 137
+   }
+  },
+  "training senders": {
+   "emails": 1204,
+   "senders": 65,
+   "flagged": 25,
+   "sent_to_review": 38,
+   "flagged_per_sender_mean": 0.014184042982100029,
+   "categories": {
+    "promotions": 144,
+    "purchases": 6,
+    "updates": 1054
+   }
+  },
+  "new senders": {
+   "emails": 19,
+   "senders": 14,
+   "flagged": 1,
+   "sent_to_review": 0,
+   "flagged_per_sender_mean": 0.03571428571428571,
+   "categories": {
+    "primary": 3,
+    "promotions": 7,
+    "updates": 9
+   }
+  },
+  "spam folder": {
+   "emails": 9,
+   "senders": 5,
+   "flagged": 0,
+   "sent_to_review": 0,
+   "flagged_per_sender_mean": 0.0,
+   "categories": {
+    "spam": 9
+   }
+  }
+ }
+}
