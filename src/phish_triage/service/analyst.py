@@ -34,7 +34,7 @@ from pydantic import BaseModel, ValidationError, field_validator
 from phish_triage.data.parse import html_to_text
 from phish_triage.data.private import refuse_private
 from phish_triage.features.html import summarize_html, visible_html
-from phish_triage.features.sender import SenderCheck
+from phish_triage.features.sender import SenderCheck, warning_sentence
 from phish_triage.service.pii import redact
 
 MODEL = "claude-haiku-5-5"
@@ -42,7 +42,7 @@ MODEL = "claude-haiku-5-5"
 # v1: "at most 80 words" (16% longer); v2: asks for 60 (1.5% longer); v3: asks for 50, random per-request tags;
 # v4: numbered signals that indicators cite by number (v3 quoted the signals as if they were the email: 8 of 11 drops);
 # v5: the summary must agree with recommended_action (v4: "no action" with "check the sender if unsure").
-PROMPT_VERSION = 6
+PROMPT_VERSION = 7
 MAX_BODY_CHARS = 6_000
 MAX_LINKS = 15
 # Each header, link and attachment name shown is cut to this many characters, and at most MAX_ATTACHMENTS names are
@@ -175,11 +175,18 @@ class AnalystInput:
     signals: list[str] = field(default_factory=list)  # our numbered signals: S1 is signals[0]
 
 
+def _plain(text: str) -> str:
+    """The text as the model reads it: NFKC (full-width letters become ASCII) with invisible characters removed."""
+    return _INVISIBLE.sub("", unicodedata.normalize("NFKC", text))
+
+
 def ai_instructions(visible: str, hidden: str) -> list[str]:
+    """Where instructions aimed at an AI are, looked for in the text as the model reads it, so a zero-width space or
+    full-width letters can't hide "ignore all previous instructions" from this check but not from the model."""
     found = []
-    if _AI_INSTRUCTIONS.search(visible):
+    if _AI_INSTRUCTIONS.search(_plain(visible)):
         found.append("visible text")
-    if _AI_INSTRUCTIONS.search(hidden):
+    if _AI_INSTRUCTIONS.search(_plain(hidden)):
         found.append("hidden text")
     return found
 
@@ -209,16 +216,17 @@ def render(
         body = f"{body}\n{hidden_text}" if hidden_text else body
     links = list(dict.fromkeys(href for href, _ in summarize_html(html).links)) if html else []
     links = links or list(record.get("urls") or [])
-    lines = [
-        f"{name}: {value[:MAX_FIELD_CHARS]}"
-        for name in ("From", "Reply-To", "To")
-        if (value := _header(record, name.lower()))
-    ]
+    # Every field is normalized before it is cut, so the caps (and the spend reservation sized from them,
+    # `explain.worst_case_microusd`) hold for what the model gets: NFKC can turn one character into 18.
+    nfkc = lambda text: unicodedata.normalize("NFKC", text)  # noqa: E731
+    body, hidden_text, subject_header = nfkc(body), nfkc(hidden_text), nfkc(subject_header)
+    headers = {name: nfkc(value) for name in ("From", "Reply-To", "To") if (value := _header(record, name.lower()))}
+    lines = [f"{name}: {value[:MAX_FIELD_CHARS]}" for name, value in headers.items()]
     lines.append(f"Subject: {subject_header[:MAX_FIELD_CHARS]}")
     if links:
-        lines.append("Links (targets): " + " ".join(link[:MAX_FIELD_CHARS] for link in links[:MAX_LINKS]))
+        lines.append("Links (targets): " + " ".join(nfkc(link)[:MAX_FIELD_CHARS] for link in links[:MAX_LINKS]))
     if attachments := record.get("attachments"):
-        names = [(a.get("filename") or "unnamed")[:MAX_FIELD_CHARS] for a in attachments[:MAX_ATTACHMENTS]]
+        names = [nfkc(a.get("filename") or "unnamed")[:MAX_FIELD_CHARS] for a in attachments[:MAX_ATTACHMENTS]]
         more = f" and {len(attachments) - MAX_ATTACHMENTS} more" if len(attachments) > MAX_ATTACHMENTS else ""
         lines.append("Attachments: " + ", ".join(names) + more)
     cut = len(body) > MAX_BODY_CHARS
@@ -229,7 +237,9 @@ def render(
     shown = _OUR_TAGS.sub(lambda m: m.group(0).replace("<", "[").replace(">", "]"), redaction.text)
     found_urls = [redact(u).text for u in [*links, *(record.get("urls") or [])]] + _URL.findall(shown)
     known_urls = list(dict.fromkeys(found_urls))
-    found = ai_instructions(f"{subject_header}\n{body}", hidden_text) if defended else []
+    # the sender's name and Reply-To too: they are shown to the model as well
+    visible = "\n".join([headers.get("From", ""), headers.get("Reply-To", ""), subject_header, body])
+    found = ai_instructions(visible, hidden_text) if defended else []
 
     if not defended:
         return AnalystInput(shown, SYSTEM_UNDEFENDED, shown, known_urls, redactions=redaction.counts)
@@ -244,7 +254,9 @@ def render(
             f"{k}={v}" for k, v in (("spf", sender.spf), ("dkim", sender.dkim), ("dmarc", sender.dmarc)) if v
         )
         notes.append(f"Sender check: {sender.verdict}" + (f" ({results})" if results else ""))
-        notes += [f"Sender warning: {w}" for w in sender.warnings]
+        # Our fixed sentence for each kind of warning, not the warning itself: that names the sender's domains,
+        # which the sender chooses, and this block is the part the model may rely on. The domains are in the email.
+        notes += [f"Sender warning: {w}" for w in dict.fromkeys(map(warning_sentence, sender.warnings))]
     if view and view.hidden:
         parts = ", ".join(f"{n} {k.replace('_', ' ')}" for k, n in sorted(view.hidden.items()))
         notes.append(f"Hidden content was removed from the email before you saw it: {parts}")
@@ -393,15 +405,17 @@ def finish(
     refused: bool = False,
     cut_off: bool = False,
     classifier_review: bool = False,
+    content_failure: bool = False,
 ) -> AnalystResult:
     """Validate the model's answer, drop ungrounded indicators and apply the raise-only rule. `refused`: the model
     declined to answer (`stop_reason` "refusal"); `cut_off`: it hit its token limit; an answer that came back but
     doesn't match the schema counts the same (the caller has already asked once more). `classifier_review`: the
-    scanner sent the email to review (too little text)."""
+    scanner sent the email to review (too little text). `content_failure`: no answer came back, but the email may be
+    why (the request was rejected, or the answer before a failed retry didn't match the schema)."""
     output = parse_answer(raw)
     if output is None:
         ai_found = bool(analyst_input.ai_instructions)
-        content_failure = defended and (refused or cut_off or raw is not None)
+        content_failure = defended and (refused or cut_off or raw is not None or content_failure)
         verdict, reasons = final_verdict(
             classifier_phish, None, ai_found, content_failure=content_failure, classifier_review=classifier_review
         )

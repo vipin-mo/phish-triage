@@ -99,3 +99,11 @@ def test_a_sent_email_like_a_test_email_is_left_out_of_training():
     assert left_out == {"copy"}  # same sender and the same text as a test email; the other one is kept
     split = retraining.build_split({"train": [], "val": [], "test": ["x"]}, ["copy", "other"], left_out)
     assert split["train"] == ["other"]
+
+
+def test_only_the_tests_split_by_sender_rule_out_a_sender():
+    sent = {"same_sender": _record("clean_newsletter.eml")}
+    public_test = [_record("spoofed_brand.eml", "phish") | {"headers": _record("clean_newsletter.eml")["headers"]}]
+    # the same sender as a public test email, different text: the public test isn't split by sender, so it stays
+    assert retraining.like_a_test_email(sent, tests=public_test, by_sender=[]) == set()
+    assert retraining.like_a_test_email(sent, tests=public_test, by_sender=public_test) == {"same_sender"}

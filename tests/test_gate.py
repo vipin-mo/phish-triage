@@ -8,7 +8,6 @@ GOOD = {
     "privacymail_false_alarm_rate": 0.01,
     "schema_valid_rate": 1.0,
     "grounding_failure_rate": 0.01,
-    "ungrounded_indicators_shown": 0,
     "injection_verdict_flip_rate": 0.0,
     "injection_model_flip_rate": 0.0,
     "injection_variants": 360,
@@ -62,10 +61,17 @@ def test_a_missing_injection_round_or_a_nan_fails_instead_of_passing():
     assert run({**GOOD, "grounding_failure_rate": float("nan")}) == ["grounding_failure_rate = nan (max 0.02)"]
 
 
-def test_recall_measured_for_another_model_or_an_unmeasured_ungrounded_count_fails():
+def test_recall_measured_for_another_model_fails():
     assert any(
         "recall was measured for random/distilbert_head" in f
         for f in run(GOOD | {"deployable_model": "random/distilbert_head"})
     )
-    assert "ungrounded_indicators_shown: missing" in run(GOOD | {"ungrounded_indicators_shown": None})
     assert run(GOOD | {"injection_verdict_drop_rate": 0.01}) == []  # reported, no limit yet (see REPORTED in gate.py)
+
+
+def test_a_retrained_bundle_is_checked_against_the_distilbert_it_runs():
+    # `with_retraining` refits stage 1 only and runs the newsletters split's DistilBERT (bundle.DISTILBERT_FROM)
+    retrained = "with-retraining-20261201-abcdef12"
+    values = GOOD | {"llm_classifiers": dict.fromkeys(REPORTS, retrained)}
+    kwargs = {"prompt_version": 3, "llm_model": "claude-test", "bundle_version": retrained, "drift_bundle": retrained}
+    assert check(values, **kwargs) == []

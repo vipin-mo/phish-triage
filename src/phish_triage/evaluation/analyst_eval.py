@@ -33,6 +33,7 @@ from phish_triage.features.sender import check_sender
 from phish_triage.models import llm_batch
 from phish_triage.models.llm_classifier import max_llm_spend_usd, sample_ids, spent_usd
 from phish_triage.service import analyst
+from phish_triage.service.triage import too_little_text
 
 EMAILS = 200
 RATED = 50
@@ -63,17 +64,19 @@ def build(emails: int = EMAILS):
             reader=getattr(classify, "reader", 1),
             classifier_score=float(score),
             classifier_phish=flagged,
-            sender=check_sender(record),
+            sender=check_sender(record, ranks),  # with the ranks, as the service checks the sender
             signals=analyst.signals_from_features(extract(record, ranks)),
         )
         params[email_id] = analyst.request_params(a)
-        meaning[email_id] = {"label": record["label"], "flagged": flagged, "_input": a}
+        # the scanner's review verdict (too little text), which the service passes on as a floor
+        review = not flagged and too_little_text(record)
+        meaning[email_id] = {"label": record["label"], "flagged": flagged, "review": review, "_input": a}
     return params, meaning, version
 
 
 def evaluate(responses: dict, meaning: dict, classifier: str = "") -> tuple[dict, list[dict]]:
     rows, verdicts, indicators, dropped, with_drop, invalid, errors = [], Counter(), 0, 0, 0, 0, Counter()
-    from_signals = conflicts = no_action = ungrounded = 0
+    from_signals = conflicts = no_action = 0
     for email_id, m in meaning.items():
         raw = responses.get(email_id, {})
         if raw.get("error"):
@@ -81,14 +84,15 @@ def evaluate(responses: dict, meaning: dict, classifier: str = "") -> tuple[dict
         refused = raw.get("stop_reason") == "refusal"
         cut_off = raw.get("error") == "max_tokens"
         text = None if raw.get("error") else raw.get("text")
-        r = analyst.finish(text, m["_input"], m["flagged"], refused=refused, cut_off=cut_off)
+        r = analyst.finish(
+            text, m["_input"], m["flagged"], refused=refused, cut_off=cut_off, classifier_review=m.get("review", False)
+        )
         invalid += not r.schema_valid
         kept = len(r.output.indicators) if r.output else 0
         indicators += kept + r.indicators_dropped
         dropped += r.indicators_dropped
         with_drop += r.indicators_dropped > 0
         from_signals += sum(i.source == "signal" for i in r.output.indicators) if r.output else 0
-        ungrounded += sum(not analyst.grounded(i, m["_input"]) for i in r.output.indicators) if r.output else 0
         no_action += bool(r.output) and r.output.recommended_action == "no_action"
         conflicts += bool(r.output) and analyst.advice_conflict(r.output)
         verdicts[(m["label"], r.verdict)] += 1
@@ -121,7 +125,6 @@ def evaluate(responses: dict, meaning: dict, classifier: str = "") -> tuple[dict
         "indicators": indicators,
         "grounding_failures": dropped,
         "grounding_failure_rate": dropped / indicators if indicators else 0.0,
-        "ungrounded_indicators_shown": ungrounded,  # kept indicators checked again; finish() should leave none
         "kept_indicators_citing_a_signal": from_signals,
         "answers_with_a_dropped_indicator": with_drop,
         "no_action_answers": no_action,

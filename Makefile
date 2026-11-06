@@ -23,10 +23,14 @@ format:  ## auto-fix lint and formatting
 test:  ## unit tests
 	uv run pytest
 
-check-data:  ## fail if any tracked file looks like raw data
+check-data:  ## fail if any tracked file, or any version in the history, looks like raw data or a secret
 	uv run python scripts/check_no_raw_data.py
+	uv run python scripts/check_no_raw_data.py --history
+	@if command -v gitleaks >/dev/null; then gitleaks git --log-opts="--all" --redact --no-banner .; \
+	else echo "gitleaks isn't installed (brew install gitleaks): CI runs it"; fi
 
-check: lint check-data test  ## everything CI runs
+check: lint check-data test  ## everything CI runs: lint, the raw-data and secret checks, tests, the eval gate
+	uv run python -m phish_triage.evaluation.gate --check
 
 data: data-download data-build data-prepare data-splits  ## download, parse, mask, de-duplicate and split (fixed seeds)
 
@@ -92,7 +96,7 @@ eval-with-inbox:  ## before/after: models trained without and with part of my in
 eval-test-inbox:  ## false alarms on my private test inbox (local models only, aggregates only; never sent to an LLM)
 	uv run --group train python -m phish_triage.evaluation.test_inbox
 
-bundle:  ## export the deployable model bundle (with_newsletters) and check it against reports/with_inbox.md (reports/bundle.md)
+bundle:  ## export the deployable bundle of the split in infra/bundle-version and check it against reports/with_inbox.md (reports/bundle.md)
 	uv run python -m phish_triage.service.bundle
 
 serve:  ## run the API locally on the latest bundle (prints a one-run API key)
@@ -102,11 +106,11 @@ serve:  ## run the API locally on the latest bundle (prints a one-run API key)
 retrain-pull:  ## move the emails I sent for retraining out of the bucket into data/private/retraining (counts only)
 	$(AWS_ENV) && uv run python -m phish_triage.data.retraining --pull "phish-triage-retraining-$(ACCOUNT)"
 
-retrain: retrain-pull  ## pull, build `with_retraining`, evaluate, bundle, point infra/bundle-version at it, drift reference
+retrain: retrain-pull  ## pull, add the sent emails to the deployed split, refit stage 1, bundle `with_normalized` (reader 2), point infra/bundle-version at it, drift reference
 	uv run python -m phish_triage.data.retraining --build
 	$(MAKE) eval-with-inbox
-	uv run python -m phish_triage.service.bundle --split with_retraining
-	uv run python -c "from phish_triage.service.bundle import latest; print(latest(split='with_retraining').name)" > infra/bundle-version
+	uv run python -m phish_triage.service.bundle --split with_normalized
+	uv run python -c "from phish_triage.service.bundle import latest; print(latest(split='with_normalized').name)" > infra/bundle-version
 	$(MAKE) drift-reference
 	@echo "infra/bundle-version: $$(cat infra/bundle-version). Next: the Claude evaluations behind it (they cost money:"
 	@echo "make eval-analyst CONFIRM=--confirm; make eval-injection CONFIRM=--confirm), make gate, then deploy."
