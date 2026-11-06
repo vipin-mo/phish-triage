@@ -10,6 +10,7 @@ help:  ## list targets
 setup:  ## create .venv (Python 3.12), install dev deps, install git hooks
 	uv sync
 	uv run pre-commit install
+	@command -v gitleaks >/dev/null || echo "gitleaks isn't installed: the secret-scan hook needs it (brew install gitleaks)"
 
 lint:  ## ruff lint + format check
 	uv run ruff check .
@@ -233,11 +234,12 @@ deploy-image:  ## build the arm64 Lambda image with the bundle and push it to th
 	  echo "pushed phish-triage:$$tag"; \
 	fi && echo "$$tag" > build/image-tag
 
-deploy-plan:  ## plan infra/service for the image in build/image-tag (alarm email from ~/.config/phish-triage/alert-email)
+deploy-plan:  ## plan infra/service for the image in build/image-tag (alarm email from ~/.config/phish-triage/alert-email; CI_BOUNDARY=1 once CI deploys are on)
 	@test -n "$(ALERT_EMAIL)" || { echo "no ALERT_EMAIL (or ~/.config/phish-triage/alert-email): the plan would remove the alarm emails"; exit 1; }
 	@test -s build/image-tag || { echo "no build/image-tag: run make deploy-image first"; exit 1; }
 	$(AWS_ENV) && terraform -chdir=infra/service init -input=false -backend-config="bucket=phish-triage-tfstate-$(ACCOUNT)" && \
-	terraform -chdir=infra/service plan -input=false -out=service.tfplan -var "image_tag=$$(cat build/image-tag)" -var "alert_email=$(ALERT_EMAIL)"
+	terraform -chdir=infra/service plan -input=false -out=service.tfplan -var "image_tag=$$(cat build/image-tag)" -var "alert_email=$(ALERT_EMAIL)" \
+	  $(if $(CI_BOUNDARY),-var ci_role_boundary=true)
 
 deploy-apply:  ## apply the saved service plan, canary the new version (smoke check, 10% for 10 min), then check the loaded model
 	$(AWS_ENV) && terraform -chdir=infra/service apply -input=false service.tfplan && \

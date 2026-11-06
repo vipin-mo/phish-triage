@@ -22,6 +22,8 @@ def test_the_manifest_asks_only_for_the_open_message_and_names_no_address():
 def test_the_add_on_logs_nothing_and_names_no_address():
     code = (ADDON / "Code.js").read_text()
     assert "Logger.log" not in code and "console." not in code
+    # Apps Script's own error logging would send an error's details to Google Cloud Logging
+    assert json.loads((ADDON / "appsscript.template.json").read_text())["exceptionLogging"] == "NONE"
     assert "execute-api" not in code and "amazonaws.com" not in code
 
 

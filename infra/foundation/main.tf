@@ -47,6 +47,8 @@ locals {
   account     = data.aws_caller_identity.me.account_id
   state_arn   = "arn:aws:s3:::phish-triage-tfstate-${local.account}"
   models_name = "phish-triage-models-${local.account}"
+  # Every role the deploy role creates must carry this boundary (infra/service, `ci_role_boundary`).
+  boundary_arn = "arn:aws:iam::${local.account}:policy/phish-triage-svc-boundary"
 }
 
 # GitHub Actions signs in with a short-lived token instead of stored keys.
@@ -114,15 +116,38 @@ resource "aws_iam_role_policy_attachment" "plan_read" {
 }
 
 data "aws_iam_policy_document" "plan_no_data" {
+  # ReadOnlyAccess reads data as well as settings; a plan needs only the settings. Denied: the model and the
+  # emails sent for retraining, the tables' items, the Anthropic key, the image (it holds the model) and the logs.
   statement {
     effect    = "Deny"
     actions   = ["s3:GetObject", "s3:GetObjectVersion"]
-    resources = ["${aws_s3_bucket.models.arn}/*"]
+    resources = ["${aws_s3_bucket.models.arn}/*", "arn:aws:s3:::phish-triage-retraining-*/*"]
+  }
+  statement {
+    effect = "Deny"
+    actions = [
+      "dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query", "dynamodb:Scan", "dynamodb:PartiQLSelect",
+      "dynamodb:ExportTableToPointInTime", "dynamodb:GetRecords",
+    ]
+    resources = ["arn:aws:dynamodb:${var.region}:${local.account}:table/phish-triage-*"]
   }
   statement {
     effect    = "Deny"
-    actions   = ["dynamodb:GetItem", "dynamodb:BatchGetItem", "dynamodb:Query", "dynamodb:Scan"]
-    resources = ["arn:aws:dynamodb:${var.region}:${local.account}:table/phish-triage-*"]
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = ["*"]
+  }
+  statement {
+    effect    = "Deny"
+    actions   = ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"]
+    resources = [aws_ecr_repository.service.arn]
+  }
+  statement {
+    effect = "Deny"
+    actions = [
+      "logs:GetLogEvents", "logs:FilterLogEvents", "logs:StartQuery", "logs:GetQueryResults", "logs:StartLiveTail",
+      "logs:GetLogRecord", "sqs:ReceiveMessage",
+    ]
+    resources = ["*"]
   }
 }
 
@@ -215,10 +240,44 @@ data "aws_iam_policy_document" "deploy" {
     actions   = ["sns:CreateTopic", "sns:DeleteTopic", "sns:SetTopicAttributes", "sns:Subscribe", "sns:Unsubscribe", "sns:TagResource", "sns:UntagResource"]
     resources = ["arn:aws:sns:${var.region}:${local.account}:phish-triage-*"]
   }
+  # The function roles: the deploy role may only make roles that carry the boundary, so a role it writes can't hold
+  # more than the boundary allows, whatever its own policy says; it can't remove the boundary, and it can attach
+  # only the one AWS policy CodeDeploy needs.
   statement {
     sid       = "FunctionRoles"
-    actions   = ["iam:CreateRole", "iam:DeleteRole", "iam:UpdateAssumeRolePolicy", "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:AttachRolePolicy", "iam:DetachRolePolicy", "iam:TagRole", "iam:UntagRole"]
+    actions   = ["iam:CreateRole", "iam:PutRolePolicy", "iam:PutRolePermissionsBoundary"]
     resources = ["arn:aws:iam::${local.account}:role/phish-triage-svc-*"]
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PermissionsBoundary"
+      values   = [local.boundary_arn]
+    }
+  }
+  statement {
+    sid       = "FunctionRolesAttach"
+    actions   = ["iam:AttachRolePolicy"]
+    resources = ["arn:aws:iam::${local.account}:role/phish-triage-svc-*"]
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PermissionsBoundary"
+      values   = [local.boundary_arn]
+    }
+    condition {
+      test     = "ArnEquals"
+      variable = "iam:PolicyARN"
+      values   = ["arn:aws:iam::aws:policy/service-role/AWSCodeDeployRoleForLambda"]
+    }
+  }
+  statement {
+    sid       = "FunctionRolesChange"
+    actions   = ["iam:DeleteRole", "iam:UpdateAssumeRolePolicy", "iam:DeleteRolePolicy", "iam:DetachRolePolicy", "iam:TagRole", "iam:UntagRole"]
+    resources = ["arn:aws:iam::${local.account}:role/phish-triage-svc-*"]
+  }
+  statement {
+    sid       = "KeepTheBoundary"
+    effect    = "Deny"
+    actions   = ["iam:DeleteRolePermissionsBoundary", "iam:CreatePolicyVersion", "iam:DeletePolicy", "iam:SetDefaultPolicyVersion"]
+    resources = ["arn:aws:iam::${local.account}:role/*", local.boundary_arn]
   }
   statement {
     sid       = "PassFunctionRoles"
@@ -236,6 +295,61 @@ resource "aws_iam_role_policy" "deploy" {
   count  = var.github_oidc ? 1 : 0
   role   = aws_iam_role.deploy[0].id
   policy = data.aws_iam_policy_document.deploy.json
+}
+
+# The most any function role made by the deploy role can do: the service's own tables, logs, secret, buckets, alarms
+# and functions, and nothing in IAM or STS. The roles' own policies are narrower; this caps what a changed one could
+# grant.
+data "aws_iam_policy_document" "boundary" {
+  statement {
+    actions = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = [
+      "arn:aws:logs:${var.region}:${local.account}:log-group:/aws/lambda/phish-triage-*",
+      "arn:aws:logs:${var.region}:${local.account}:log-group:/aws/lambda/CodeDeployHook_phish-triage*",
+    ]
+  }
+  statement {
+    actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:Scan"]
+    resources = ["arn:aws:dynamodb:${var.region}:${local.account}:table/phish-triage-*"]
+  }
+  statement {
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = ["arn:aws:secretsmanager:${var.region}:${local.account}:secret:phish-triage/*"]
+  }
+  statement {
+    actions   = ["kms:Decrypt"] # the secret's key, only through Secrets Manager
+    resources = ["*"]
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["secretsmanager.${var.region}.amazonaws.com"]
+    }
+  }
+  statement {
+    actions   = ["s3:PutObject", "s3:GetObject", "s3:GetObjectVersion"]
+    resources = ["arn:aws:s3:::phish-triage-retraining-${local.account}/*"]
+  }
+  statement {
+    actions = ["lambda:InvokeFunction", "lambda:GetAlias", "lambda:UpdateAlias", "lambda:GetProvisionedConcurrencyConfig"]
+    resources = [
+      "arn:aws:lambda:${var.region}:${local.account}:function:phish-triage-*",
+      "arn:aws:lambda:${var.region}:${local.account}:function:CodeDeployHook_phish-triage*",
+    ]
+  }
+  statement {
+    actions   = ["codedeploy:GetDeployment", "codedeploy:PutLifecycleEventHookExecutionStatus", "cloudwatch:PutMetricData", "cloudwatch:DescribeAlarms"]
+    resources = ["*"]
+  }
+  statement {
+    actions   = ["sns:Publish"]
+    resources = ["arn:aws:sns:${var.region}:${local.account}:phish-triage-*"]
+  }
+}
+
+resource "aws_iam_policy" "boundary" {
+  count  = var.github_oidc ? 1 : 0
+  name   = "phish-triage-svc-boundary"
+  policy = data.aws_iam_policy_document.boundary.json
 }
 
 # The image registry (private) and the model bucket (private, versioned). The model is trained partly on my

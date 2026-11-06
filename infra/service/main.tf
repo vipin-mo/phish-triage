@@ -27,7 +27,8 @@ data "aws_ecr_repository" "service" {
 }
 
 locals {
-  name = "phish-triage"
+  role_boundary = var.ci_role_boundary ? "arn:aws:iam::${data.aws_caller_identity.me.account_id}:policy/phish-triage-svc-boundary" : null
+  name          = "phish-triage"
   # one owner per line, the same file `make retrain` reads (data/retraining.py)
   retraining_owners = join(",", compact([for line in split("\n", file("${path.module}/../retraining-owners")) : trimspace(line)]))
   image_uri         = "${data.aws_ecr_repository.service.repository_url}:${var.image_tag}"
@@ -87,8 +88,9 @@ data "aws_iam_policy_document" "lambda_trust" {
 }
 
 resource "aws_iam_role" "scan" {
-  name               = "${local.name}-svc-scan"
-  assume_role_policy = data.aws_iam_policy_document.lambda_trust.json
+  permissions_boundary = local.role_boundary
+  name                 = "${local.name}-svc-scan"
+  assume_role_policy   = data.aws_iam_policy_document.lambda_trust.json
 }
 
 data "aws_iam_policy_document" "scan" {
@@ -328,7 +330,8 @@ resource "aws_secretsmanager_secret" "anthropic" {
 # --- Canary: CodeDeploy moves `live` 10% for 10 minutes, after a smoke check, and rolls back on the alarms ---
 
 resource "aws_iam_role" "codedeploy" {
-  name = "${local.name}-svc-codedeploy"
+  permissions_boundary = local.role_boundary
+  name                 = "${local.name}-svc-codedeploy"
   assume_role_policy = jsonencode({
     Version   = "2012-10-17"
     Statement = [{ Effect = "Allow", Action = "sts:AssumeRole", Principal = { Service = "codedeploy.amazonaws.com" } }]
@@ -373,8 +376,9 @@ resource "aws_codedeploy_deployment_group" "scan" {
 # check on the new version and passes or fails the deployment. Its name must start with CodeDeployHook_ for AWS's
 # policy above to invoke it.
 resource "aws_iam_role" "smoke" {
-  name               = "${local.name}-svc-smoke"
-  assume_role_policy = data.aws_iam_policy_document.lambda_trust.json
+  permissions_boundary = local.role_boundary
+  name                 = "${local.name}-svc-smoke"
+  assume_role_policy   = data.aws_iam_policy_document.lambda_trust.json
 }
 
 data "aws_iam_policy_document" "smoke" {
@@ -422,8 +426,9 @@ resource "aws_lambda_function" "smoke" {
 # --- The weekly drift check (service/drift.py): PSI of this week's verdicts against held-out legitimate mail ---
 
 resource "aws_iam_role" "drift" {
-  name               = "${local.name}-svc-drift"
-  assume_role_policy = data.aws_iam_policy_document.lambda_trust.json
+  permissions_boundary = local.role_boundary
+  name                 = "${local.name}-svc-drift"
+  assume_role_policy   = data.aws_iam_policy_document.lambda_trust.json
 }
 
 data "aws_iam_policy_document" "drift" {
