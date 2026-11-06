@@ -15,7 +15,9 @@ To avoid that, this project uses:
 
 - **raw emails with full headers** for both classes, so header and link signals can be measured;
 - **both classes from the same years** (2015–2026), with each email dated by its earliest `Received:`
-  hop, because the `Date:` header is written by the sender and phishers forge it;
+  hop, because the `Date:` header is written by the sender and phishers forge it (that hop can be written by the
+  sender too, but it falls in another month than the collecting server's own for at most 1.0% of the phishing,
+  [reports/dating_check.md](../reports/dating_check.md));
 - **more than one source per class**, so I can test on a source the model never saw in training.
 
 ## Sources
@@ -311,7 +313,10 @@ What this shows:
   837), and neither in any public email: too rare to be the shortcut the public collectors were. The masking for
   them was written, but never ran on the existing private builds: the list it reads wasn't created until November
   2026. Counted then, 3 of the inbox's 1,701 emails and 28 of PrivacyMail's 18,682 show one as the models read
-  them. Masking now refuses to run on private data without the list, and the next build uses it.
+  them. Masking now refuses to run on private data without the list, and the next build uses it. The service can't
+  mask them (the list stays on my laptop); re-masked without it, 19 of my inbox's 249 test emails and 31 of the
+  3,738 held-out newsletters mask differently, and no verdict or deciding stage changes
+  ([reports/masking_check.md](../reports/masking_check.md)).
 - **List mail is not always legitimate.** Two Apache list posts turned out to be phishing (found as label
   conflicts), so a few spam or phishing posts that got past the lists' filters may still be labelled
   legitimate.

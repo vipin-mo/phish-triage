@@ -52,18 +52,34 @@ The TF-IDF models and DistilBERT read `baselines.email_text`: the subject and th
   by 16–20 points).
 - **No source names,** masked as in the plain text, links included ([DATA.md](DATA.md)).
 
+That is reader 1. The model in service (since 2026-11-05) reads with **reader 2** (the robustness defence,
+[reports/defence.md](../reports/defence.md)), set by the bundle's `reader` and used by both stages and the analyst:
+
+- it applies the `<style>` block's rules, so a class or id that hides text hides it here too;
+- it removes off-screen text (absolutely or fixed positioned at −100 px or further) and tiny text (below 4 px, 3 pt,
+  0.3 em or rem, or 30%), reading a font size with its unit (reader 1 read `1em` as 1 px and cut ordinary text);
+- it removes invisible format characters, applies NFKC and turns look-alike letters in mixed-script words back
+  into Latin;
+- when the HTML shows almost nothing and the email has no plain-text part of its own, it keeps the little the HTML
+  shows, instead of the parser's text with the hidden parts in it.
+
+It has no rule for text hidden with `text-indent`, `clip` or `transform`, which still gets through.
+
 **Too little text goes to review** (`service/triage.py`). An email with images or attachments and fewer than 20
 visible words in the body (an image-only or QR-code email, or one whose content is all in an attachment) gives the
 text models nothing to judge, so it goes to human review instead of being marked safe. On the public test 8.9% of
 the phishing fits that description and none of the legitimate mail does; the cascade flags most of those emails
-anyway, so the rule adds 0.2–0.4 points of recall ([reports/with_inbox.md](../reports/with_inbox.md)).
+anyway, so the rule adds 0.2–0.4 points of recall ([reports/with_inbox.md](../reports/with_inbox.md)). It sends 35
+of PrivacyMail's 3,738 held-out newsletters to review. It counts words as reader 1 reads them, in every model,
+because counting reader 2's visible words sent 24 of my inbox's 249 test emails to review.
 
 **Features that only work on my inbox.** Each feature is also scored on its own on my test inbox: a feature with ROC
 AUC 0.9 or more between the inbox's unseen senders and 2026 phishing, but under 0.7 on the public test, is a
 suspected shortcut (rule set before the run). `n_urls` (0.961), `n_link_domains` (0.918) and `dkim_aligned` (0.918)
 are: the inbox's legitimate mail is newsletters and notifications from large senders, with many links and their
-own DKIM signature. They stay in the model: refitted without them, the cascade flags exactly the same emails,
-because on this mail DistilBERT (text only) decides. The weak spot is in the text: phishing that is DKIM-signed by
+own DKIM signature. They stay in the model: refitted without them, the cascade (the inbox model of the time) flagged exactly the same
+emails, because on this mail DistilBERT (text only) decided; for the model in service, the same holds for all 11
+header features ([reports/sender_ablation.md](../reports/sender_ablation.md)). The weak spot is in the text: phishing that is DKIM-signed by
 its own domain and has 12 or more links, like a newsletter, is caught 25 of 31 times, and 23 of 31 by the deployed
 model trained with PrivacyMail newsletters too ([reports/with_inbox.md](../reports/with_inbox.md)).
 
@@ -87,6 +103,7 @@ copy above.
 **"Pass" does not mean safe.** It means the `From` domain really sent the email. Phishers' own look-alike domains
 pass SPF and DKIM too, which is why the warnings sit next to the verdict.
 
-The sender check is tested on hand-made emails (`tests/fixtures/spoofed_brand.eml`, `clean_newsletter.eml`). Its
-fair evaluation is the private test inbox, where every email carries Gmail's real results; the public datasets
-can't show it, because their results depend on who collected them.
+The sender check is tested on hand-made emails (`tests/fixtures/spoofed_brand.eml`, `clean_newsletter.eml`). The
+private test inbox, where every email carries Gmail's real results, shows how often it warns on legitimate mail
+(reports/test_inbox.md, reports/privacymail.md); the public datasets can't, because their results depend on who
+collected them. Nothing measures its warnings on phishing yet.
