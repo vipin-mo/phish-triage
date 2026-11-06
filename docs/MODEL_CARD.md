@@ -22,7 +22,9 @@ to block, delete or file mail on its own, or to judge mail very different from w
    the threshold for 1% false alarms on validation.
 3. **Rules around them:** an unflagged email with images or attachments and fewer than 20 visible words goes to
    review. The sender check (SPF, DKIM, DMARC, look-alike domains, display names) is shown next to the verdict and
-   doesn't change it.
+   doesn't change it. Stage 1 also has header features (the sender's domain, display name, Reply-To, DKIM), but
+   refitted without them it catches and flags the same emails, bar 2 of 1,644
+   ([reports/sender_ablation.md](../reports/sender_ablation.md)).
 
 Both stages read the email with reader 2 ([docs/FEATURES.md](FEATURES.md), the robustness defence in
 [reports/defence.md](../reports/defence.md)): the visible HTML text with `<style>` rules, off-screen and tiny text
@@ -55,6 +57,7 @@ On test emails it never trained on ([README](../README.md#results), with 95% int
 | My test inbox, 26 senders it never saw (249) | 1.6% flagged (0.6–4.1%) |
 | Newsletters from 189 websites it never saw (3,738) | 1.4% flagged (1.0–1.8%), 2.3% with review |
 | LLM-written phishing (1,000) | 94.0% caught (92.4–95.3%) |
+| Phishing three months newer than training (354; a candidate trained on phishing up to July 2026) | 83.1% caught (78.8–86.6%) |
 
 These sets were scored for every model I compared and the one in service was chosen on them, so they are closer to
 validation numbers than to a fresh test. Its robustness to evasion tricks is in
@@ -68,6 +71,8 @@ validation numbers than to a fresh test. Its robustness to evasion tricks is in
   read as phishing (README, Known issues).
 - Text hidden with `text-indent`, `clip` or `transform` gets through (6.9% caught), and a planted block of fake
   "signals" un-flagged it on 1 of 40 test phishing emails.
+- It ages within months: trained on phishing up to July 2026, a candidate caught 98.2% of August's phishing,
+  95.5% of September's and 83.1% of October's ([reports/time_split.md](../reports/time_split.md)).
 - It doesn't read images or QR codes.
 - Only English newsletters were taken from PrivacyMail; other languages weren't measured on their own.
 

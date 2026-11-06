@@ -1,0 +1,138 @@
+{
+ "bundle": "with-normalized-20261105-8baede93",
+ "reader": 2,
+ "setups": {
+  "all": {
+   "left_out": [],
+   "cutoffs": {
+    "low": 0.0023123210204059807,
+    "high": 0.9950028677312581
+   },
+   "tests": {
+    "public_phish": {
+     "emails": 1401,
+     "flagged": 1369,
+     "stage1_decided": 1252
+    },
+    "public_legit": {
+     "emails": 1401,
+     "flagged": 3,
+     "stage1_decided": 1272
+    },
+    "phish_2026": {
+     "emails": 1644,
+     "flagged": 1616,
+     "stage1_decided": 1548
+    },
+    "newsletter_like_phish": {
+     "emails": 31,
+     "flagged": 23,
+     "stage1_decided": 18
+    },
+    "inbox_test": {
+     "emails": 249,
+     "flagged": 4,
+     "stage1_decided": 64
+    },
+    "privacymail_test": {
+     "emails": 3738,
+     "flagged": 51,
+     "stage1_decided": 2305
+    }
+   }
+  },
+  "no_dkim": {
+   "left_out": [
+    "dkim_signed",
+    "dkim_aligned"
+   ],
+   "cutoffs": {
+    "low": 0.0018446084698117702,
+    "high": 0.9959757106012775
+   },
+   "tests": {
+    "public_phish": {
+     "emails": 1401,
+     "flagged": 1369,
+     "stage1_decided": 1236
+    },
+    "public_legit": {
+     "emails": 1401,
+     "flagged": 3,
+     "stage1_decided": 1254
+    },
+    "phish_2026": {
+     "emails": 1644,
+     "flagged": 1616,
+     "stage1_decided": 1539
+    },
+    "newsletter_like_phish": {
+     "emails": 31,
+     "flagged": 23,
+     "stage1_decided": 18
+    },
+    "inbox_test": {
+     "emails": 249,
+     "flagged": 4,
+     "stage1_decided": 54
+    },
+    "privacymail_test": {
+     "emails": 3738,
+     "flagged": 51,
+     "stage1_decided": 2145
+    }
+   }
+  },
+  "no_header": {
+   "left_out": [
+    "from_missing",
+    "from_free_mail",
+    "from_log_rank",
+    "from_lookalike",
+    "display_name_brand_mismatch",
+    "display_name_has_other_address",
+    "reply_to_differs",
+    "reply_to_free_mail_differs",
+    "to_missing",
+    "dkim_signed",
+    "dkim_aligned"
+   ],
+   "cutoffs": {
+    "low": 0.0016932046254514329,
+    "high": 0.9956588292186581
+   },
+   "tests": {
+    "public_phish": {
+     "emails": 1401,
+     "flagged": 1369,
+     "stage1_decided": 1200
+    },
+    "public_legit": {
+     "emails": 1401,
+     "flagged": 3,
+     "stage1_decided": 1221
+    },
+    "phish_2026": {
+     "emails": 1644,
+     "flagged": 1614,
+     "stage1_decided": 1506
+    },
+    "newsletter_like_phish": {
+     "emails": 31,
+     "flagged": 23,
+     "stage1_decided": 17
+    },
+    "inbox_test": {
+     "emails": 249,
+     "flagged": 4,
+     "stage1_decided": 62
+    },
+    "privacymail_test": {
+     "emails": 3738,
+     "flagged": 51,
+     "stage1_decided": 1976
+    }
+   }
+  }
+ }
+}

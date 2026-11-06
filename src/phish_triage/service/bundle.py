@@ -78,7 +78,8 @@ SOURCES = {
     "with_normalized": (Path("artifacts/distilbert_with_normalized"), "normalized"),
 }
 DISTILBERT_FROM = {"with_retraining": "with_newsletters"}
-READER = {"with_attacks": 2, "with_normalized": 2}  # what a split's models read (`baselines.email_text`); else 1
+# what a split's models read (`baselines.email_text`); else 1
+READER = {"with_attacks": 2, "with_normalized": 2, "with_time_split": 2}
 
 
 def reader_of(split: str) -> int:
@@ -114,16 +115,20 @@ def verify(folder: Path) -> dict:
 
 def load_split(name: str) -> tuple[dict[str, list[str]], dict]:
     """The split and its test slices; `with_newsletters` adds the held-out PrivacyMail websites to the inbox's."""
-    from phish_triage.data import attacks, inbox, privacymail, retraining
+    from phish_triage.data import attacks, inbox, privacymail, retraining, time_split
 
     split, slices = inbox.load_split()
-    if name in (privacymail.NEWSLETTER_SPLIT, retraining.SPLIT, retraining.NORMALIZED_SPLIT, attacks.SPLIT):
+    later = (retraining.SPLIT, retraining.NORMALIZED_SPLIT, attacks.SPLIT, time_split.SPLIT)
+    if name in (privacymail.NEWSLETTER_SPLIT, *later):
         split, extra = privacymail.load_split()
         slices = slices | extra
     if name in (retraining.SPLIT, retraining.NORMALIZED_SPLIT):
         split = retraining.load_split()
     if name == attacks.SPLIT:
         split = attacks.load_split()
+    if name == time_split.SPLIT:
+        split, extra = time_split.load()
+        slices = slices | extra
     check_public_test_unseen(split["train"] + split["val"])
     return split, slices
 

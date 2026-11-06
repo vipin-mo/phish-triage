@@ -38,6 +38,7 @@ test emails it never trained on ([reports/with_inbox.md](reports/with_inbox.md),
 | Public test phishing (Nazario, phishing_pot; 1,401 emails) | 97.7% caught | 96.8–98.4% |
 | Public test legitimate mail (Apache lists; 1,401) | 3 flagged (0.2%) | 0.1–0.6% |
 | 2026 phishing (phishing_pot, the same months as training; 1,644) | 98.3% caught | 97.5–98.8% |
+| Phishing three months newer than training (a candidate trained on phishing up to July 2026; 354 October emails) | 83.1% caught (98.2% in August) | 78.8–86.6% |
 | Phishing that looks like a newsletter (31) | 23 caught (74%) | 57–86% |
 | My test inbox (a Gmail account I subscribed to newsletters and shops), 26 senders it never saw (249 emails) | 4 flagged (1.6%; 5.8% averaged per sender) | 0.6–4.1% |
 | Newsletters from 189 websites it never saw (PrivacyMail; 3,738) | 51 flagged (1.4%), 86 (2.3%) with the ones sent to review | 1.0–1.8% |
@@ -55,7 +56,8 @@ Three caveats:
 - **The test inbox is bulk mail,** mostly notifications, newsletters and shops, not personal mail. My real mail
   is the second-to-last row, and 48 emails are far too few for a rate.
 - **The 2026 phishing comes from the same honeypot and months as training,** and the public test's legitimate
-  side is mailing-list discussion, which text alone tells apart. The precision row is why a flag here means "look
+  side is mailing-list discussion, which text alone tells apart. Phishing from months the model hasn't seen gets
+  through more often: the October row is a separate model trained the same way on phishing up to July. The precision row is why a flag here means "look
   closer", not "delete".
 
 ### The course project, rebuilt
@@ -121,6 +123,15 @@ it ([reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/inj
 - **Explanations** ([reports/explanations.md](reports/explanations.md)): the words LIME and Integrated Gradients
   rank highest move the score 4–24 times more than random words, but no handful of words decides a verdict. The
   explanations I read in the add-on are Claude's, and they aren't tested this way.
+- **Newer phishing** ([reports/time_split.md](reports/time_split.md)): a candidate trained as the deployed model is,
+  but with every phishing email from August 2026 on taken out of training, caught 98.2% of the earlier months' test
+  phishing, 98.2% of August's, 95.5% of September's and 83.1% of October's. It ages within months, so new phishing
+  has to keep reaching training. Its false alarms differ too (8 of my inbox's 249 test emails against the deployed
+  model's 4, 17 PrivacyMail newsletters against 51), so it sits at a different trade-off, not only an older one.
+- **Sender features** ([reports/sender_ablation.md](reports/sender_ablation.md)): stage 1 refitted without the 11
+  header features (sender domain, display name, Reply-To, DKIM and the rest) catches and flags the same emails,
+  except 2 of the 1,644 2026 phishing emails. Detection doesn't rest on them; without them stage 1 is sure of fewer
+  emails and passes 2–9 points more to DistilBERT.
 - **Real use** ([reports/real_use.md](reports/real_use.md)): 48 of my own emails scanned from the add-on, all by an
   older model (`with-newsletters-20261104-e7f1d257`); 5 were flagged, and 2 of them (a bank's and a ride app's
   notices) are false alarms I know of, like the Xfinity notice in the demo since (Known issues).
@@ -208,6 +219,7 @@ cents a month at my use. (The account's total also has $0.69 of disk storage fro
   lists); a second legitimate source I planned (the Linux kernel lists) isn't added. My test inbox and PrivacyMail
   stand in for real mail, both mostly bulk mail, and the real-use numbers are one person's few days.
 - **The tests chose the model** (above): the reported numbers are closer to validation than to a fresh test.
+- **It ages within months:** trained on phishing up to July, a candidate caught 83.1% of October's.
 - **Newsletter-like phishing:** 23 of 31 caught. Few public phishing emails look like that, so there is little to
   learn from.
 - **Big brands asking me to act read as phishing.** A rule sending own-domain-signed mail to review moved as many
@@ -660,7 +672,8 @@ except my hand ratings, as noted.
 
 - **One user.** The plan had 5 to 10 invited users; the add-on is used by me only.
 - **No second public legitimate source** (the plan's Linux kernel lists), so the cross-source tests cover new phishing
-  only; and no test yet of how much detection depends on the sender-authentication features.
+  only. The test of how much detection depends on the sender features came after v1.0.0
+  ([reports/sender_ablation.md](reports/sender_ablation.md)).
 - **No stored email.** The plan kept raw emails for 30 days; the service keeps only a verdict, a score and the
   email's hash, plus the emails I choose to send for retraining (90 days at most). Explanations run on demand
   instead of through a queue, which would have had to hold the email.

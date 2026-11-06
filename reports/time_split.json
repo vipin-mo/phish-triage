@@ -1,0 +1,102 @@
+{
+ "cut": "2026-08",
+ "bundles": {
+  "candidate": "with-time-split-20261105-c4fd5d95",
+  "deployed": "with-normalized-20261105-8baede93"
+ },
+ "candidate": {
+  "phish_before_cut": {
+   "emails": 814,
+   "flagged": 799,
+   "stage1_decided": 732
+  },
+  "phish_after_cut": {
+   "emails": 1899,
+   "flagged": 1792,
+   "stage1_decided": 1610
+  },
+  "month_2026-08": {
+   "emails": 827,
+   "flagged": 812,
+   "stage1_decided": 764
+  },
+  "month_2026-09": {
+   "emails": 718,
+   "flagged": 686,
+   "stage1_decided": 608
+  },
+  "month_2026-10": {
+   "emails": 354,
+   "flagged": 294,
+   "stage1_decided": 238
+  },
+  "public_phish": {
+   "emails": 1401,
+   "flagged": 1355,
+   "stage1_decided": 1176
+  },
+  "public_legit": {
+   "emails": 1401,
+   "flagged": 4,
+   "stage1_decided": 1363
+  },
+  "inbox_test": {
+   "emails": 249,
+   "flagged": 8,
+   "stage1_decided": 134
+  },
+  "privacymail_test": {
+   "emails": 3738,
+   "flagged": 17,
+   "stage1_decided": 3236
+  }
+ },
+ "deployed": {
+  "phish_before_cut": {
+   "emails": 814,
+   "flagged": 805,
+   "stage1_decided": 769
+  },
+  "phish_after_cut": {
+   "emails": 970,
+   "flagged": 950,
+   "stage1_decided": 914
+  },
+  "month_2026-08": {
+   "emails": 414,
+   "flagged": 406,
+   "stage1_decided": 394
+  },
+  "month_2026-09": {
+   "emails": 287,
+   "flagged": 284,
+   "stage1_decided": 278
+  },
+  "month_2026-10": {
+   "emails": 269,
+   "flagged": 260,
+   "stage1_decided": 242
+  },
+  "public_phish": {
+   "emails": 1401,
+   "flagged": 1369,
+   "stage1_decided": 1252
+  },
+  "public_legit": {
+   "emails": 1401,
+   "flagged": 3,
+   "stage1_decided": 1272
+  },
+  "inbox_test": {
+   "emails": 249,
+   "flagged": 4,
+   "stage1_decided": 64
+  },
+  "privacymail_test": {
+   "emails": 3738,
+   "flagged": 51,
+   "stage1_decided": 2305
+  }
+ },
+ "deployed_2026_test_after_cut": 830
+}

@@ -24,7 +24,7 @@ from pathlib import Path
 
 import numpy as np
 
-from phish_triage.data import attacks, inbox, privacymail, retraining
+from phish_triage.data import attacks, inbox, privacymail, retraining, time_split
 from phish_triage.data.splits import SPLITS_DIR
 from phish_triage.evaluation import metrics, predictions
 from phish_triage.models import transformer
@@ -40,7 +40,13 @@ SPLITS = (
     "old_era",
 )
 EXPORT_SPLIT = "random"
-PRIVATE_SPLITS = (inbox.SPLIT, privacymail.NEWSLETTER_SPLIT, attacks.SPLIT, retraining.NORMALIZED_SPLIT)  # when named
+PRIVATE_SPLITS = (  # when named
+    inbox.SPLIT,
+    privacymail.NEWSLETTER_SPLIT,
+    attacks.SPLIT,
+    retraining.NORMALIZED_SPLIT,
+    time_split.SPLIT,
+)
 
 ARTIFACTS_DIR = Path("artifacts")
 REPORTS_DIR = Path("reports")
@@ -160,6 +166,7 @@ def onnx_markdown(r: dict, split: str = EXPORT_SPLIT) -> str:
         privacymail.NEWSLETTER_SPLIT: "make train-with-newsletters",
         attacks.SPLIT: "make train-with-attacks",
         retraining.NORMALIZED_SPLIT: "make train-normalized",
+        time_split.SPLIT: "make train-time-split",
     }.get(split, "make train-with-inbox")
     lines = [
         "# DistilBERT: PyTorch vs ONNX vs ONNX int8",
@@ -222,6 +229,8 @@ def main(argv: list[str] | None = None) -> int:
         splits[attacks.SPLIT] = attacks.load_split()
     if retraining.NORMALIZED_SPLIT in args.splits:
         splits[retraining.NORMALIZED_SPLIT] = retraining.load_split()
+    if time_split.SPLIT in args.splits:
+        splits[time_split.SPLIT] = time_split.load_split()
     tokenizer = transformer.load_tokenizer()
     config = transformer.TrainConfig(strategy=args.strategy, epochs=args.epochs)
     for name in args.splits or list(SPLITS):
