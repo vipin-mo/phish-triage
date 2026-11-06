@@ -44,7 +44,7 @@ def build_split(base: dict[str, list[str]], test_2026: list[str], phish_month: d
 
 
 def build() -> dict:
-    from phish_triage.data import retraining
+    from phish_triage.data import inbox, retraining
     from phish_triage.data.build import INTERIM_DIR
     from phish_triage.service.bundle import load_split
 
@@ -52,6 +52,10 @@ def build() -> dict:
     used = {i for part in base.values() for i in part}
     index = json.loads((INTERIM_DIR / "index.json").read_text())
     phish_month = {e["id"]: (e["date"] or "")[:7] for e in index if e["label"] == "phish" and e["id"] in used}
+    # The private emails aren't in the public index: dated from their own records (phishing I sent for retraining)
+    listed = {e["id"] for e in index}
+    private = inbox.read_split_records({i for i in used if i not in listed})
+    phish_month |= {i: (r.get("date") or "")[:7] for i, r in private.items() if r["label"] == "phish"}
     split, new = build_split(base, slices["phish_2026_test"], phish_month)
     PRIVATE_DIR.mkdir(parents=True, exist_ok=True)
     SPLIT_FILE.write_text(json.dumps({SPLIT: split, "slices": new}) + "\n")

@@ -96,15 +96,17 @@ def build_split(
     return {"train": base["train"] + added, "val": list(base["val"]), "test": list(base["test"])}
 
 
-def like_a_test_email(records: dict[str, dict], tests: list[dict]) -> set[str]:
-    """The sent emails that share a sender domain with a test email, or copy one (exactly, or at the de-duplication's
-    near-copy similarity): training on them would leak into those tests, which keep senders apart for this reason."""
+def like_a_test_email(records: dict[str, dict], tests: list[dict], by_sender: list[dict] | None = None) -> set[str]:
+    """The sent emails that copy a test email (exactly, or at the de-duplication's near-copy similarity), or share a
+    sender domain with one of the tests split by sender (`by_sender`: my inbox's and PrivacyMail's; the public test
+    isn't split by sender, so sharing one there leaks nothing): training on them would leak into those tests."""
     import numpy as np
 
     from phish_triage.data import dedup
     from phish_triage.data.inbox import sender_group
 
-    test_senders = {sender_group(r) for r in tests}
+    no_sender = sender_group({"headers": []})  # emails without a sender domain share this group; it says nothing
+    test_senders = {sender_group(r) for r in (tests if by_sender is None else by_sender)} - {no_sender}
     perms = dedup.permutations()
     test_items = [dedup.make_item(r, perms) for r in tests]
     exact = {item.exact_key for item in test_items}
@@ -123,10 +125,12 @@ def like_a_test_email(records: dict[str, dict], tests: list[dict]) -> set[str]:
 def build() -> dict:
     from phish_triage.data import inbox, privacymail
 
-    base, _ = privacymail.load_split()
+    base, slices = privacymail.load_split()
+    slices = inbox.load_split()[1] | slices  # my inbox's test slice is the inbox split's
     records = read_masked()
-    tests = list(inbox.read_split_records(set(base["test"])).values())
-    left_out = like_a_test_email(records, tests)
+    tests = inbox.read_split_records(set(base["test"]))
+    by_sender = [tests[i] for name in ("inbox_test", "privacymail_test") for i in slices[name] if i in tests]
+    left_out = like_a_test_email(records, list(tests.values()), by_sender)
     split = build_split(base, list(records), left_out)
     SPLIT_FILE.write_text(json.dumps({SPLIT: split}) + "\n")
     labels = [records[i]["label"] for i in split["train"] if i in records]

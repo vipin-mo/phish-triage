@@ -32,10 +32,15 @@ def _valid(raw: str | None) -> bool:
     return analyst.parse_answer(raw) is not None
 
 
+CLIENT_RETRIES = 1  # the Anthropic client's own retry of a failed request (`anthropic_client`)
+
+
 def worst_case_microusd(model: str = analyst.MODEL) -> int:
-    """The most one explanation can cost: two calls (the schema retry), each with the largest prompt the analyst
-    builds (its body, header, link and attachment caps, the system prompt, about 3 characters a token) and the full
-    output allowance. Reserved from the day's budget before the call, so calls running at once can't overshoot it."""
+    """The most one explanation can cost: two calls (the schema retry), each tried up to 1 + CLIENT_RETRIES times
+    (a request that timed out may still have been billed), each with the largest prompt the analyst builds (its body,
+    header, link and attachment caps, applied after normalizing, the system prompt, about 3 characters a token) and
+    the full output allowance. Reserved from the day's budget before the call, so calls running at once can't
+    overshoot it."""
     from phish_triage.models.llm_classifier import PRICE_PER_MTOK
 
     prompt_chars = (
@@ -46,7 +51,7 @@ def worst_case_microusd(model: str = analyst.MODEL) -> int:
     )
     input_rate, output_rate = PRICE_PER_MTOK[model]
     per_call = (prompt_chars / 3 * input_rate + analyst.MAX_OUTPUT_TOKENS * output_rate) / 1e6
-    return round(2 * per_call * 1e6) + 1
+    return round(2 * (1 + CLIENT_RETRIES) * per_call * 1e6) + 1
 
 
 class Explainer:
@@ -77,7 +82,7 @@ class Explainer:
             reader=reader,
         )
         params = analyst.request_params(a, self.model)
-        cost, answer, reasons = 0.0, None, []
+        cost, answer, reasons, content_failure = 0.0, None, [], False
         try:
             for _ in range(2):  # an answer that doesn't match the schema is asked for once more; a refusal isn't
                 message = self.client.messages.create(**params, timeout=CALL_TIMEOUT_S)
@@ -85,7 +90,14 @@ class Explainer:
                 answer = answer_of(message)
                 if not needs_retry(answer, _valid):
                     break
-        except Exception as exc:  # noqa: BLE001 - an outage or timeout: the email didn't cause it
+                content_failure = True  # this answer didn't match the schema: the email may have caused it
+        except Exception as exc:  # noqa: BLE001 - an outage or a timeout, unless the request itself was rejected
+            # A 4xx other than auth and rate limits (a prompt too long, content the API won't take) is caused by the
+            # email, so an attacker could use it to switch the analyst off: it counts like a refusal.
+            status = getattr(exc, "status_code", None)
+            content_failure = content_failure or (
+                status is not None and 400 <= status < 500 and status not in (401, 403, 429)
+            )
             answer, reasons = None, [f"the analyst could not be reached ({type(exc).__name__})"]
         result = analyst.finish(
             None if answer is None or answer.get("error") == "max_tokens" else answer.get("text"),
@@ -94,6 +106,7 @@ class Explainer:
             refused=bool(answer) and answer.get("stop_reason") == "refusal",
             cut_off=bool(answer) and answer.get("error") == "max_tokens",
             classifier_review=verdict["verdict"] == "review",
+            content_failure=content_failure and answer is None,
         )
         output = result.output
         body = {
@@ -119,4 +132,4 @@ def anthropic_client():
     import boto3
 
     secret = boto3.client("secretsmanager").get_secret_value(SecretId=os.environ["PHISH_ANTHROPIC_SECRET"])
-    return anthropic.Anthropic(api_key=secret["SecretString"].strip(), max_retries=1)
+    return anthropic.Anthropic(api_key=secret["SecretString"].strip(), max_retries=CLIENT_RETRIES)

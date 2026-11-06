@@ -55,3 +55,23 @@ def test_an_outage_keeps_the_scanners_verdict_and_says_why():
     assert result.body["verdict"] == "safe" and "could not be reached (TimeoutError)" in result.body["reasons"][0]
     flagged, _ = _explain(TimeoutError("slow"), verdict={**VERDICT, "verdict": "phish", "score": 0.999})
     assert flagged.body["verdict"] == "phish"
+
+
+class Rejected(Exception):
+    """What the Anthropic client raises for a 4xx (`status_code`, like `anthropic.BadRequestError`)."""
+
+    def __init__(self, status_code: int):
+        super().__init__(f"HTTP {status_code}")
+        self.status_code = status_code
+
+
+def test_a_request_the_email_got_rejected_goes_to_a_person():
+    # A prompt too long or content the API won't take: the email caused it, so an attacker could use it to switch
+    # the analyst off. Rate limits and auth errors are outages.
+    assert _explain(Rejected(400))[0].body["verdict"] == "needs_human_review"
+    assert _explain(Rejected(429))[0].body["verdict"] == "safe"
+
+
+def test_an_invalid_answer_then_a_failed_retry_goes_to_a_person():
+    result, client = _explain(_message("not json"), TimeoutError("slow"))
+    assert client.calls == 2 and result.body["verdict"] == "needs_human_review" and result.cost_usd > 0

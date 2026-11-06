@@ -1,29 +1,28 @@
 {
- "prompt_version": 6,
+ "prompt_version": 7,
  "llm_model": "claude-haiku-5-5",
  "classifier": "with-normalized-20261105-8baede93",
  "emails": 200,
  "schema_valid_rate": 1.0,
- "indicators": 636,
+ "indicators": 640,
  "grounding_failures": 3,
- "grounding_failure_rate": 0.0047169811320754715,
- "ungrounded_indicators_shown": 0,
- "kept_indicators_citing_a_signal": 352,
- "answers_with_a_dropped_indicator": 3,
- "no_action_answers": 73,
- "no_action_with_advice_in_summary": 6,
+ "grounding_failure_rate": 0.0046875,
+ "kept_indicators_citing_a_signal": 355,
+ "answers_with_a_dropped_indicator": 2,
+ "no_action_answers": 81,
+ "no_action_with_advice_in_summary": 4,
  "errors": {},
  "verdicts": {
-  "legit -> safe": 92,
-  "legit -> suspicious": 8,
+  "legit -> safe": 94,
+  "legit -> suspicious": 6,
   "phish -> phish": 99,
   "phish -> suspicious": 1
  },
- "schema_valid_first_try": 1.0,
- "retried": 0,
+ "schema_valid_first_try": 0.995,
+ "retried": 1,
  "latency_s": {
-  "p50": 2.353142354506417,
-  "p95": 3.568454499350628,
-  "cost_usd": 0.006117105
+  "p50": 2.4063932915159967,
+  "p95": 3.2374050791928313,
+  "cost_usd": 0.005797305000000001
  }
 }

@@ -104,11 +104,12 @@ it ([reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/inj
 
 - **Prompt injection:** 40 phishing emails, each with an instruction planted nine ways (visible and hidden text,
   a comment, alt text, the subject, a forged signals block, fake operator and IT-test notices): with the
-  defences, 0 of the 360 ended as safe. Without them Claude's own answer never said safe either, so this shows the
-  pipeline holds, not how much each defence adds. The verdict here is the explanation's: a plain scan is the
+  defences, 0 of the 360 ended as safe. Without them Claude's own answer said safe once in 360, but about half of
+  those answers didn't match the schema at all (186 of 360), so this shows the pipeline holds, not how much each
+  defence adds. The verdict here is the explanation's: a plain scan is the
   classifier's alone, and the forged signals block un-flagged the classifier on 1 of the 40 (Known issues).
 - **Ordinary mail:** 100% schema-valid answers; 0.5% of indicators dropped as ungrounded; it raised the one
-  phishing email of 100 the classifier missed to "suspicious", and 8 of the 100 legitimate (mailing-list) emails
+  phishing email of 100 the classifier missed to "suspicious", and 6 of the 100 legitimate (mailing-list) emails
   too.
 
 ### Robustness, load and explanations
@@ -208,7 +209,7 @@ spend ledger my Claude runs write:
 | API Gateway | $0.002 |
 | Lambda, CloudWatch, KMS, SNS, Budgets | $0.000 (inside the free tier) |
 | **This project on AWS, eight days** | **$0.02**, paid from the Free plan's credits |
-| Claude Haiku 5.5, every evaluation in this README | $3.24 |
+| Claude, every evaluation in this README (Haiku 5.5, and Sonnet 5.5 on 200 emails in Phase 3) | $3.50 |
 
 A live explanation costs about $0.001. Most of the money went to measuring, not running: the service itself costs
 cents a month at my use. (The account's total also has $0.69 of disk storage from outside this project.)
@@ -314,10 +315,10 @@ November 2026 after the input fixes, after each new model and after the analyst'
   in 40 real phishing emails in six ways (visible text, HTML comment, CSS-hidden text, white-on-white text, image
   alt text, subject) and in three attacks on the defences themselves (a forged signals block, a fake operator
   message, a fake IT-test notice). With the defences on, 0 of 360 variants made the model say safe, and none ended
-  as safe. Without them, the forged signals block ended as safe once in 40 in each of the last three runs (twice in
-  the run before them): the planted block un-flags the classifier itself (Known issues).
+  as safe. Without them, the forged signals block ended as safe once or twice in 40 in every run (twice in the
+  latest): the planted block un-flags the classifier itself (Known issues).
 - **A refusal could switch the analyst off.** The deployed cascade misses 1 of the 40 phishing emails, which the
-  analyst raises when it's clean. With an instruction planted in it, Claude refused to answer all six
+  analyst raises when it's clean. In one run, with an instruction planted in it, Claude refused to answer all six
   variants, and with no answer the classifier's "safe" stood: 2 of 240 ended as safe (the rule-based detector
   caught the other 4). The old DistilBERT flagged all 40, so this never showed. Now a refused email the classifier
   didn't flag goes to a person; re-checked on the saved answers, 0 of 240 end as safe. An attacker could cause a
@@ -328,18 +329,18 @@ November 2026 after the input fixes, after each new model and after the analyst'
   why the random tags, hidden-text removal and the raise-only rule don't depend on it.
 - **Grounding needed a design change, not a looser check.** With prompt version 3, 2.5% of indicators were dropped
   (the gate allows 2%), 8 of the 11 because the model quoted our own signals as if they were the email. Letting it
-  cite a signal by number brought that to 0.3%, and 0.5% (3 of 636) in the latest run; the user sees our wording
+  cite a signal by number brought that to 0.3%, and 0.5% (3 of 640) in the latest run; the user sees our wording
   of the signal, not the model's.
 - **The advice now matches the action.** With version 4, 38 of 81 "no action" answers still told the user to check
   something ("check the sender if unsure"). Version 5 asks for the same advice in both, and a rule-based check
-  finds 6 of 73 in the latest run.
+  finds 4 of 81 in the latest run.
 - **On 200 ordinary emails** 99 of the 100 phishing emails ended as phishing and the 100th, which the classifier
   missed, as suspicious: the analyst caught it. The classifier flagged none of the 100 legitimate ones and the
-  analyst raised 8 to "suspicious" (7 to 9 in the earlier runs; 17 before the masking fix). 6 of the 8 had no
-  SPF/DKIM results, which is normal for archived mailing-list mail and not for
-  Gmail, so this needs re-measuring on real mail. In an earlier run, one summary ran over the 80-word limit, so an
-  answer that doesn't match the schema is now asked for once more (the latest run needed none). A live analyst call
-  takes 2.4 s (p50), 3.6 s at p95.
+  analyst raised 6 to "suspicious" (7 to 9 in the earlier runs; 17 before the masking fix). Archived mailing-list
+  mail often has no SPF/DKIM results, which is normal there and not in Gmail, so this needs re-measuring on real
+  mail. In an earlier run, one summary ran over the 80-word limit, so an
+  answer that doesn't match the schema is now asked for once more (once in the latest run). A live analyst call
+  takes 2.4 s (p50), 3.2 s at p95.
 - **I rated 50 of the answers myself** (25 phishing, 25 legitimate, 1–3 on the
   [rubric](docs/ANALYST_RUBRIC.md)), because the automatic checks can't tell whether an explanation is right and
   helpful. Averages: correct 2.86, grounded 2.98, clear 3.00, useful 2.88; 38 of 50 scored 3 on everything.

@@ -92,3 +92,46 @@ def test_history_checks_every_version_size_and_content():
         "mail.txt: starts like a raw email",
         f"old.txt: {big:,} bytes is too large for code or a report",
     ]
+
+
+def _git(repo, *args):
+    import subprocess
+
+    # Fixed git arguments in a temporary repo: S603/S607 do not apply.
+    subprocess.run(["git", "-c", "user.email=t@example.com", "-c", "user.name=t", *args], cwd=repo, check=True)  # noqa: S603, S607
+
+
+def test_history_checks_a_deleted_email_that_also_sits_at_an_allowed_fixture_path(tmp_path, monkeypatch):
+    mail = b"Received: from mx\nMessage-ID: <a@b>\nSubject: hi\n\nbody\n"
+    (tmp_path / "notes").mkdir()
+    (tmp_path / "tests" / "fixtures").mkdir(parents=True)
+    (tmp_path / "notes" / "mail.txt").write_bytes(mail)
+    (tmp_path / "tests" / "fixtures" / "a.eml").write_bytes(mail)  # the same blob at a path that is allowed
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-qm", "1")
+    _git(tmp_path, "rm", "-q", "notes/mail.txt")
+    _git(tmp_path, "commit", "-qm", "2")
+    monkeypatch.chdir(tmp_path)
+    blobs = check.history_blobs()
+    assert check.violations(sorted(blobs), blobs=blobs) == ["notes/mail.txt: starts like a raw email"]
+
+
+def test_staged_content_is_checked_not_the_working_tree(tmp_path, monkeypatch):
+    _git(tmp_path, "init", "-q")
+    (tmp_path / "notes.txt").write_bytes(b"Received: a\nMessage-ID: b\nSubject: c\n\nbody\n")
+    _git(tmp_path, "add", "notes.txt")
+    (tmp_path / "notes.txt").write_text("harmless now\n")  # changed after staging
+    monkeypatch.chdir(tmp_path)
+    assert check.violations(["notes.txt"], blobs=check.staged_blobs(["notes.txt"])) == [
+        "notes.txt: starts like a raw email"
+    ]
+
+
+def test_a_pasted_email_after_a_preface_line_and_more_secret_names_are_blocked(tmp_path):
+    (tmp_path / "paste.txt").write_bytes(
+        b"Here is the email I got:\nReceived: from mx\nDKIM-Signature: v=1\nAuthentication-Results: mx; spf=pass\n"
+    )
+    assert check.violations(["paste.txt"], tmp_path) == ["paste.txt: starts like a raw email"]
+    names = ["prod.env", ".envrc", "client_secret_123.json", "credentials.json", ".clasprc.json", "x/model.ckpt"]
+    assert len(check.violations(names)) == len(names)

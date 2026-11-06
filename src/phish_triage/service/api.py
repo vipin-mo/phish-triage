@@ -34,7 +34,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from phish_triage.service.store import FEEDBACK_LABELS, MemoryStore, Store, scan_id
+from phish_triage.service.store import FEEDBACK_LABELS, MemoryStore, Store, scan_id, today
 
 MAX_BYTES = 2 * 1024 * 1024
 PER_MINUTE = 60
@@ -210,16 +210,16 @@ def create_app(
         raw = await email_of(request)
         from phish_triage.service.explain import worst_case_microusd
 
-        if store.add_today(SPEND_COUNTER, 0) >= daily_budget_microusd:  # before a key's daily count is used up
+        # The worst case is reserved first, in one atomic step, and settled to the real cost afterwards, on the day it
+        # was reserved: two explanations running at once can't both pass a check and then both spend. A key's daily
+        # count is only used once the budget had room.
+        day, reserved = today(), worst_case_microusd()
+        if store.add_today(SPEND_COUNTER, reserved, day) > daily_budget_microusd:
+            store.add_today(SPEND_COUNTER, -reserved, day)
             raise HTTPException(429, "today's LLM budget is used up; the scan verdict still works")
         if store.add_today(f"explain#{owner}", 1) > EXPLAIN_PER_DAY:
+            store.add_today(SPEND_COUNTER, -reserved, day)
             raise HTTPException(429, f"at most {EXPLAIN_PER_DAY} explanations a day per key")
-        # The worst case is reserved first, in one atomic step, and settled to the real cost afterwards: two
-        # explanations running at once can't both pass a check and then both spend.
-        reserved = worst_case_microusd()
-        if store.add_today(SPEND_COUNTER, reserved) > daily_budget_microusd:
-            store.add_today(SPEND_COUNTER, -reserved)
-            raise HTTPException(429, "today's LLM budget is used up; the scan verdict still works")
         spent = 0
         try:
             verdict = verdict_of(owner, raw)
@@ -227,7 +227,7 @@ def create_app(
             result = explainer().explain(raw, verdict, getattr(model, "ranks", None), getattr(model, "reader", 1))
             spent = round(result.cost_usd * 1e6)
         finally:
-            store.add_today(SPEND_COUNTER, spent - reserved)
+            store.add_today(SPEND_COUNTER, spent - reserved, day)
         request.state.verdict = result.body["verdict"]
         return result.body
 

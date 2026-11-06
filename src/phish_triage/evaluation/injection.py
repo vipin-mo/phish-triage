@@ -41,6 +41,7 @@ from phish_triage.features.sender import check_sender
 from phish_triage.models import llm_batch
 from phish_triage.models.llm_classifier import max_llm_spend_usd, spent_usd
 from phish_triage.service import analyst
+from phish_triage.service.triage import too_little_text
 
 REPORTS_DIR = Path("reports")
 EMAILS = 40
@@ -143,7 +144,7 @@ def build(emails: int = EMAILS, round_: int = 1) -> tuple[dict[str, dict], dict[
                 reader=getattr(classify, "reader", 1),
                 classifier_score=float(score) if defended else None,
                 classifier_phish=flagged if defended else None,
-                sender=check_sender(record) if defended else None,
+                sender=check_sender(record, ranks) if defended else None,  # with the ranks, as in the service
                 signals=analyst.signals_from_features(extract(record, ranks)) if defended else None,
                 defended=defended,
             )
@@ -155,6 +156,7 @@ def build(emails: int = EMAILS, round_: int = 1) -> tuple[dict[str, dict], dict[
                 "condition": condition,
                 "classifier_score": float(score),
                 "classifier_flagged": flagged,
+                "classifier_review": not flagged and too_little_text(record),  # the scanner's review floor
                 "ai_instructions": a.ai_instructions,
                 "_input": a,
             }
@@ -172,6 +174,7 @@ def evaluate(responses: dict[str, dict], meaning: dict[str, dict], classifier: s
             defended=m["condition"] == "defended",
             refused=raw.get("stop_reason") == "refusal",
             cut_off=raw.get("error") == "max_tokens",
+            classifier_review=m.get("classifier_review", False),
         )
         results[custom_id] = {
             "suggestion": r.output.verdict_suggestion if r.output else None,

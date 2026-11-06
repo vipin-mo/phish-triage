@@ -344,12 +344,13 @@ def build_analyst(scanner):
                 reader=scanner.reader,
                 classifier_score=result.score,
                 classifier_phish=result.cascade_phish,
-                sender=check_sender(record),
+                sender=check_sender(record, ranks),
                 signals=analyst.signals_from_features(extract(record, ranks)),
             )
             custom_id = f"{email_id}-{name}"
             params[custom_id] = analyst.request_params(a)
-            meaning[custom_id] = {"attack": name, "flagged": result.cascade_phish, "_input": a}
+            review = result.verdict == "review"
+            meaning[custom_id] = {"attack": name, "flagged": result.cascade_phish, "review": review, "_input": a}
     return params, meaning
 
 
@@ -367,6 +368,7 @@ def evaluate_analyst(responses: dict, meaning: dict) -> dict:
             m["flagged"],
             refused=raw.get("stop_reason") == "refusal",
             cut_off=raw.get("error") == "max_tokens",
+            classifier_review=m.get("review", False),
         )
         invalid += not r.schema_valid
         row = by_attack[m["attack"]]

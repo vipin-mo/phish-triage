@@ -12,6 +12,8 @@ import json
 import time
 import uuid
 
+from phish_triage.service.store import today
+
 RATE_TTL_SECONDS = 300
 VERDICT_DAYS = 90  # a stored verdict (the scan id, never the email) is deleted after this; infra/service sets the TTL
 
@@ -48,9 +50,9 @@ class DynamoStore:
         )
         return int(result["Attributes"]["requests"]["N"]) <= per_minute
 
-    def add_today(self, counter: str, amount: int) -> int:
+    def add_today(self, counter: str, amount: int, day: int | None = None) -> int:
         """A per-day counter in the rate table (its `minute` key holds the day here), deleted two days later."""
-        day = int(time.time() // 86_400)
+        day = today() if day is None else day
         result = self._db.update_item(
             TableName=self.rate,
             Key={"owner": {"S": f"day#{counter}"}, "minute": {"N": str(day)}},

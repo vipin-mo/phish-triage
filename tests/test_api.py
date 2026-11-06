@@ -107,18 +107,18 @@ class FakeExplainer:
 
 
 def test_an_explanation_is_on_demand_limited_per_key_and_by_the_days_budget(monkeypatch):
-    monkeypatch.setenv("PHISH_DAILY_LLM_USD", "0.005")
-    store, explainer = MemoryStore(), FakeExplainer(cost=0.002)
+    monkeypatch.setenv("PHISH_DAILY_LLM_USD", "0.010")  # the worst case of one explanation is about $0.006
+    store, explainer = MemoryStore(), FakeExplainer(cost=0.003)
     key = store.add_key("tester")
     c = TestClient(api.create_app(FakeScanner, store, explanations=True, explainer_factory=lambda: explainer))
     first = c.post("/v1/explain", content=EMAIL, headers={"x-api-key": key})
     assert first.status_code == 200 and first.json()["scan_id"] == scan_id(EMAIL) and explainer.calls == 1
     assert "ZQX-secret-body" not in json.dumps(list(store.verdicts.values()))  # the email is never stored
-    c.post("/v1/explain", content=EMAIL, headers={"x-api-key": key})  # $0.004 spent
-    # a third call's worst case no longer fits in $0.005, so it isn't made: the day's spend can't overshoot
+    c.post("/v1/explain", content=EMAIL, headers={"x-api-key": key})  # $0.006 spent
+    # a third call's worst case no longer fits in $0.010, so it isn't made: the day's spend can't overshoot
     over = c.post("/v1/explain", content=EMAIL, headers={"x-api-key": key})
     assert over.status_code == 429 and "budget" in over.json()["detail"] and explainer.calls == 2
-    assert store.add_today(api.SPEND_COUNTER, 0) == 4_000  # reservations settled to the real cost
+    assert store.add_today(api.SPEND_COUNTER, 0) == 6_000  # reservations settled to the real cost
     assert c.post("/v1/scan", content=EMAIL, headers={"x-api-key": key}).status_code == 200  # scans still work
     assert c.post("/v1/explain", content=b"", headers={"x-api-key": key}).status_code == 400
     assert c.post("/v1/explain", content=EMAIL).status_code == 401
@@ -186,3 +186,21 @@ def test_feedback_needs_a_real_scan_id(client):
             c.post("/v1/feedback", json={"scan_id": bad, "label": "correct"}, headers={"x-api-key": key}).status_code
             == 422
         )
+
+
+def test_a_key_over_its_daily_count_gets_its_reservation_back(monkeypatch):
+    monkeypatch.setattr(api, "EXPLAIN_PER_DAY", 1)
+    store, explainer = MemoryStore(), FakeExplainer(cost=0.001)
+    key = store.add_key("tester")
+    c = TestClient(api.create_app(FakeScanner, store, explanations=True, explainer_factory=lambda: explainer))
+    assert c.post("/v1/explain", content=EMAIL, headers={"x-api-key": key}).status_code == 200
+    second = c.post("/v1/explain", content=EMAIL, headers={"x-api-key": key})
+    assert second.status_code == 429 and "per key" in second.json()["detail"] and explainer.calls == 1
+    assert store.add_today(api.SPEND_COUNTER, 0) == 1_000  # only what the first one cost
+
+
+def test_a_reservation_is_settled_on_the_day_it_was_made():
+    store = MemoryStore()
+    store.add_today("spend", 5_000, day=100)
+    store.add_today("spend", -4_000, day=100)  # settled after midnight, on the reservation's own day
+    assert store.add_today("spend", 0, day=100) == 1_000 and store.add_today("spend", 0, day=101) == 0

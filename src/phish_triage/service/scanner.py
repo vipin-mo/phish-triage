@@ -62,7 +62,7 @@ class ScanResult:
     signals: list[str] = field(default_factory=list)
     sender: dict = field(default_factory=dict)
     # The score is the deciding stage's, so it means something different per stage: phishing above this. DistilBERT's
-    # threshold is 0.9964, so a score of 0.99 is still safe.
+    # threshold is the bundle's (0.9737 in the one in service), so a score of 0.97 is still safe.
     phishing_above: float | None = None
 
 
@@ -135,7 +135,8 @@ class Scanner:
         cut = self.config["stage1_cutoffs"]
         decision = int(decide(np.array([stacked]), Cutoffs(cut["low"], cut["high"]))[0])
         if decision >= 0:
-            stage, score, phish, above = "stacked", stacked, bool(decision), cut["high"]
+            # `decide` flags above the larger cutoff (they swap when validation separated the classes completely)
+            stage, score, phish, above = "stacked", stacked, bool(decision), max(cut["low"], cut["high"])
         else:
             score = float(self._distilbert.score([text])[0])
             above = self.config["distilbert_threshold"]

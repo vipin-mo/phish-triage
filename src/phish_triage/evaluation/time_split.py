@@ -23,14 +23,24 @@ NAME = "time_split"
 DISTILBERT = Path("artifacts/distilbert_with_time_split")
 
 
+def candidate() -> Path | None:
+    """The built candidate that runs the DistilBERT in DISTILBERT now (an older one, from before it was trained
+    again, doesn't count)."""
+    from phish_triage.service.bundle import CANDIDATE_ROOT, sha256, verify
+
+    current = sha256(DISTILBERT / "model.onnx")
+    folders = [p for p in sorted((CANDIDATE_ROOT / NAME).glob("*")) if p.is_dir()]
+    return next((p for p in folders if verify(p)["sha256"]["distilbert.onnx"] == current), None)
+
+
 def build() -> str:
     from phish_triage.data import time_split
-    from phish_triage.service.bundle import CANDIDATE_ROOT, export_candidate
+    from phish_triage.service.bundle import export_candidate
 
     if not (DISTILBERT / "model.onnx").exists():
         raise SystemExit(f"{DISTILBERT}/model.onnx is missing (make train-time-split)")
-    if built := [p.name for p in (CANDIDATE_ROOT / NAME).glob("*") if p.is_dir()]:
-        return built[0]
+    if built := candidate():
+        return built.name
     return export_candidate(time_split.SPLIT, DISTILBERT, NAME, reader=2).name
 
 
@@ -38,7 +48,7 @@ def measure() -> dict:
     from phish_triage.data import inbox, time_split
     from phish_triage.data.build import INTERIM_DIR
     from phish_triage.evaluation.defence import test_sets
-    from phish_triage.service.bundle import CANDIDATE_ROOT, DEPLOYED_SPLIT, latest, load_split
+    from phish_triage.service.bundle import DEPLOYED_SPLIT, latest, load_split
     from phish_triage.service.scanner import Scanner
 
     clean, records = test_sets()
@@ -57,10 +67,13 @@ def measure() -> dict:
         "inbox_test": clean["inbox_test"],
         "privacymail_test": clean["privacymail_test"],
     }
-    (candidate,) = [p for p in (CANDIDATE_ROOT / NAME).iterdir() if p.is_dir()]
+    if (folder := candidate()) is None:
+        raise SystemExit(
+            "no candidate runs the current DistilBERT: run `python -m phish_triage.evaluation.time_split build`"
+        )
     out: dict = {"cut": time_split.CUT, "bundles": {}, "candidate": {}, "deployed": {}}
-    for who, folder in (("candidate", candidate), ("deployed", latest(split=DEPLOYED_SPLIT))):
-        scanner = Scanner(folder, threads=4)
+    for who, bundle in (("candidate", folder), ("deployed", latest(split=DEPLOYED_SPLIT))):
+        scanner = Scanner(bundle, threads=4)
         out["bundles"][who] = scanner.version
         for name, ids in sets.items():
             if who == "deployed" and (name == "phish_after_cut" or name.startswith("month_")):

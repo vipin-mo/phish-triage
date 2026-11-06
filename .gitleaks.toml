@@ -1,0 +1,40 @@
+# gitleaks' own rules, plus the values this repo must never hold: they aren't secrets in gitleaks' sense, but they
+# identify my AWS account, my service or me (docs/THREAT_MODEL.md, rule 10).
+title = "phish-triage"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "aws-account-id-in-arn"
+description = "An AWS account ID inside an ARN"
+regex = '''arn:aws:[a-z0-9-]+:[a-z0-9-]*:\d{12}:'''
+keywords = ["arn:aws:"]
+
+[[rules]]
+id = "aws-account-id-in-registry"
+description = "An AWS account ID in a container registry address"
+regex = '''\b\d{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com'''
+keywords = [".dkr.ecr."]
+
+[[rules]]
+id = "api-gateway-address"
+description = "The address of a deployed API Gateway API"
+regex = '''\b[a-z0-9]{10}\.execute-api\.[a-z0-9-]+\.amazonaws\.com'''
+keywords = [".execute-api."]
+
+[[rules]]
+id = "phish-triage-api-key"
+description = "An API key of this service (`store.new_api_key`)"
+regex = '''\bpt_[A-Za-z0-9_-]{43}\b'''
+keywords = ["pt_"]
+
+[[rules]]
+id = "personal-email-address"
+description = "An address at a personal mail provider or a university"
+regex = '''[A-Za-z0-9._%+-]+@(?:(?:gmail|googlemail|hotmail|outlook|live|yahoo|icloud|proton|protonmail)\.(?:com|me)|(?:[a-z0-9-]+\.)*[a-z0-9-]+\.edu)\b'''
+keywords = ["@"]
+
+[[rules.allowlists]]
+description = "The made-up Reply-To of a hand-made test email: the free-mail feature needs a real free-mail domain"
+regexes = ['''payments\.team@gmail\.com''']

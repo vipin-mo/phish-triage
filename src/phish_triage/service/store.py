@@ -39,7 +39,13 @@ class Store(Protocol):
     def get_verdict(self, owner: str, scan: str) -> dict | None: ...
     def put_verdict(self, owner: str, scan: str, verdict: dict) -> None: ...
     def put_feedback(self, owner: str, scan: str, label: str, model_version: str | None = None) -> None: ...
-    def add_today(self, counter: str, amount: int) -> int: ...  # the day's total after adding (UTC days)
+    # the day's total after adding (UTC days); `day` (`today()`) settles on the day a reservation was made
+    def add_today(self, counter: str, amount: int, day: int | None = None) -> int: ...
+
+
+def today() -> int:
+    """The UTC day number the daily counters are kept under."""
+    return int(time.time() // 86_400)
 
 
 @dataclass
@@ -68,8 +74,8 @@ class MemoryStore:
     def put_verdict(self, owner: str, scan: str, verdict: dict) -> None:
         self.verdicts[(owner, scan)] = verdict
 
-    def add_today(self, counter: str, amount: int) -> int:
-        day = int(time.time() // 86_400)
+    def add_today(self, counter: str, amount: int, day: int | None = None) -> int:
+        day = today() if day is None else day
         self._counts[(f"day#{counter}", day)] += amount
         return self._counts[(f"day#{counter}", day)]
 
