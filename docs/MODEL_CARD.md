@@ -55,12 +55,14 @@ On test emails it never trained on ([README](../README.md#results), with Wilson 
 | 2026 phishing, same source and months as training (1,644) | 98.3% caught (97.5–98.8%) |
 | Phishing that looks like a newsletter (31) | 74% caught (57–86%) |
 | My test inbox, 26 senders held out of training (249) | 1.6% flagged (0.6–4.1%) |
+| Later mail from the held-out inbox senders, no model chosen on it (154) | 3.9% flagged (1.8–8.2%) |
 | Newsletters from 189 websites held out of training (3,738) | 1.4% flagged (1.0–1.8%), 2.3% with review |
 | LLM-written phishing (1,000) | 94.0% caught (92.4–95.3%) |
 | Phishing three months newer than training (354; a candidate trained on phishing up to July 2026) | 83.1% caught (78.8–86.6%) |
 
 These sets were scored for every model I compared and the one in service was chosen on them, so they are closer to
-validation numbers than to a fresh test. The legitimate labels are Gmail's folder and the dataset's, not a hand check.
+validation numbers than to a fresh test; the later inbox mail ([reports/fresh_inbox.md](../reports/fresh_inbox.md))
+is the exception. The legitimate labels are Gmail's folder and the dataset's, not a hand check.
 Two of the 26 inbox test senders share a domain with training (docs/DATA.md). Its robustness to evasion tricks is in
 [reports/defence.md](../reports/defence.md) (setup d, the same models).
 
