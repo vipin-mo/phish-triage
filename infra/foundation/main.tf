@@ -98,6 +98,18 @@ data "aws_iam_policy_document" "trust_deploy" {
       variable = "token.actions.githubusercontent.com:sub"
       values   = ["repo:${var.github_repo}:environment:production"]
     }
+    # Only this workflow, from main: another workflow, or one on a branch, that names the environment gets nothing,
+    # whatever the environment's branch rules in GitHub say.
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:job_workflow_ref"
+      values   = ["${var.github_repo}/.github/workflows/deploy.yml@refs/heads/main"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:ref"
+      values   = ["refs/heads/main"]
+    }
   }
 }
 
@@ -177,8 +189,8 @@ data "aws_iam_policy_document" "deploy" {
     resources = [aws_s3_bucket.models.arn, "${aws_s3_bucket.models.arn}/*"]
   }
   statement {
-    sid       = "PushImage"
-    actions   = ["ecr:BatchCheckLayerAvailability", "ecr:CompleteLayerUpload", "ecr:InitiateLayerUpload", "ecr:PutImage", "ecr:UploadLayerPart", "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:DescribeImages", "ecr:DescribeRepositories", "ecr:ListTagsForResource", "ecr:GetRepositoryPolicy", "ecr:SetRepositoryPolicy"]
+    sid       = "PushImage" # no repository policy: it could share the image, which holds the model, with another account
+    actions   = ["ecr:BatchCheckLayerAvailability", "ecr:CompleteLayerUpload", "ecr:InitiateLayerUpload", "ecr:PutImage", "ecr:UploadLayerPart", "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:DescribeImages", "ecr:DescribeRepositories", "ecr:ListTagsForResource", "ecr:GetRepositoryPolicy"]
     resources = [aws_ecr_repository.service.arn]
   }
   statement {
@@ -189,25 +201,39 @@ data "aws_iam_policy_document" "deploy" {
   statement {
     sid = "Read"
     actions = [
-      "lambda:Get*", "lambda:List*", "dynamodb:Describe*", "dynamodb:List*", "sqs:Get*", "sqs:List*",
-      "apigateway:GET", "logs:Describe*", "logs:List*", "cloudwatch:Describe*", "cloudwatch:Get*", "cloudwatch:List*",
-      "sns:Get*", "sns:List*", "iam:Get*", "iam:List*", "sts:GetCallerIdentity", "budgets:View*",
+      "lambda:Get*", "lambda:List*", "dynamodb:Describe*", "dynamodb:List*", "apigateway:GET", "logs:Describe*",
+      "logs:List*", "cloudwatch:Describe*", "cloudwatch:Get*", "cloudwatch:List*", "sns:Get*", "sns:List*", "iam:Get*",
+      "iam:List*", "sts:GetCallerIdentity", "budgets:View*", "events:Describe*", "events:List*", "codedeploy:Get*",
+      "codedeploy:List*", "codedeploy:BatchGet*", "secretsmanager:DescribeSecret", "secretsmanager:GetResourcePolicy",
+      "secretsmanager:ListSecrets",
     ]
     resources = ["*"]
   }
   statement {
-    sid       = "Functions"
-    actions   = ["lambda:*"]
-    resources = ["arn:aws:lambda:${var.region}:${local.account}:function:phish-triage-*"]
+    sid     = "Functions"
+    actions = ["lambda:*"]
+    resources = [
+      "arn:aws:lambda:${var.region}:${local.account}:function:phish-triage-*",
+      "arn:aws:lambda:${var.region}:${local.account}:function:CodeDeployHook_phish-triage*",
+    ]
+  }
+  # No public function URL beside the API (it would skip the API's throttling), and a permission to invoke a function
+  # only for the API and the schedules.
+  statement {
+    sid       = "NoFunctionUrls"
+    effect    = "Deny"
+    actions   = ["lambda:CreateFunctionUrlConfig", "lambda:UpdateFunctionUrlConfig"]
+    resources = ["*"]
   }
   statement {
-    sid       = "EventSourceMappings"
-    actions   = ["lambda:CreateEventSourceMapping", "lambda:UpdateEventSourceMapping", "lambda:DeleteEventSourceMapping", "lambda:TagResource", "lambda:UntagResource"]
+    sid       = "InvokePermissionsForTheServiceOnly"
+    effect    = "Deny"
+    actions   = ["lambda:AddPermission"]
     resources = ["*"]
     condition {
-      test     = "StringLike"
-      variable = "lambda:FunctionArn"
-      values   = ["arn:aws:lambda:${var.region}:${local.account}:function:phish-triage-*"]
+      test     = "StringNotEquals"
+      variable = "lambda:Principal"
+      values   = ["apigateway.amazonaws.com", "events.amazonaws.com"]
     }
   }
   statement {
@@ -216,18 +242,22 @@ data "aws_iam_policy_document" "deploy" {
     resources = ["arn:aws:dynamodb:${var.region}:${local.account}:table/phish-triage-*"]
   }
   statement {
-    sid       = "Queues"
-    actions   = ["sqs:CreateQueue", "sqs:DeleteQueue", "sqs:SetQueueAttributes", "sqs:TagQueue", "sqs:UntagQueue"]
-    resources = ["arn:aws:sqs:${var.region}:${local.account}:phish-triage-*"]
-  }
-  statement {
-    sid       = "Api"
+    sid       = "Api" # it can still point the API at another target: approving the deploy is the check on that
     actions   = ["apigateway:POST", "apigateway:PUT", "apigateway:PATCH", "apigateway:DELETE", "apigateway:TagResource"]
     resources = ["arn:aws:apigateway:${var.region}::/apis", "arn:aws:apigateway:${var.region}::/apis/*", "arn:aws:apigateway:${var.region}::/tags/*"]
   }
   statement {
-    sid       = "Logs"
-    actions   = ["logs:CreateLogGroup", "logs:DeleteLogGroup", "logs:PutRetentionPolicy", "logs:TagResource", "logs:UntagResource", "logs:TagLogGroup", "logs:CreateLogDelivery", "logs:UpdateLogDelivery", "logs:DeleteLogDelivery", "logs:PutResourcePolicy", "logs:DescribeResourcePolicies"]
+    sid     = "LogGroups"
+    actions = ["logs:CreateLogGroup", "logs:DeleteLogGroup", "logs:PutRetentionPolicy", "logs:TagResource", "logs:UntagResource", "logs:TagLogGroup"]
+    resources = [
+      "arn:aws:logs:${var.region}:${local.account}:log-group:/aws/lambda/phish-triage-*",
+      "arn:aws:logs:${var.region}:${local.account}:log-group:/aws/lambda/CodeDeployHook_phish-triage*",
+      "arn:aws:logs:${var.region}:${local.account}:log-group:/aws/apigateway/phish-triage*",
+    ]
+  }
+  statement {
+    sid       = "ApiAccessLogs" # these take no resource
+    actions   = ["logs:CreateLogDelivery", "logs:GetLogDelivery", "logs:UpdateLogDelivery", "logs:DeleteLogDelivery", "logs:ListLogDeliveries", "logs:DescribeResourcePolicies"]
     resources = ["*"]
   }
   statement {
@@ -240,12 +270,58 @@ data "aws_iam_policy_document" "deploy" {
     actions   = ["sns:CreateTopic", "sns:DeleteTopic", "sns:SetTopicAttributes", "sns:Subscribe", "sns:Unsubscribe", "sns:TagResource", "sns:UntagResource"]
     resources = ["arn:aws:sns:${var.region}:${local.account}:phish-triage-*"]
   }
-  # The function roles: the deploy role may only make roles that carry the boundary, so a role it writes can't hold
-  # more than the boundary allows, whatever its own policy says; it can't remove the boundary, and it can attach
-  # only the one AWS policy CodeDeploy needs.
   statement {
-    sid       = "FunctionRoles"
-    actions   = ["iam:CreateRole", "iam:PutRolePolicy", "iam:PutRolePermissionsBoundary"]
+    sid       = "Schedules"
+    actions   = ["events:PutRule", "events:DeleteRule", "events:PutTargets", "events:RemoveTargets", "events:TagResource", "events:UntagResource", "events:EnableRule", "events:DisableRule"]
+    resources = ["arn:aws:events:${var.region}:${local.account}:rule/phish-triage-*"]
+  }
+  statement {
+    sid       = "SecretShell" # the secret's settings; its value is put there from my laptop and denied below
+    actions   = ["secretsmanager:CreateSecret", "secretsmanager:DeleteSecret", "secretsmanager:UpdateSecret", "secretsmanager:TagResource", "secretsmanager:UntagResource"]
+    resources = ["arn:aws:secretsmanager:${var.region}:${local.account}:secret:phish-triage/*"]
+  }
+  statement {
+    sid       = "NoSecretValue"
+    effect    = "Deny"
+    actions   = ["secretsmanager:GetSecretValue", "secretsmanager:BatchGetSecretValue", "secretsmanager:PutSecretValue"]
+    resources = ["*"]
+  }
+  statement {
+    sid = "RetrainingBucket" # the bucket's settings only: the emails in it are denied below
+    actions = [
+      "s3:CreateBucket", "s3:DeleteBucket", "s3:ListBucket", "s3:GetBucket*", "s3:GetLifecycleConfiguration",
+      "s3:GetEncryptionConfiguration", "s3:GetReplicationConfiguration", "s3:GetAccelerateConfiguration",
+      "s3:PutBucketPolicy", "s3:DeleteBucketPolicy", "s3:PutBucketPublicAccessBlock", "s3:PutLifecycleConfiguration",
+      "s3:PutEncryptionConfiguration", "s3:PutBucketTagging",
+    ]
+    resources = ["arn:aws:s3:::phish-triage-retraining-${local.account}"]
+  }
+  statement {
+    sid       = "NoRetrainingEmails"
+    effect    = "Deny"
+    actions   = ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:DeleteObject"]
+    resources = ["arn:aws:s3:::phish-triage-retraining-${local.account}/*"]
+  }
+  statement {
+    sid = "Canary"
+    actions = [
+      "codedeploy:CreateApplication", "codedeploy:DeleteApplication", "codedeploy:CreateDeploymentGroup",
+      "codedeploy:UpdateDeploymentGroup", "codedeploy:DeleteDeploymentGroup", "codedeploy:CreateDeployment",
+      "codedeploy:StopDeployment", "codedeploy:TagResource", "codedeploy:UntagResource",
+    ]
+    resources = [
+      "arn:aws:codedeploy:${var.region}:${local.account}:application:phish-triage",
+      "arn:aws:codedeploy:${var.region}:${local.account}:deploymentgroup:phish-triage/*",
+      "arn:aws:codedeploy:${var.region}:${local.account}:deploymentconfig:*",
+    ]
+  }
+  # The function roles: CI changes only the roles a laptop deploy made. It can't make one or change who may assume
+  # one (an outside account could then), and a policy it writes or attaches only counts on a role that carries the
+  # boundary, which caps what any policy on it can grant; it can't remove the boundary, and it can attach only the one
+  # AWS policy CodeDeploy needs.
+  statement {
+    sid       = "FunctionRolePolicies"
+    actions   = ["iam:PutRolePolicy", "iam:PutRolePermissionsBoundary"]
     resources = ["arn:aws:iam::${local.account}:role/phish-triage-svc-*"]
     condition {
       test     = "StringEquals"
@@ -270,13 +346,13 @@ data "aws_iam_policy_document" "deploy" {
   }
   statement {
     sid       = "FunctionRolesChange"
-    actions   = ["iam:DeleteRole", "iam:UpdateAssumeRolePolicy", "iam:DeleteRolePolicy", "iam:DetachRolePolicy", "iam:TagRole", "iam:UntagRole"]
+    actions   = ["iam:DeleteRolePolicy", "iam:DetachRolePolicy", "iam:TagRole", "iam:UntagRole"]
     resources = ["arn:aws:iam::${local.account}:role/phish-triage-svc-*"]
   }
   statement {
-    sid       = "KeepTheBoundary"
+    sid       = "KeepRolesAndTheBoundary"
     effect    = "Deny"
-    actions   = ["iam:DeleteRolePermissionsBoundary", "iam:CreatePolicyVersion", "iam:DeletePolicy", "iam:SetDefaultPolicyVersion"]
+    actions   = ["iam:CreateRole", "iam:DeleteRole", "iam:UpdateAssumeRolePolicy", "iam:DeleteRolePermissionsBoundary", "iam:CreatePolicyVersion", "iam:DeletePolicy", "iam:SetDefaultPolicyVersion"]
     resources = ["arn:aws:iam::${local.account}:role/*", local.boundary_arn]
   }
   statement {
@@ -286,7 +362,7 @@ data "aws_iam_policy_document" "deploy" {
     condition {
       test     = "StringEquals"
       variable = "iam:PassedToService"
-      values   = ["lambda.amazonaws.com"]
+      values   = ["lambda.amazonaws.com", "codedeploy.amazonaws.com"]
     }
   }
 }
@@ -308,9 +384,23 @@ data "aws_iam_policy_document" "boundary" {
       "arn:aws:logs:${var.region}:${local.account}:log-group:/aws/lambda/CodeDeployHook_phish-triage*",
     ]
   }
+  # Per table, what the service does with it (infra/service): keys are read, verdicts read, written and scanned by the
+  # drift check, feedback added, the rate counters updated.
   statement {
-    actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:Scan"]
-    resources = ["arn:aws:dynamodb:${var.region}:${local.account}:table/phish-triage-*"]
+    actions   = ["dynamodb:GetItem"]
+    resources = ["arn:aws:dynamodb:${var.region}:${local.account}:table/phish-triage-keys"]
+  }
+  statement {
+    actions   = ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Scan"]
+    resources = ["arn:aws:dynamodb:${var.region}:${local.account}:table/phish-triage-verdicts"]
+  }
+  statement {
+    actions   = ["dynamodb:PutItem"]
+    resources = ["arn:aws:dynamodb:${var.region}:${local.account}:table/phish-triage-feedback"]
+  }
+  statement {
+    actions   = ["dynamodb:UpdateItem"]
+    resources = ["arn:aws:dynamodb:${var.region}:${local.account}:table/phish-triage-rate"]
   }
   statement {
     actions   = ["secretsmanager:GetSecretValue"]
@@ -326,7 +416,7 @@ data "aws_iam_policy_document" "boundary" {
     }
   }
   statement {
-    actions   = ["s3:PutObject", "s3:GetObject", "s3:GetObjectVersion"]
+    actions   = ["s3:PutObject"] # write only: no role made by CI can read an email sent for retraining
     resources = ["arn:aws:s3:::phish-triage-retraining-${local.account}/*"]
   }
   statement {
