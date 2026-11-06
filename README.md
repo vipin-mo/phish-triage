@@ -737,7 +737,7 @@ noted where they appear.
   takes several `make` commands, not one, and CI deploys with OIDC are written but off (the Free plan blocks them).
 - **Smaller:** the course reproduction uses an 80/20 split, not 5-fold cross-validation; the load test had no cold
   start and never reached the concurrency cap (the rate limits refused first); shadow mode is built but hasn't been
-  run on real traffic; and only v1.0.0 is tagged, not the planned milestone tags.
+  run on real traffic; and only releases are tagged (v1.0.0, v1.1.0), not the planned milestone tags.
 
 ## Development
 
