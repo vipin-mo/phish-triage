@@ -1,0 +1,34 @@
+{
+ "sources": {
+  "apache (legit)": {
+   "emails": 83842,
+   "two dated hops": 83538,
+   "different month": 38,
+   "over 31 days apart": 0
+  },
+  "nazario (phish)": {
+   "emails": 7239,
+   "two dated hops": 6515,
+   "different month": 63,
+   "over 31 days apart": 29
+  },
+  "phishing_pot (phish)": {
+   "emails": 8853,
+   "two dated hops": 8015,
+   "different month": 14,
+   "over 31 days apart": 7
+  },
+  "spamassassin (legit)": {
+   "emails": 4241,
+   "two dated hops": 3940,
+   "different month": 93,
+   "over 31 days apart": 51
+  },
+  "spamassassin (spam)": {
+   "emails": 2618,
+   "two dated hops": 2363,
+   "different month": 142,
+   "over 31 days apart": 89
+  }
+ }
+}

@@ -124,8 +124,10 @@ def message_date(headers: list[tuple[str, str]], *, now: datetime | None = None)
     """Date a message by its earliest Received hop, falling back to the Date header.
 
     The Date header is written by the sender and phishers forge it. Received headers are prepended by each
-    server on the way, so the last one is the earliest hop. Implausible dates (before 1995, or in the future)
-    are ignored.
+    server on the way, so the last one is the earliest hop. That hop can be written by the sender too, but on the
+    public sources it falls in another month than the collecting server's topmost one for at most 1.0% of the
+    phishing and under 0.1% of the Apache mail (`make dating-check`). Implausible dates (before 1995, or in the
+    future) are ignored.
     """
     latest_plausible = now or datetime.now(UTC)
     received = [value for name, value in headers if name.lower() == "received"]
