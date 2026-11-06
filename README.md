@@ -15,13 +15,14 @@ score, and is built to catch the shortcuts that fooled the course project:
   It still let some through, which I found later; they are under [Known issues](#known-issues).
 - **A two-stage cascade:** a 5 ms stacked model (trees on features plus a text score) and a fine-tuned DistilBERT
   for what the first isn't sure of. In the model in service the first decides 89–94% of the public and 2026 test
-  emails, and DistilBERT most newsletter-style mail (74% of my test inbox). A third stage, Claude, was measured
+  emails; DistilBERT decides 74% of my test inbox and 38% of the held-out newsletters. A third stage, Claude, was measured
   too; on a 1,000-email sample no email was uncertain enough to reach it.
 - **A safe LLM step:** explanations on demand from Claude, grounded, schema-checked, able to raise risk but never
   lower it, and tested against prompt injection hidden inside phishing emails.
 - **Sender checks:** SPF, DKIM and DMARC results from the receiving mail provider, look-alike domains,
-  and mismatched display names, From and Reply-To addresses, shown to me and to the analyst. The cascade's verdict
-  doesn't use them.
+  and mismatched display names, From and Reply-To addresses, shown to me and to the analyst. The rule-based sender
+  verdict doesn't change the cascade's; stage 1 has the same header signals as features, and refitted without them
+  it decides the same.
 - **Tested against evasion:** hidden HTML, look-alike letters, invisible characters, shortened links and
   LLM-written phishing, with a defence measured before it was deployed.
 - **Real use, serverless:** a Gmail sidebar add-on (one user: me), AWS Lambda + API Gateway + DynamoDB in
@@ -31,7 +32,9 @@ score, and is built to catch the shortcuts that fooled the course project:
 
 The model in service (`with-normalized-20261105-8baede93`, since 2026-11-05; its [model card](docs/MODEL_CARD.md)), on
 test emails it never trained on ([reports/with_inbox.md](reports/with_inbox.md), *normalized*;
-[reports/defence.md](reports/defence.md), setup d):
+[reports/defence.md](reports/defence.md), setup d, whose stage-1 model scores the same as the one in service on
+4,402 public, LLM-written and attacked emails), with Wilson 95% intervals (the reports give bootstrap ones, which
+differ by about a point):
 
 | Test | Result | 95% interval |
 |---|---:|---:|
@@ -40,25 +43,28 @@ test emails it never trained on ([reports/with_inbox.md](reports/with_inbox.md),
 | 2026 phishing (phishing_pot, the same months as training; 1,644) | 98.3% caught | 97.5–98.8% |
 | Phishing three months newer than training (a candidate trained on phishing up to July 2026; 354 October emails) | 83.1% caught (98.2% in August) | 78.8–86.6% |
 | Phishing that looks like a newsletter (31) | 23 caught (74%) | 57–86% |
-| My test inbox (a Gmail account I subscribed to newsletters and shops), 26 senders it never saw (249 emails) | 4 flagged (1.6%; 5.8% averaged per sender) | 0.6–4.1% |
-| Newsletters from 189 websites it never saw (PrivacyMail; 3,738) | 51 flagged (1.4%), 86 (2.3%) with the ones sent to review | 1.0–1.8% |
+| My test inbox (a Gmail account I subscribed to newsletters and shops), 26 senders held out of training (249 emails; 2 of the senders share a domain with training, [DATA.md](docs/DATA.md)) | 4 flagged (1.6%; 5.8% averaged per sender) | 0.6–4.1% |
+| Newsletters from 189 websites held out of training (PrivacyMail; 3,738) | 51 flagged (1.4%), 86 (2.3%) with the ones sent to review | 1.0–1.8% |
 | LLM-written phishing (Greco et al.; 1,000) | 94.0% caught | 92.4–95.3% |
 | Public test phishing with text hidden by the three tricks the reader has rules for | 96.1–97.7% caught (16.9% before the defence) | |
 | ... hidden with `text-indent`, `clip` or `transform`, which it has no rule for | 6.9% caught | 5.6–8.3% |
 | My real Gmail, from the add-on (48 emails, scanned by an older model) | 5 flagged, 2 of them false alarms I know of | |
 | Precision if 1 email in 100 were phishing (recall as above, false alarms as on my test inbox) | 0.38 | 0.19–0.61 |
 
-Three caveats:
+Four caveats:
 
 - **The tests were used to choose the model.** I scored these same sets for every model I compared, and picked
   the one in service on them, so they are closer to validation numbers than to a fresh test. Differences of a few
   emails between models are within the noise of one training run. A fresh, untouched test is the next step.
 - **The test inbox is bulk mail,** mostly notifications, newsletters and shops, not personal mail. My real mail
   is the second-to-last row, and 48 emails are far too few for a rate.
+- **The legitimate labels weren't checked by hand.** My inbox's emails count as legitimate because Gmail delivered
+  them outside Spam, and PrivacyMail's because the dataset is newsletters: a phishing email among them would count
+  as a false alarm when flagged and as legitimate when missed.
 - **The 2026 phishing comes from the same honeypot and months as training,** and the public test's legitimate
   side is mailing-list discussion, which text alone tells apart. Phishing from months the model hasn't seen gets
-  through more often: the October row is a separate model trained the same way on phishing up to July. The precision row is why a flag here means "look
-  closer", not "delete".
+  through more often: the October row is a separate model trained the same way on phishing up to July. The
+  precision row is why a flag here means "look closer", not "delete".
 
 ### The course project, rebuilt
 
@@ -86,7 +92,7 @@ On a fixed 1,000-email sample of the public test, with the public-data models ([
 | Setup | Recall | False alarms | Decided by stage 1 / DistilBERT / Claude | Sent to a third party | Cost at 1M emails a day | Latency |
 |---|---:|---:|---|---:|---:|---:|
 | Stacked model only | 99.8% | 1.80% | 100% / 0% / 0% | 0% | $0 | 5 ms |
-| DistilBERT only | 100.0% | 0.80% | 0% / 100% / 0% | 0% | $0 | 29 ms |
+| DistilBERT only (ONNX int8; the service runs fp32) | 100.0% | 0.80% | 0% / 100% / 0% | 0% | $0 | 29 ms |
 | Cascade: stacked → DistilBERT → Claude | 99.6% | 0.00% | 99.7% / 0.3% / 0% | 0% | $0 | 6 ms |
 | Claude Haiku 5.5 on every email | 97.4% | 0.80% | 0% / 0% / 100% | 100% | $167 a day | 1.5 s |
 | Claude Haiku 5.5 with 4 examples, on every email | 96.6% | 0.20% | 0% / 0% / 100% | 100% | $187 a day | 1.5 s |
@@ -116,23 +122,27 @@ it ([reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/inj
 
 - **Evasion** ([reports/robustness.md](reports/robustness.md), [reports/defence.md](reports/defence.md)): hidden
   HTML text dropped the old model to 16.9%. A better reader (reader 2) and retraining brought it to 96.1–97.7% for
-  the three tricks the reader has rules for, and LLM-written phishing from 88.8% to 94.0%. Text hidden with
+  the three tricks the reader has rules for, and LLM-written phishing from 88.8% to 94.0% (one training run each;
+  across the setups I tried, LLM-written phishing ranged from 84.1% to 94.0%). Text hidden with
   `text-indent`, `clip` or `transform`, which it has no rule for, gets through more often than before: 6.9%.
 - **Load** ([reports/load_test.md](reports/load_test.md)): 543 requests of one short test email at up to 10 a
   second, a test of the rate limits rather than of real load. The limits refused the excess, nothing failed, and an
   answered scan took 45 ms at the gateway (p50); a real email takes about 0.2 s end to end.
 - **Explanations** ([reports/explanations.md](reports/explanations.md)): the words LIME and Integrated Gradients
-  rank highest move the score 4–24 times more than random words, but no handful of words decides a verdict. The
+  rank highest move the score 4–25 times more than random words, but for most flagged emails no handful of words
+  decides the verdict: removing the top 10 drops 12–25% of them to the threshold (0.3–7% for random words). The
   explanations I read in the add-on are Claude's, and they aren't tested this way.
 - **Newer phishing** ([reports/time_split.md](reports/time_split.md)): a candidate trained as the deployed model is,
   but with every phishing email from August 2026 on taken out of training, caught 98.2% of the earlier months' test
   phishing, 98.2% of August's, 95.5% of September's and 83.1% of October's. It ages within months, so new phishing
-  has to keep reaching training. Its false alarms differ too (8 of my inbox's 249 test emails against the deployed
-  model's 4, 17 PrivacyMail newsletters against 51), so it sits at a different trade-off, not only an older one.
+  has to keep reaching training, and today that takes a new pull of public phishing and a full retrain: the add-on
+  can't run on Spam, where most phishing lands, and `make retrain` refits stage 1 only. Its false alarms differ too
+  (8 of my inbox's 249 test emails against the deployed model's 4, 17 PrivacyMail newsletters against 51), so it
+  sits at a different trade-off, not only an older one.
 - **Sender features** ([reports/sender_ablation.md](reports/sender_ablation.md)): stage 1 refitted without the 11
   header features (sender domain, display name, Reply-To, DKIM and the rest) catches and flags the same emails,
   except 2 of the 1,644 2026 phishing emails. Detection doesn't rest on them; without them stage 1 is sure of fewer
-  emails and passes 2–9 points more to DistilBERT.
+  emails and passes 1–9 points more to DistilBERT.
 - **Real use** ([reports/real_use.md](reports/real_use.md)): 48 of my own emails scanned from the add-on, all by an
   older model (`with-newsletters-20261104-e7f1d257`); 5 were flagged, and 2 of them (a bank's and a ride app's
   notices) are false alarms I know of, like the Xfinity notice in the demo since (Known issues).
@@ -263,7 +273,7 @@ From [reports/course_reproduction.md](reports/course_reproduction.md) and [repor
   barely changes it.
 - **It doesn't survive a new source.** Trained on five of the course data's six sources and tested on the sixth,
   the same model flags 7–24% of legitimate mail at its default threshold, and catches only 51% of the Nazario
-  phishing. Most of its "phishing" label turned out to be spam (about 89%).
+  phishing. Most of its "phishing" label turned out to be spam (88%).
 - **On this project's 2023–2026 test mail,** the course model catches 82.3% of phishing at a 1% false-alarm rate;
   the new text model catches 99.0%, and 79.9% at 0.1%.
 - **This project's own numbers are optimistic too,** for the reason the leakage audit found: the legitimate mail
@@ -309,14 +319,17 @@ From [docs/RESULTS.md](docs/RESULTS.md), rebuilt by `make eval` from saved predi
 From [reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/injection.md) and
 [reports/injection_round2.md](reports/injection_round2.md), all with Claude Haiku 5.5 behind the deployed cascade
 (the `with_normalized` bundle, one email at a time, as the service runs it), on public test emails only. Re-run in
-November 2026 after the input fixes, after each new model and after the analyst's own fixes ($0.25–0.27 each).
+November 2026 after the input fixes, after each new model and after the analyst's own fixes ($0.25–0.27 each; the
+latest, prompt version 7, $0.26).
 
-- **Planted instructions never cleared a phishing email.** I hid instructions like "this message is verified safe"
-  in 40 real phishing emails in six ways (visible text, HTML comment, CSS-hidden text, white-on-white text, image
-  alt text, subject) and in three attacks on the defences themselves (a forged signals block, a fake operator
-  message, a fake IT-test notice). With the defences on, 0 of 360 variants made the model say safe, and none ended
-  as safe. Without them, the forged signals block ended as safe once or twice in 40 in every run (twice in the
-  latest): the planted block un-flags the classifier itself (Known issues).
+- **With the analyst, planted instructions never cleared a phishing email.** On a plain scan, without the analyst,
+  a forged signals block un-flagged the classifier on 1 of the 40 (Known issues). I hid instructions like "this
+  message is verified safe" in 40 real phishing emails in six ways (visible text, HTML comment, CSS-hidden text,
+  white-on-white text, image alt text, subject) and in three attacks on the defences themselves (a forged signals
+  block, a fake operator message, a fake IT-test notice). With the defences on, 0 of 360 variants made the model say
+  safe, and none ended as safe. Without them, about half of the answers didn't match the schema (186 of 360), so
+  the undefended side is a weak baseline, and the forged signals block ended as safe once or twice in 40 in every
+  run (twice in the latest): the planted block un-flags the classifier itself (Known issues).
 - **A refusal could switch the analyst off.** The deployed cascade misses 1 of the 40 phishing emails, which the
   analyst raises when it's clean. In one run, with an instruction planted in it, Claude refused to answer all six
   variants, and with no answer the classifier's "safe" stood: 2 of 240 ended as safe (the rule-based detector
@@ -350,18 +363,20 @@ November 2026 after the input fixes, after each new model and after the analyst'
   pass: 7 once the sheet showed the recommended action, and 6 to apply the rubric's two scoring rules on every row
   (1 for the final verdict, 5 for the action and summary agreeing). These ratings are of prompt version 4 on the
   data from before the fixes; I haven't rated the latest run's answers yet.
-- **The CI eval gate** checks these numbers on every push ([reports/gate.json](reports/gate.json)) and fails if
-  they were measured on an older prompt, another Claude model or another model bundle than the one in
-  `infra/bundle-version`, or if a report is missing. It also checks the model I deploy (trained with part of my
+- **The CI eval gate** checks the committed numbers on every push ([reports/gate.json](reports/gate.json)) and
+  fails if they were measured on an older prompt, another Claude model or another model bundle than the one in
+  `infra/bundle-version`, or if one is missing. CI doesn't measure them: they come from `make gate` on my laptop
+  after the evaluations, and CI doesn't replay the recorded Claude answers, so a code change that weakens the
+  analyst shows only when I re-measure (a prompt change forces it, through the prompt version). It also checks the model I deploy (trained with part of my
   inbox and of PrivacyMail): false alarms on my inbox's unseen senders (1.6%, at most 5%, a limit I set before the
   run) and on PrivacyMail websites kept out of training (1.4%, at most 5%, added after the inbox model passed the
   inbox limit and failed on PrivacyMail), and DistilBERT's recall at 1% false alarms on the public test (0.994, at
   least 0.98). That last one measures how well DistilBERT ranks phishing, at a threshold picked on the test; the
   service runs the cascade at stricter thresholds picked on validation, where it catches 97.7% at 0.21% false
   alarms. A code review found the gate's wording implied the second; the gate now reports it next to the first,
-  without a limit, since one set after seeing the number would mean little. All Phase 4 Claude runs cost $1.06
-  together; the re-run after the fixes was $0.27 of that, the one behind the newsletters model $0.26 more, and
-  the one behind the first retrained model $0.27 more.
+  without a limit, since one set after seeing the number would mean little. The Phase 4 Claude runs cost $1.06
+  together up to 2026-11-02; each later re-run (behind a new model, or after the analyst's own fixes) cost
+  $0.25–0.27, and all of Claude came to $3.50 (Cost).
 
 ## What my private test inbox showed
 
@@ -518,7 +533,10 @@ for a background design were removed, since a queue would have had to hold the e
   2026) took the 2 emails I had sent, both legitimate and both flagged by the deployed model. The retrained cascade
   scores every held-out test exactly as before (reports/with_inbox.md, *retrained*), and still flags both emails
   ([reports/retraining_check.md](reports/retraining_check.md)): DistilBERT decides them, and only stage 1 is
-  refitted. So the loop works, and it can't fix this kind of false alarm on its own.
+  refitted. So the loop works, and it can't fix this kind of false alarm on its own. That model went out through
+  the canary (version 4 to 5). Since reader 2, `make retrain` builds the reader-2 split in service
+  (`with_normalized`); until the second review it still built the reader-1 one, which would have undone the
+  hidden-HTML defence.
 - Cost at my use: $0.02 on AWS in the first eight days ([Cost](#cost)), within the Free plan's credits. The Free plan
   ends on 2027-04-27 and the account closes with it unless I upgrade, taking every resource with it; before then I
   either upgrade or export the feedback and API keys and destroy the service.
@@ -526,7 +544,8 @@ for a background design were removed, since a queue would have had to hold the e
 ## What the attacks showed
 
 I attacked the public test's 1,401 phishing emails with tricks set before the first run, and scored them with the
-deployed model one email at a time ([reports/robustness.md](reports/robustness.md)):
+model deployed then (`with-retraining-20261104-6addaf34`, reader 1), one email at a time
+([reports/robustness.md](reports/robustness.md)); the last paragraph has the model in service:
 
 - **Look-alike letters, zero-width characters and shortened links barely matter.** Recall is 97.4% clean, 97.2%
   with a zero-width space in every longer word or with every link turned into a bit.ly link, and 99.6% with 30% of
@@ -571,7 +590,7 @@ removing as many random words.
   take 0.135, close to the 0.139 of occlusion (each word's own effect when it alone is removed, the best pick one
   word at a time). At 10 words it falls behind: 0.175 against 0.260. For DistilBERT, the 10 words Integrated
   Gradients ranks highest cut the log-odds by 2.16, random ones by 0.53.
-- **No handful of words decides the verdict.** Without its 10 top words, 12% of the emails fall to the text model's
+- **For most emails, no handful of words decides the verdict.** Without its 10 top words, 12% of the emails fall to the text model's
   threshold by LIME's choice (25% by occlusion's, 0.3% at random), and 20% to DistilBERT's (7% at random). The
   score rests on many words, so a word list is evidence of what a model leans on, not the reason for one verdict.
 
@@ -579,8 +598,10 @@ removing as many random words.
 
 All but five are fixed (one of them partly). The first two were found while rating the analyst's answers by hand,
 the rest afterwards: on my test inbox, while packaging the model, on PrivacyMail, in the Claude re-run, in a review
-of the code and in the robustness test, all in November 2026. Every number above was re-measured after the fixes,
-except my hand ratings, as noted.
+of the code and in the robustness test, all in November 2026. The numbers above were re-measured after the fixes,
+except my hand ratings, the Claude-as-classifier comparison (which read each email's plain-text part), the
+robustness report's analyst sample (behind an older model and prompt) and the sender-overlap check (DATA.md), as
+noted where they appear.
 
 - **Masking rewrote links (fixed).** Replacing the Apache list names with `project` ran over the whole body and
   HTML, including URLs and addresses. It rewrote a URL or address in 7,978 of the 13,541 legitimate emails the
@@ -608,7 +629,7 @@ except my hand ratings, as noted.
   shown as "phishing probability 0.00 (flagged)". It is now told only whether the classifier flagged the email.
 - **The int8 model's scores depended on the batch (fixed).** Its dynamic quantization picks its scales from the
   whole batch, so an email scored alone got a different score than in the batch of 32 the evaluation used: up to
-  0.074 apart on my inbox's test emails, enough to flip 1 of the 249. The packaged model would have disagreed
+  0.074 apart on my inbox's test emails with the model of the time, enough to flip 1 of the 249. The packaged model would have disagreed
   with its own report. The service now runs DistilBERT as ONNX fp32 (under 0.000001 apart), the reports for the
   deployed model use fp32 scores, and packaging stops unless the package reproduces the report
   ([reports/bundle.md](reports/bundle.md)). The `random` split's comparison tables still show int8 as measured.
@@ -630,8 +651,9 @@ except my hand ratings, as noted.
   the newsletters were added). It is a data problem: the newsletters gave it plenty of bulk-looking legitimate
   mail, but there are few phishing emails of that kind to learn from, and no public dataset I found has them (see
   [docs/DATA.md](docs/DATA.md)); the report tracks this number for every model I train.
-- **The analyst and injection results were from before these fixes (fixed).** Re-run behind the deployed model for
-  $0.26; that run found the refusal gap above, now closed.
+- **The analyst and injection results were from before these fixes (fixed).** Re-run behind the model deployed then
+  (the newsletters one) for $0.26; that run found the refusal gap above, now closed. They have been re-run behind
+  every model since.
 - **The service lost the forged-header warning (fixed).** Masking drops the lower Authentication-Results headers, so
   the warning that one of them claims a pass the provider didn't give never fired in the service, only on raw
   emails. Masking now keeps whether one did. Stored verdicts also carry a rules version now, so a change like this
@@ -657,6 +679,18 @@ except my hand ratings, as noted.
   held-out newsletters instead of 1.8%, for 0.4 points more of the public test's phishing (none more of the 2026
   phishing); reading with reader 2 has the same effect (it would send 24 of the inbox's 249 to review). Reading the
   image itself (OCR, QR codes) is the fix I'd make instead.
+- **A second review, after v1.0.0, found more (fixed).** It went over the code, the numbers, the plan, the security
+  and the claims again. The fixes: `make retrain` still built the reader-1 split, which would have undone
+  the hidden-HTML defence, and the gate would have rejected its bundle; the check for instructions aimed at an AI
+  ran before normalizing, so one zero-width space or full-width letters hid "ignore all previous instructions" from
+  it but not from the model; the trusted signals block quoted the sender's domain, which the sender chooses; the
+  analyst's fields were capped before normalizing, which can turn one character into 18, so the spend reservation
+  could fall short; a request the API rejected because of the email ended as "safe" instead of going to a person;
+  the history check of the raw-data guard missed a file that shared its content with a test fixture; and the dormant
+  CI deploy would have printed private values in its public log, with a deploy role that was too broad. The
+  analyst and injection evaluations were re-run after the fixes ($0.26). Two of its questions were measured and
+  were fine: masking at scan time ([reports/masking_check.md](reports/masking_check.md)) and dating by the earliest
+  Received hop ([reports/dating_check.md](reports/dating_check.md)).
 
 ## Progress
 
@@ -672,9 +706,24 @@ except my hand ratings, as noted.
 ### Changed from the plan
 
 - **One user.** The plan had 5 to 10 invited users; the add-on is used by me only.
+- **Two stages, not three.** The plan's cascade ended with an LLM on the hardest emails; measured, no email was
+  uncertain enough to reach it, so Claude never decides a verdict here: it explains one email when I ask, and can
+  only raise its verdict.
+- **Retraining:** from my laptop (`make retrain`), not a GitHub Actions workflow, on emails I send with a label
+  from the add-on, not on the feedback buttons' labels, and refitting stage 1 only.
+- **The eval gate** allows 2% of indicators dropped as ungrounded, not 0 (the latest run drops 0.5%), measures
+  DistilBERT's recall at a threshold read off the test, and in CI checks the committed numbers rather than
+  replaying the recorded Claude answers.
+- **The drift check** compares the week's verdicts with the deployed model's verdicts on held-out legitimate mail
+  (scores, deciding stage, sender check), not feature rates against the training data.
+- **DistilBERT runs as ONNX fp32, not int8:** int8 scores changed with the batch (Known issues).
+- **Not done:** an ARC (forwarding-chain) signal in the sender check, the comparison with Verholias (2026) the plan
+  asked for, and the optional parts (QLoRA, conformal cutoffs, a GitHub Pages site). The Apache side has 5 lists,
+  not about 10, and the trees are scikit-learn's `HistGradientBoostingClassifier`, not LightGBM.
 - **No second public legitimate source** (the plan's Linux kernel lists), so the cross-source tests cover new phishing
-  only. The test of how much detection depends on the sender features came after v1.0.0
-  ([reports/sender_ablation.md](reports/sender_ablation.md)).
+  only. The test of how much detection depends on the sender features, the time-split test of newer phishing and
+  the model card came after v1.0.0 ([reports/sender_ablation.md](reports/sender_ablation.md),
+  [reports/time_split.md](reports/time_split.md)).
 - **No stored email.** The plan kept raw emails for 30 days; the service keeps only a verdict, a score and the
   email's hash, plus the emails I choose to send for retraining (90 days at most). Explanations run on demand
   instead of through a queue, which would have had to hold the email.
@@ -693,14 +742,16 @@ Requires [uv](https://docs.astral.sh/uv/), Python 3.12 and, for the commit hook,
 
 ```bash
 make setup   # create .venv, install dev deps, install git hooks
-make check   # lint, raw-data guard, tests (what CI runs)
+make check   # lint, the raw-data and secret checks, tests, the eval gate (what CI runs)
 ```
 
 Raw email datasets are never committed. A pre-commit hook and a CI check block mail, archive, dataset and model
 files (`.eml`, `.mbox`, `.jsonl`, `.onnx`, `.joblib`, ...), anything under `data/`, `artifacts/` or `build/`, any
-file over 1 MB and any file that starts like an email; CI also checks every version of every file in the history,
-so one added and then deleted can't stay there. Secrets, keys and Terraform state, variables and plans are blocked
-by name, and gitleaks looks for secrets in each commit (a pre-commit hook) and in the whole history (CI). Instead, `make data` downloads every source, checks it against pinned checksums,
+file over 1 MB (bar the lock file and the 1.2 MB demo GIF) and any file that starts like an email; CI also checks
+every version of every path in the history, so one added and then deleted can't stay there. Secrets, keys and
+Terraform state, variables and plans are blocked by name, and gitleaks looks for secrets, account IDs, API
+addresses, API keys and personal addresses in each commit (a pre-commit hook) and in the whole history (CI).
+Instead, `make data` downloads every source, checks it against pinned checksums,
 parses it into one record format, masks source fingerprints, removes duplicates and builds every split with
 fixed seeds (see [docs/DATA.md](docs/DATA.md)). `make audit` re-runs the leakage audit, `make eval-baselines`
 trains and reports the baseline models on every split, `make eval-course` reproduces the course project's
@@ -711,8 +762,8 @@ their Claude cost and only call the API with `CONFIRM=--confirm`; `make gate` tu
 
 `make bundle` packages the deployed model and checks it against its report, and `make serve` runs the API locally
 on it. Deploying needs an MFA session (`aws sts get-caller-identity --profile phish-triage`) and Docker:
-`infra/bootstrap.sh` (once) and `make tf-foundation-plan` / `tf-foundation-apply` create the state bucket, image
-registry and model bucket; then `make upload-bundle`, `make deploy-image`, `make deploy-plan` (shows the change) and
+`infra/bootstrap.sh` (once) creates the state bucket, and `make tf-foundation-plan` / `tf-foundation-apply` the
+image registry and the model bucket; then `make upload-bundle`, `make deploy-image`, `make deploy-plan` (shows the change) and
 `make deploy-apply` (applies exactly that plan, loads the model and checks `/v1/health`). `make api-key OWNER=...`
 creates a key, shown once.
 
