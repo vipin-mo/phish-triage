@@ -1,0 +1,151 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif">
+<defs><marker id="a_475569" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker><marker id="a_ED7100" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ED7100"/></marker><marker id="a_D97757" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#D97757"/></marker><marker id="a_EA4335" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#EA4335"/></marker><marker id="a_0F766E" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0F766E"/></marker><marker id="a_3B48CC" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3B48CC"/></marker><marker id="a_3F8624" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#3F8624"/></marker><marker id="a_DD344C" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#DD344C"/></marker><marker id="a_8C4FFF" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8C4FFF"/></marker><filter id="sh" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0f172a" flood-opacity="0.10"/></filter>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f5f7fb"/></linearGradient></defs>
+<rect width="1600" height="900" fill="url(#bg)"/>
+<text x="40" y="52" font-size="30" font-weight="800" fill="#0f172a" text-anchor="start">phish-triage</text>
+<text x="250" y="52" font-size="20" font-weight="500" fill="#64748b" text-anchor="start">how one email is scanned and explained</text>
+<rect x="30" y="120" width="250" height="300" rx="14" fill="#FDECEA" stroke="#EA4335" stroke-width="2" filter="url(#sh)"/>
+<rect x="30" y="120" width="250" height="6" rx="3" fill="#EA4335"/>
+<text x="155.0" y="148" font-size="11" font-weight="700" fill="#EA4335" text-anchor="middle">CLIENT</text>
+<text x="155.0" y="168" font-size="15" font-weight="700" fill="#111827" text-anchor="middle">My Gmail</text>
+<text x="155.0" y="190" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">Add-on (Apps Script)</text>
+<text x="155.0" y="208" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">reads only the open email,</text>
+<text x="155.0" y="226" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">only when I click</text>
+<rect x="60" y="262" width="190" height="27" rx="13.5" fill="white" stroke="#EA4335" stroke-width="1.8"/>
+<text x="155" y="280.5" font-size="13" font-weight="600" fill="#EA4335" text-anchor="middle">Scan</text>
+<rect x="60" y="298" width="190" height="27" rx="13.5" fill="white" stroke="#D97757" stroke-width="1.8"/>
+<text x="155" y="316.5" font-size="13" font-weight="600" fill="#D97757" text-anchor="middle">Explain</text>
+<rect x="60" y="334" width="190" height="27" rx="13.5" fill="white" stroke="#0F766E" stroke-width="1.8"/>
+<text x="155" y="352.5" font-size="13" font-weight="600" fill="#0F766E" text-anchor="middle">Feedback</text>
+<rect x="60" y="370" width="190" height="27" rx="13.5" fill="white" stroke="#3F8624" stroke-width="1.8"/>
+<text x="155" y="388.5" font-size="13" font-weight="600" fill="#3F8624" text-anchor="middle">Send for retraining</text>
+<rect x="30" y="470" width="250" height="370" rx="14" fill="#EEF2F7" stroke="#475569" stroke-width="2" filter="url(#sh)"/>
+<rect x="30" y="470" width="250" height="6" rx="3" fill="#475569"/>
+<text x="155.0" y="498" font-size="11" font-weight="700" fill="#475569" text-anchor="middle">BUILD &amp; DEPLOY</text>
+<text x="155.0" y="518" font-size="15" font-weight="700" fill="#111827" text-anchor="middle">My laptop</text>
+<text x="155" y="552" font-size="13" font-weight="400" fill="#334155" text-anchor="middle">Data: dedup, masking,</text>
+<text x="155" y="577" font-size="13" font-weight="400" fill="#334155" text-anchor="middle">leakage audit, splits</text>
+<text x="155" y="602" font-size="13" font-weight="600" fill="#334155" text-anchor="middle"></text>
+<text x="155" y="627" font-size="13" font-weight="400" fill="#334155" text-anchor="middle">Training on the M5 GPU</text>
+<text x="155" y="652" font-size="13" font-weight="400" fill="#334155" text-anchor="middle">Eval gate (CI checks it)</text>
+<text x="155" y="677" font-size="13" font-weight="400" fill="#334155" text-anchor="middle">Bundle parity check</text>
+<text x="155" y="702" font-size="13" font-weight="600" fill="#334155" text-anchor="middle"></text>
+<text x="155" y="727" font-size="13" font-weight="600" fill="#334155" text-anchor="middle">make retrain ← S3</text>
+<text x="155" y="752" font-size="13" font-weight="600" fill="#334155" text-anchor="middle">Deploy with MFA →</text>
+<text x="155" y="777" font-size="13" font-weight="600" fill="#334155" text-anchor="middle">image, plan, apply</text>
+<rect x="320" y="100" width="970" height="760" rx="20" fill="#FFFAF3" stroke="#FF9900" stroke-width="2.5" stroke-dasharray="10 6"/>
+<rect x="340" y="86" width="290" height="30" rx="15" fill="#FF9900"/>
+<text x="485" y="106" font-size="14" font-weight="700" fill="white" text-anchor="middle">AWS  ·  us-east-2  ·  Terraform</text>
+<rect x="345" y="160" width="210" height="150" rx="14" fill="#F3E8FF" stroke="#8C4FFF" stroke-width="2" filter="url(#sh)"/>
+<rect x="345" y="160" width="210" height="6" rx="3" fill="#8C4FFF"/>
+<text x="450.0" y="190" font-size="15" font-weight="700" fill="#111827" text-anchor="middle">API Gateway</text>
+<text x="450.0" y="212" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">HTTP API</text>
+<text x="450.0" y="230" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">5 requests/s</text>
+<text x="450.0" y="248" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">60/min per API key</text>
+<text x="450.0" y="266" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">2 MB limit</text>
+<rect x="590" y="135" width="680" height="400" rx="18" fill="#FFF1E0" stroke="#ED7100" stroke-width="2.5" filter="url(#sh)"/>
+<text x="610" y="166" font-size="17" font-weight="800" fill="#9a3412" text-anchor="start">Lambda: scan</text>
+<text x="735" y="166" font-size="13" font-weight="500" fill="#9a3412" text-anchor="start">container image · arm64 · FastAPI</text>
+<rect x="608" y="185" width="148" height="145" rx="14" fill="#E0F2FE" stroke="#0284C7" stroke-width="2" filter="url(#sh)"/>
+<rect x="608" y="185" width="148" height="6" rx="3" fill="#0284C7"/>
+<text x="682.0" y="215" font-size="15" font-weight="700" fill="#111827" text-anchor="middle">Parse + mask</text>
+<text x="682.0" y="237" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">reader 2: the text</text>
+<text x="682.0" y="255" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">a mail program shows</text>
+<text x="682.0" y="273" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">(hidden HTML removed)</text>
+<circle cx="612" cy="189" r="13" fill="#0284C7" stroke="white" stroke-width="2.5"/>
+<text x="612" y="193.5" font-size="13" font-weight="800" fill="white" text-anchor="middle">1</text>
+<line x1="757" y1="257" x2="771" y2="257" stroke="#475569" stroke-width="2.5" marker-end="url(#a_475569)"/>
+<rect x="772" y="185" width="148" height="145" rx="14" fill="#DCFCE7" stroke="#16A34A" stroke-width="2" filter="url(#sh)"/>
+<rect x="772" y="185" width="148" height="6" rx="3" fill="#16A34A"/>
+<text x="846.0" y="215" font-size="15" font-weight="700" fill="#111827" text-anchor="middle">Stage 1</text>
+<text x="846.0" y="237" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">stacked model</text>
+<text x="846.0" y="255" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">42 features + TF-IDF</text>
+<text x="846.0" y="273" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">~5 ms, decides most</text>
+<circle cx="776" cy="189" r="13" fill="#16A34A" stroke="white" stroke-width="2.5"/>
+<text x="776" y="193.5" font-size="13" font-weight="800" fill="white" text-anchor="middle">2</text>
+<line x1="921" y1="257" x2="935" y2="257" stroke="#475569" stroke-width="2.5" marker-end="url(#a_475569)"/>
+<rect x="936" y="185" width="148" height="145" rx="14" fill="#EDE9FE" stroke="#7C3AED" stroke-width="2" filter="url(#sh)"/>
+<rect x="936" y="185" width="148" height="6" rx="3" fill="#7C3AED"/>
+<text x="1010.0" y="215" font-size="15" font-weight="700" fill="#111827" text-anchor="middle">Stage 2</text>
+<text x="1010.0" y="237" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">DistilBERT</text>
+<text x="1010.0" y="255" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">ONNX fp32</text>
+<text x="1010.0" y="273" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">for the unsure rest</text>
+<circle cx="940" cy="189" r="13" fill="#7C3AED" stroke="white" stroke-width="2.5"/>
+<text x="940" y="193.5" font-size="13" font-weight="800" fill="white" text-anchor="middle">3</text>
+<line x1="1085" y1="257" x2="1099" y2="257" stroke="#475569" stroke-width="2.5" marker-end="url(#a_475569)"/>
+<rect x="1100" y="185" width="148" height="145" rx="14" fill="#FEF9C3" stroke="#CA8A04" stroke-width="2" filter="url(#sh)"/>
+<rect x="1100" y="185" width="148" height="6" rx="3" fill="#CA8A04"/>
+<text x="1174.0" y="215" font-size="15" font-weight="700" fill="#111827" text-anchor="middle">Rules</text>
+<text x="1174.0" y="237" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">little text → review</text>
+<text x="1174.0" y="255" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">sender check:</text>
+<text x="1174.0" y="273" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">SPF · DKIM · DMARC</text>
+<circle cx="1104" cy="189" r="13" fill="#CA8A04" stroke="white" stroke-width="2.5"/>
+<text x="1104" y="193.5" font-size="13" font-weight="800" fill="white" text-anchor="middle">4</text>
+<rect x="608" y="345" width="640" height="40" rx="20" fill="white" stroke="#ED7100" stroke-width="1.5"/>
+<text x="628" y="370" font-size="13" font-weight="700" fill="#9a3412" text-anchor="start">verdict: safe · review · phish</text>
+<text x="1228" y="370" font-size="12.5" font-weight="600" fill="#9a3412" text-anchor="end">stored: verdict, score, SHA-256 — never the email</text>
+<rect x="608" y="400" width="640" height="118" rx="14" fill="#FBEDE7" stroke="#D97757" stroke-width="2" filter="url(#sh)"/>
+<text x="624" y="426" font-size="15" font-weight="700" fill="#9a3412" text-anchor="start">Explain (only when I click)</text>
+<text x="624" y="450" font-size="12.5" font-weight="400" fill="#7c2d12" text-anchor="start">• hidden text removed · personal data redacted · email inside random per-request tags</text>
+<text x="624" y="471" font-size="12.5" font-weight="400" fill="#7c2d12" text-anchor="start">• answer must match a schema · every quote exact · every URL from the email</text>
+<text x="624" y="492" font-size="12.5" font-weight="400" fill="#7c2d12" text-anchor="start">• can raise a verdict, never lower it · refusal or bad answer → a person</text>
+<rect x="345" y="575" width="225" height="130" rx="14" fill="#E0E7FF" stroke="#3B48CC" stroke-width="2" filter="url(#sh)"/>
+<rect x="345" y="575" width="225" height="6" rx="3" fill="#3B48CC"/>
+<text x="457.5" y="605" font-size="15" font-weight="700" fill="#111827" text-anchor="middle">DynamoDB</text>
+<text x="457.5" y="627" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">hashed API keys</text>
+<text x="457.5" y="645" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">verdicts, feedback</text>
+<text x="457.5" y="663" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">rate counts, spend</text>
+<rect x="585" y="575" width="225" height="130" rx="14" fill="#E3F4DD" stroke="#3F8624" stroke-width="2" filter="url(#sh)"/>
+<rect x="585" y="575" width="225" height="6" rx="3" fill="#3F8624"/>
+<text x="697.5" y="605" font-size="15" font-weight="700" fill="#111827" text-anchor="middle">S3</text>
+<text x="697.5" y="627" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">emails I send for</text>
+<text x="697.5" y="645" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">retraining (opt-in)</text>
+<text x="697.5" y="663" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">deleted after 90 days</text>
+<rect x="825" y="575" width="210" height="130" rx="14" fill="#FDE2E6" stroke="#DD344C" stroke-width="2" filter="url(#sh)"/>
+<rect x="825" y="575" width="210" height="6" rx="3" fill="#DD344C"/>
+<text x="930.0" y="605" font-size="15" font-weight="700" fill="#111827" text-anchor="middle">Secrets Manager</text>
+<text x="930.0" y="627" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">Anthropic API key</text>
+<rect x="1050" y="575" width="220" height="130" rx="14" fill="#FFEDD5" stroke="#ED7100" stroke-width="2" filter="url(#sh)"/>
+<rect x="1050" y="575" width="220" height="6" rx="3" fill="#ED7100"/>
+<text x="1160.0" y="605" font-size="15" font-weight="700" fill="#111827" text-anchor="middle">ECR</text>
+<text x="1160.0" y="627" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">the container image</text>
+<text x="1160.0" y="645" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">(model bundle inside)</text>
+<line x1="457" y1="535" x2="457" y2="573" stroke="#3B48CC" stroke-width="2.5" marker-end="url(#a_3B48CC)" marker-start="url(#a_3B48CC)"/>
+<line x1="697" y1="535" x2="697" y2="573" stroke="#3F8624" stroke-width="2.5" marker-end="url(#a_3F8624)"/>
+<line x1="930" y1="573" x2="930" y2="537" stroke="#DD344C" stroke-width="2.5" marker-end="url(#a_DD344C)"/>
+<line x1="1160" y1="573" x2="1160" y2="537" stroke="#ED7100" stroke-width="2.5" marker-end="url(#a_ED7100)"/>
+<rect x="345" y="735" width="220" height="95" rx="14" fill="#CCFBF1" stroke="#0F766E" stroke-width="2" filter="url(#sh)"/>
+<text x="455" y="772" font-size="14.5" font-weight="700" fill="#134e4a" text-anchor="middle">CodeDeploy canary</text>
+<text x="455" y="798" font-size="12" font-weight="400" fill="#115e59" text-anchor="middle">smoke check, 10% for 10 min, rollback</text>
+<rect x="578" y="735" width="220" height="95" rx="14" fill="#CCFBF1" stroke="#0F766E" stroke-width="2" filter="url(#sh)"/>
+<text x="688" y="772" font-size="14.5" font-weight="700" fill="#134e4a" text-anchor="middle">CloudWatch alarms</text>
+<text x="688" y="798" font-size="12" font-weight="400" fill="#115e59" text-anchor="middle">errors, 5xx, latency → email</text>
+<rect x="811" y="735" width="220" height="95" rx="14" fill="#CCFBF1" stroke="#0F766E" stroke-width="2" filter="url(#sh)"/>
+<text x="921" y="772" font-size="14.5" font-weight="700" fill="#134e4a" text-anchor="middle">Weekly drift check</text>
+<text x="921" y="798" font-size="12" font-weight="400" fill="#115e59" text-anchor="middle">PSI on scores, stage, sender</text>
+<rect x="1044" y="735" width="220" height="95" rx="14" fill="#CCFBF1" stroke="#0F766E" stroke-width="2" filter="url(#sh)"/>
+<text x="1154" y="772" font-size="14.5" font-weight="700" fill="#134e4a" text-anchor="middle">Warm-up ping</text>
+<text x="1154" y="798" font-size="12" font-weight="400" fill="#115e59" text-anchor="middle">every 5 min keeps one copy loaded</text>
+<line x1="282" y1="235" x2="343" y2="235" stroke="#EA4335" stroke-width="2.5" marker-end="url(#a_EA4335)"/>
+<line x1="557" y1="235" x2="588" y2="235" stroke="#475569" stroke-width="2.5" marker-end="url(#a_475569)"/>
+<line x1="282" y1="790" x2="343" y2="790" stroke="#0F766E" stroke-width="2.5" marker-end="url(#a_0F766E)"/>
+<polyline points="650,707 650,720 284,720" fill="none" stroke="#3F8624" stroke-width="2.5" marker-end="url(#a_3F8624)"/>
+<text x="470" y="716" font-size="11.5" font-weight="600" fill="#3F8624" text-anchor="middle">make retrain (moves the emails out)</text>
+<rect x="1320" y="135" width="250" height="400" rx="14" fill="#FBEDE7" stroke="#D97757" stroke-width="2" filter="url(#sh)"/>
+<rect x="1320" y="135" width="250" height="6" rx="3" fill="#D97757"/>
+<text x="1445.0" y="163" font-size="11" font-weight="700" fill="#D97757" text-anchor="middle">LLM, ON DEMAND</text>
+<text x="1445.0" y="183" font-size="15" font-weight="700" fill="#111827" text-anchor="middle">Claude Haiku 5.5</text>
+<text x="1445.0" y="205" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">Anthropic API</text>
+<text x="1445.0" y="223" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">explains one email</text>
+<text x="1445.0" y="241" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">when I ask</text>
+<text x="1445.0" y="259" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle"></text>
+<text x="1445.0" y="277" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">50 a day per key</text>
+<text x="1445.0" y="295" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">$0.50 a day cap</text>
+<text x="1445.0" y="313" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">~$0.001 an explanation</text>
+<text x="1445.0" y="331" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle"></text>
+<text x="1445.0" y="349" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">never part of the scan</text>
+<text x="1445.0" y="367" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">the email and the answer</text>
+<text x="1445.0" y="385" font-size="12.5" font-weight="400" fill="#374151" text-anchor="middle">aren&#x27;t stored</text>
+<line x1="1250" y1="459" x2="1318" y2="459" stroke="#D97757" stroke-width="2.5" marker-end="url(#a_D97757)"/>
+<text x="1445" y="580" font-size="13" font-weight="600" fill="#64748b" text-anchor="middle">one user: me</text>
+</svg>
