@@ -61,7 +61,7 @@ THRESHOLDS = {
 # share the little-text rule sends to a person on the newsletters.
 # `injection_verdict_drop_rate` too: any step down, not only to safe. Reported, no limit yet: 1 of the 360 drops,
 # because the planted "fake signals" block un-flagged the classifier itself (so a plain scan calls that email safe;
-# README, Known issues). It gets a limit of 0 once the model update fixes that.
+# docs/FINDINGS.md, Known issues). It gets a limit of 0 once the model update fixes that.
 REPORTED = (
     "cascade_public_recall",
     "cascade_public_false_alarm_rate",

@@ -71,7 +71,7 @@ Two of the 26 inbox test senders share a domain with training (docs/DATA.md). It
 - One public legitimate source, mailing-list discussion; two phishing sources; one person's test inbox and real
   mail, mostly bulk mail.
 - Newsletter-like phishing is its weak spot (23 of 31), and genuine notices from big brands asking me to act can
-  read as phishing (README, Known issues).
+  read as phishing ([Known issues](FINDINGS.md#known-issues)).
 - Text hidden with `text-indent`, `clip` or `transform` gets through (6.9% caught), and a planted block of fake
   "signals" un-flagged it on 1 of 40 test phishing emails.
 - It ages within months: trained on phishing up to July 2026, a candidate caught 98.2% of August's phishing,

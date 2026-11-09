@@ -18,7 +18,7 @@ from pathlib import Path
 
 REPORT = Path("reports/real_use")
 FIXTURES = Path("tests/fixtures")
-# Headers my deploy checks put in front of a test email so it scanned as new (README, the deploy notes).
+# Headers my deploy checks put in front of a test email so it scanned as new (docs/FINDINGS.md, the deployment notes).
 CHECK_HEADERS = (b"", b"X-Deploy-Check: with-newsletters-1\n", b"X-Deploy-Check: batch4\n")
 # The add-on came after these models; what they last scanned are my Phase 5 deploy tests (the latency run's emails).
 BEFORE_ADDON = {"with-inbox-20261103-8cd8ccfa", "with-inbox-20261104-4ee04857"}
