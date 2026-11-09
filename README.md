@@ -167,32 +167,9 @@ retraining as legitimate. The member-tier badge is blurred.
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    subgraph Gmail["My Gmail"]
-        addon["Add-on (Apps Script)"]
-    end
-    subgraph AWS["AWS, us-east-2 (Terraform)"]
-        api["API Gateway HTTP API<br/>5 requests/s, 60/min per key"]
-        scan["Lambda: scan<br/>stacked model → DistilBERT (ONNX)<br/>sender check, rules"]
-        db[("DynamoDB<br/>hashed keys, verdicts by SHA-256,<br/>feedback, rate counts")]
-        bucket[("S3: emails I send for retraining<br/>(opt-in, deleted after 90 days)")]
-        drift["Lambda: weekly drift check"]
-        alarms["CloudWatch alarms → email"]
-        deploy["CodeDeploy canary<br/>smoke check, 10% for 10 min"]
-    end
-    claude["Claude Haiku 5.5<br/>(explanations on demand)"]
-    laptop["My laptop: training, packaging,<br/>deploys with MFA"]
+![How one email is scanned and explained: the Gmail add-on, API Gateway, the scan Lambda's four steps, Claude on demand, DynamoDB, S3, Secrets Manager, ECR, the canary, alarms, drift check and warm-up ping, and my laptop for training and deploys](docs/architecture.png)
 
-    addon -- "scan / explain / feedback" --> api --> scan
-    scan --> db
-    scan -- "send for retraining" --> bucket
-    scan -- "POST /v1/explain" --> claude
-    drift --> db
-    scan --> alarms
-    laptop -- "image + plan + apply" --> deploy --> scan
-    laptop -- "make retrain" --> bucket
-```
+([SVG source](docs/architecture.svg))
 
 The service stores no email, only a verdict, a score and the email's SHA-256, unless I send one for retraining
 ([docs/THREAT_MODEL.md](docs/THREAT_MODEL.md)). The Anthropic key sits in Secrets Manager, and explanations stop
