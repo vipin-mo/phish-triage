@@ -252,7 +252,7 @@ for a background design were removed, since a queue would have had to hold the e
   batch problem (Known issues).
 - **The AWS Free plan blocks GitHub's keyless sign-in (OIDC):** AWS denies `iam:*Provider*` on Free plan accounts.
   Rather than store AWS keys in GitHub, I deploy from my laptop with an MFA session (`make deploy-*`). A CI deploy
-  workflow and roles are written but switched off. Since the second review a CI deploy runs the gate, the canary
+  workflow and roles are written but switched off. Since the second audit a CI deploy runs the gate, the canary
   and the loaded-model check as a laptop deploy does; unlike `make deploy-plan`, it doesn't yet stop on an empty
   alarm address.
 - **A privacy gap the live test found:** the sender check's warnings name the sender's domain, and the stored
@@ -291,7 +291,7 @@ for a background design were removed, since a queue would have had to hold the e
   ([reports/retraining_check.md](../reports/retraining_check.md)): DistilBERT decides them, and only stage 1 is
   refitted. So the loop works, and it can't fix this kind of false alarm on its own. That model went out through
   the canary (version 4 to 5). Since reader 2, `make retrain` builds the reader-2 split in service
-  (`with_normalized`); until the second review it still built the reader-1 one, which would have undone the
+  (`with_normalized`); until the second audit it still built the reader-1 one, which would have undone the
   hidden-HTML defence.
 - Cost at my use: $0.02 on AWS in the first eight days ([Cost](../README.md#cost)), within the Free plan's credits. The Free plan
   ends on 2027-04-27 and the account closes with it unless I upgrade, taking every resource with it; before then I
@@ -354,10 +354,11 @@ removing as many random words.
 
 All but five are fixed (one of them partly). The first two were found while rating the analyst's answers by hand,
 the rest afterwards: on my test inbox, while packaging the model, on PrivacyMail, in the Claude re-run, in a review
-of the code and in the robustness test, all in November 2026. The numbers above were re-measured after the fixes,
-except my hand ratings, the Claude-as-classifier comparison (which read each email's plain-text part), the
-robustness report's analyst sample (behind an older model and prompt) and the sender-overlap check (DATA.md), as
-noted where they appear.
+of the code and in the robustness test, all in November 2026. The reviews and audits named here were done by AI
+agents I ran over the code, the numbers and the claims; I decided what to fix and how. The numbers above were
+re-measured after the fixes, except my hand ratings, the Claude-as-classifier comparison (which read each email's
+plain-text part), the robustness report's analyst sample (behind an older model and prompt) and the sender-overlap
+check (DATA.md), as noted where they appear.
 
 - **Masking rewrote links (fixed).** Replacing the Apache list names with `project` ran over the whole body and
   HTML, including URLs and addresses. It rewrote a URL or address in 7,978 of the 13,541 legitimate emails the
@@ -435,7 +436,7 @@ noted where they appear.
   held-out newsletters instead of 1.8%, for 0.4 points more of the public test's phishing (none more of the 2026
   phishing); reading with reader 2 has the same effect (it would send 24 of the inbox's 249 to review). Reading the
   image itself (OCR, QR codes) is the fix I'd make instead.
-- **A second review, after v1.0.0, found more (fixed).** It went over the code, the numbers, the plan, the security
+- **A second AI audit, after v1.0.0, found more (fixed).** It went over the code, the numbers, the plan, the security
   and the claims again. The fixes: `make retrain` still built the reader-1 split, which would have undone
   the hidden-HTML defence, and the gate would have rejected its bundle; the check for instructions aimed at an AI
   ran before normalizing, so one zero-width space or full-width letters hid "ignore all previous instructions" from

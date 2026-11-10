@@ -40,6 +40,8 @@ artifacts/
 *.tfstate
 *.tfstate.*
 *.tfplan
+*.tfvars
+*.tfvars.json
 crash.log
 
 # Node / Apps Script
