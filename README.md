@@ -50,7 +50,7 @@ differ by about a point):
 | My test inbox (a Gmail account I subscribed to newsletters and shops), 26 senders held out of training (249 emails; 2 of the senders share a domain with training, [DATA.md](docs/DATA.md)) | 4 flagged (1.6%; 5.8% averaged per sender) | 0.6–4.1% |
 | My test inbox's later mail from those 26 senders, which no model was chosen on (154 emails from 17 of them) | 6 flagged (3.9%) | 1.8–8.2% |
 | Newsletters from 189 websites held out of training (PrivacyMail; 3,738) | 51 flagged (1.4%), 86 (2.3%) with the ones sent to review | 1.0–1.8% |
-| LLM-written phishing (Greco et al.; 1,000) | 94.0% caught | 92.4–95.3% |
+| LLM-written phishing (Greco et al., written with WormGPT; 1,000) | 94.0% caught | 92.4–95.3% |
 | Public test phishing with text hidden by the three tricks the reader has rules for | 96.1–97.7% caught (16.9% before the defence) | |
 | ... hidden with `text-indent`, `clip` or `transform`, which it has no rule for | 6.9% caught | 5.6–8.3% |
 | My real Gmail, from the add-on (48 emails, scanned by an older model) | 5 flagged, 2 of them false alarms I know of | |
@@ -94,7 +94,8 @@ read off the test set's curve here, to compare models; the service runs at thres
 
 ### How much LLM is needed
 
-On a fixed 1,000-email sample of the public test, with the public-data models ([docs/RESULTS.md](docs/RESULTS.md)):
+On a fixed 1,000-email sample of the public test (500 phishing, 500 legitimate), with the public-data models
+([docs/RESULTS.md](docs/RESULTS.md)):
 
 | Setup | Recall | False alarms | Decided by stage 1 / DistilBERT / Claude | Sent to a third party | Cost at 1M emails a day | Latency |
 |---|---:|---:|---|---:|---:|---:|
@@ -206,8 +207,10 @@ spend ledger my Claude runs write:
 | **This project on AWS, eight days** | **$0.02**, paid from the Free plan's credits |
 | Claude, every evaluation in this README (Haiku 5.5, and Sonnet 5.5 on 200 emails in Phase 3) | $3.50 |
 
-A live explanation costs about $0.001. Most of the money went to measuring, not running: the service itself costs
-cents a month at my use. (The account's total also has $0.69 of disk storage from outside this project.)
+A live explanation costs about $0.001. Most of the money went to measuring, not running. Keeping the service up
+costs about $1 a month at AWS's list prices, nearly all of it storage: about $0.60 for the last 10 container images
+and $0.40 for the secret; my scans fit in the free tier. (The account's total also has $0.69 of disk storage from
+outside this project.)
 
 ## Limits
 
@@ -237,6 +240,19 @@ The full list, with what was fixed, is under [Known issues](docs/FINDINGS.md#kno
 - The [model card](docs/MODEL_CARD.md), the [threat model](docs/THREAT_MODEL.md), the [data card](docs/DATA.md), the
   [features](docs/FEATURES.md) and the [Phase 3 results](docs/RESULTS.md).
 - [reports/](reports/): every measurement behind these numbers.
+
+## How I built it
+
+The problem and the goals were mine. In my course project I trained standard models on a public dataset; they
+scored about 98%, and their explanations showed why that number couldn't be trusted, so I set out to rebuild it
+with an evaluation that shortcuts can't pass so easily. The design choices were mine too: local models decide and
+an LLM only explains and can never lower a verdict, the service keeps no email, it runs serverless on AWS, and LLM
+spend has hard caps.
+
+Most of the code was written by an AI coding assistant (Claude Code), working from my plans and decisions. The two
+reviews in [Known issues](docs/FINDINGS.md#known-issues) were audits I ran with AI agents over the code, the
+numbers and the claims. When they found a problem I didn't patch around it: I asked what the better fix was, and
+what each one found and what changed is listed there.
 
 ## Progress
 

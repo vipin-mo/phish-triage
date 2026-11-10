@@ -1,5 +1,5 @@
-# Everything that runs: the scan function behind API Gateway, its DynamoDB tables, the (switched-off)
-# explanation queue and worker, logs, alarms and a dashboard. Deployed from my laptop with `make deploy-plan` and
+# Everything that runs: the scan function behind API Gateway, its DynamoDB tables, the canary, the drift check,
+# logs, alarms and a dashboard. Deployed from my laptop with `make deploy-plan` and
 # `make deploy-apply` (the Free plan blocks the CI workflow's OIDC sign-in); the image tag names the build.
 
 terraform {
