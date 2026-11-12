@@ -23,6 +23,20 @@ from canary import ALIAS, FUNCTION, deploy  # noqa: E402
 REPORTS_DIR = Path("reports")
 
 
+def hook_log(logs, target: str, hours: int = 2) -> dict:
+    """The smoke hook's log line for `target` (`lambda_handler.before_traffic`): what it loaded and why it failed."""
+    import time
+
+    events = logs.filter_log_events(
+        logGroupName="/aws/lambda/CodeDeployHook_phish-triage-smoke",
+        startTime=int((time.time() - hours * 3600) * 1000),
+        filterPattern='"smoke"',
+    )["events"]
+    lines = [json.loads(e["message"][e["message"].index("{") :]) for e in events if "{" in e["message"]]
+    mine = [line for line in lines if line.get("version") == target]
+    return {"loaded": mine[-1].get("model_version"), "hook_error": mine[-1].get("error")} if mine else {}
+
+
 def run(lambda_client, codedeploy, target: str) -> dict:
     before = lambda_client.get_alias(FunctionName=FUNCTION, Name=ALIAS)
     status = deploy(lambda_client, codedeploy, target)
@@ -62,10 +76,11 @@ def to_markdown(r: dict) -> str:
             f"| `live` alias before / after | version {r['alias_before']} / version {r['alias_after']} |",
             f"| Traffic sent to the bad version | {'none' if held else r['weights_after']} |",
             "",
-            "The smoke hook (`lambda_handler.before_traffic`) failed the version because its loaded model isn't the "
-            "pinned one, before any traffic moved. This shows the hook's stop and CodeDeploy's rollback; the "
-            "alarm-driven rollback during the 10% window hasn't had to run, and with one user that window often gets "
-            "no scans.",
+            "The smoke hook (`lambda_handler.before_traffic`) failed the version before any traffic moved. Its log "
+            f"line: version {r['target']} passed the two smoke emails, loaded `{r.get('loaded', 'an older bundle')}`, "
+            f'and was failed as "{r.get("hook_error", "not the pinned bundle")}"; without the version check it would '
+            "have gone on to the 10% window. This shows the hook's stop and CodeDeploy's rollback; the alarm-driven "
+            "rollback during the 10% window hasn't had to run, and with one user that window often gets no scans.",
             "",
         ]
     )
@@ -77,6 +92,7 @@ def main(argv: list[str]) -> int:
     if len(argv) != 1:
         raise SystemExit("usage: rollback_check.py VERSION")
     result = run(boto3.client("lambda"), boto3.client("codedeploy"), argv[0])
+    result |= hook_log(boto3.client("logs"), argv[0])
     (REPORTS_DIR / "canary_rollback.json").write_text(json.dumps(result, indent=1) + "\n")
     text = to_markdown(result)
     (REPORTS_DIR / "canary_rollback.md").write_text(text)
