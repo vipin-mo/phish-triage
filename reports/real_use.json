@@ -1,25 +1,28 @@
 {
- "as_of": "2026-11-05",
- "emails_scanned": 48,
- "test_emails_left_out": 18,
+ "as_of": "2026-11-12",
+ "emails_scanned": 123,
+ "test_emails_left_out": 797,
  "verdicts": {
-  "safe": 43,
-  "phish": 5
+  "safe": 103,
+  "phish": 18,
+  "review": 2
  },
  "decided_by": {
-  "stacked": 5,
-  "distilbert": 43
+  "stacked": 13,
+  "distilbert": 110
  },
  "by_model": {
-  "with-newsletters-20261104-e7f1d257": 48
+  "with-newsletters-20261104-e7f1d257": 45,
+  "with-normalized-20261105-8baede93": 78
  },
  "feedback": {
-  "correct": 1
+  "correct": 52,
+  "false_alarm": 10
  },
  "sent_for_retraining": {
   "pulled": {
    "legit": 2
   },
-  "waiting_in_bucket": 6
+  "waiting_in_bucket": 19
  }
 }

@@ -49,5 +49,6 @@ def test_deeply_nested_mime_does_not_crash():
     nested = b"Content-Type: multipart/mixed; boundary=b0\n\n" + b"".join(
         f"--b{i}\nContent-Type: multipart/mixed; boundary=b{i + 1}\n\n".encode() for i in range(2000)
     )
-    record = parse.parse_email(nested, source="t", label="phish", origin="x")
-    assert record.parse_errors == ["MIME nesting too deep to parse"]
+    records = []
+    assert _seconds(lambda: records.append(parse.parse_email(nested, source="t", label="phish", origin="x"))) < 2.0
+    assert records[0].parse_errors == ["MIME nesting too deep to parse"]

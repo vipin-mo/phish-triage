@@ -44,8 +44,8 @@ From [reports/course_reproduction.md](../reports/course_reproduction.md) and [re
 
 From [docs/RESULTS.md](RESULTS.md), rebuilt by `make eval` from saved predictions:
 
-- **How much LLM is needed: on this sample, none.** On a fixed 1,000-email sample, the cascade (a 5 ms model, then
-  DistilBERT) caught 498 of 500 phishing emails with no false alarms, and no email was uncertain enough to go on
+- **How much LLM is needed: on this sample, none.** On a fixed 1,000-email sample, the cascade (a model taking about 5 ms on
+  my laptop, then DistilBERT) caught 498 of 500 phishing emails with no false alarms, and no email was uncertain enough to go on
   to Claude Haiku 5.5 (0.2% did before the November 2026 input fixes). Haiku on every email caught 97.4% with 0.8%
   false alarms, sent all mail to a third party, and would cost about $167 a day at 1 million emails. With 500
   emails of each kind in the sample, one email is 0.2%, so the intervals are wide.
@@ -276,12 +276,18 @@ for a background design were removed, since a queue would have had to hold the e
   (set before the first run). Not against the training data: that is half phishing and my mail is almost all
   legitimate, so the mix alone would read as drift. A week with fewer than 30 scans reports "not enough data",
   which at my use is most weeks. The reference holds only bin counts, and the gate fails if it was made with
-  another bundle.
-- **Real use so far** ([reports/real_use.md](../reports/real_use.md), counts only): 48 emails from my own Gmail,
-  scanned from the add-on, 5 flagged as phishing and 43 safe; DistilBERT decided 43 and stage 1 the other 5. I sent
-  2 of the flagged ones for retraining as legitimate (the bank and ride-app emails in Known issues), 6 more wait for
-  the next run, and I gave one "correct". That is one person's mail over a few days: it shows where the model goes
-  wrong, not how often.
+  another bundle. The first full week (to 2026-11-08, 48 scans) alarmed on all three: PSI 2.29 on the scores, 1.09
+  on the stage and 2.86 on the sender check. The sender check is all "pass" on my Gmail but a third "partial" in
+  PrivacyMail, and DistilBERT decides most of my mail but less of PrivacyMail's, so most of those two is the
+  reference's mix. Against my test inbox alone the stage (0.17) and the sender check (0.03) fit and the scores
+  don't (1.42), so after this first reading I'm moving the reference to the test inbox alone with the next model;
+  the score alarm stays, because it's a real gap.
+- **Real use so far** ([reports/real_use.md](../reports/real_use.md), counts only, 2026-11-12): 123 emails from my
+  own Gmail, scanned from the add-on, 18 flagged as phishing, 2 sent to review and 103 safe; DistilBERT decided 110.
+  The model in service scanned 78 of them and flagged 14, and I marked 10 of those 14 as false alarms, all decided by
+  DistilBERT; I marked 52 verdicts correct, none of them a flag, and reported no missed phishing. I sent 2 flagged
+  emails for retraining earlier (the bank and ride-app emails in Known issues) and 19 more wait for the next run.
+  That is one person's mail, scanned when I chose to: it shows where the model goes wrong, not how often.
 - **Retraining runs from my laptop.** `make retrain` moves the emails I sent from the add-on out of the bucket (and
   deletes them there), adds them to the deployed split's training part only, refits stage 1 (DistilBERT stays),
   evaluates the result on the same held-out tests as every other setup, builds and checks the bundle and the drift

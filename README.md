@@ -13,8 +13,8 @@ score, and is built to catch the shortcuts that fooled the course project:
 - **An evaluation built against shortcuts:** duplicates removed, a dataset-leakage audit, tests on a different
   source, on newer phishing, on a test inbox and on newsletters, and recall reported at a fixed false-alarm rate.
   It still let some through, which I found later; they are under [Known issues](docs/FINDINGS.md#known-issues).
-- **A two-stage cascade:** a 5 ms stacked model (trees on features plus a text score) and a fine-tuned DistilBERT
-  for what the first isn't sure of. In the model in service the first decides 89–94% of the public and 2026 test
+- **A two-stage cascade:** a stacked model (trees on features plus a text score; about 5 ms an email on my laptop)
+  and a fine-tuned DistilBERT for what the first isn't sure of. In the model in service the first decides 89–94% of the public and 2026 test
   emails; DistilBERT decides 74% of my test inbox and 38% of the held-out newsletters. A third stage, Claude, was measured
   too; on a 1,000-email sample no email was uncertain enough to reach it.
 - **A safe LLM step:** explanations on demand from Claude, grounded, schema-checked, able to raise risk but never
@@ -53,7 +53,7 @@ differ by about a point):
 | LLM-written phishing (Greco et al., written with WormGPT; 1,000) | 94.0% caught | 92.4–95.3% |
 | Public test phishing with text hidden by the three tricks the reader has rules for | 96.1–97.7% caught (16.9% before the defence) | |
 | ... hidden with `text-indent`, `clip` or `transform`, which it has no rule for | 6.9% caught | 5.6–8.3% |
-| My real Gmail, from the add-on (48 emails, scanned by an older model) | 5 flagged, 2 of them false alarms I know of | |
+| My real Gmail, from the add-on (78 emails scanned by the model in service, 45 more by an older one) | 14 flagged by the model in service; I marked 10 of them false alarms and none correct | |
 | Precision if 1 email in 100 were phishing (recall as above, false alarms as on my test inbox) | 0.38 | 0.19–0.61 |
 
 Four caveats:
@@ -64,7 +64,8 @@ Four caveats:
   from its held-out senders ([reports/fresh_inbox.md](reports/fresh_inbox.md)): 3.9% flagged, against 1.6% on
   the emails the model was chosen on; the intervals overlap, and with it the precision row would be 0.20.
 - **The test inbox is bulk mail,** mostly notifications, newsletters and shops, not personal mail. My real mail
-  is the second-to-last row, and 48 emails are far too few for a rate.
+  is the second-to-last row: 123 emails I chose to scan, too few and too hand-picked for a rate, but its false
+  alarms are far more than the test inbox predicts.
 - **The legitimate labels weren't checked by hand.** My inbox's emails count as legitimate because Gmail delivered
   them outside Spam, and PrivacyMail's because the dataset is newsletters: a phishing email among them would count
   as a false alarm when flagged and as legitimate when missed.
@@ -151,10 +152,15 @@ it ([reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/inj
   header features (sender domain, display name, Reply-To, DKIM and the rest) catches and flags the same emails,
   except 2 of the 1,644 2026 phishing emails. Detection doesn't rest on them; without them stage 1 is sure of fewer
   emails and passes 1–9 points more to DistilBERT.
-- **Real use** ([reports/real_use.md](reports/real_use.md)): 48 of my own emails scanned from the add-on, all by an
-  older model (`with-newsletters-20261104-e7f1d257`); 5 were flagged, and 2 of them (a bank's and a ride app's
-  notices) are false alarms I know of, like the Xfinity notice in the demo since
-  ([Known issues](docs/FINDINGS.md#known-issues)).
+- **Real use** ([reports/real_use.md](reports/real_use.md)): 123 of my own emails scanned from the add-on by
+  2026-11-12, 78 of them by the model in service. It flagged 14 of those 78, and I marked 10 of the 14 as false
+  alarms (none as correct, no phishing missed). All 10 were DistilBERT's calls, so `make retrain`, which refits stage
+  1 only, can't fix them; the next model update retrains both stages with the 19 emails I've sent since.
+- **The drift check's first reading** (the week to 2026-11-08, 48 scans) alarmed on all three distributions: PSI
+  2.29 on the scores, 1.09 on the deciding stage and 2.86 on the sender check, against a limit of 0.25. Measured
+  against my test inbox alone instead of the inbox and PrivacyMail together, the stage (0.17) and the sender check
+  (0.03) fit, and the scores still don't (1.42): half of my real scans land in the less-safe bins, against a tenth of
+  the test inbox's.
 
 ## Demo
 
@@ -217,6 +223,7 @@ outside this project.)
 - **Few sources, one person's mail.** Two public phishing sources and one public legitimate one (Apache mailing
   lists); a second legitimate source I planned (the Linux kernel lists) isn't added. My test inbox and PrivacyMail
   stand in for real mail, both mostly bulk mail, and the real-use numbers are one person's few days.
+- **My real mail gets more false alarms than the tests show:** 10 of the 14 emails the model in service flagged.
 - **The tests chose the model** (above): the reported numbers are closer to validation than to a fresh test.
 - **It ages within months:** trained on phishing up to July, a candidate caught 83.1% of October's.
 - **Newsletter-like phishing:** 23 of 31 caught. Few public phishing emails look like that, so there is little to
@@ -271,7 +278,7 @@ Requires [uv](https://docs.astral.sh/uv/), Python 3.12 and, for the commit hook,
 
 ```bash
 make setup   # create .venv, install dev deps, install git hooks
-make check   # lint, the raw-data and secret checks, tests, the eval gate (what CI runs)
+make check   # lint, the raw-data and secret checks, the 273 tests, the eval gate (what CI runs)
 ```
 
 Raw email datasets are never committed. A pre-commit hook and a CI check block mail, archive, dataset and model
@@ -287,7 +294,8 @@ trains and reports the baseline models on every split, `make eval-course` reprod
 score, `make train-transformer` fine-tunes DistilBERT (needs `uv sync --group train`), and `make eval` rebuilds
 [docs/RESULTS.md](docs/RESULTS.md) from saved predictions. `make eval-analyst` and `make eval-injection` show
 their Claude cost and only call the API with `CONFIRM=--confirm`; `make gate` turns their results into
-[reports/gate.json](reports/gate.json), which CI checks without calling any API.
+[reports/gate.json](reports/gate.json), which CI checks without calling any API. `make parse-timings` times the
+parsing fixes against the code they replaced ([reports/parse_timings.md](reports/parse_timings.md)).
 
 `make bundle` packages the deployed model and checks it against its report, and `make serve` runs the API locally
 on it. Deploying needs an MFA session (`aws sts get-caller-identity --profile phish-triage`) and Docker:
