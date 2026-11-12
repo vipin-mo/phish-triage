@@ -260,7 +260,8 @@ for a background design were removed, since a queue would have had to hold the e
 - **The deploy checks itself.** A review of the deploy steps found that a deploy whose model failed to load still
   printed success, that a plan without the alarm address removed the alarm emails, and that five test images would
   have pushed the running image out of the registry. Now the deploy stops unless the loaded model is the one in
-  `infra/bundle-version`; only a clean, merged `main` is deployed; plans refuse an empty alarm address; test images
+  `infra/bundle-version` (since 2026-11-12 the smoke hook checks it before any traffic moves, and a deliberate
+  deployment of the previous version was stopped that way, [reports/canary_rollback.md](../reports/canary_rollback.md)); only a clean, merged `main` is deployed; plans refuse an empty alarm address; test images
   are cleaned up first; the tables can't be deleted by a plan; and the scan function can only read API keys. The
   slowness alarm fired on both deploys with nobody waiting, because it watched the function's run time, which
   counts the warm-up pings and the 60 s first load on a new image; it now watches the API's latency instead.

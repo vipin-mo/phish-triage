@@ -1,0 +1,13 @@
+{
+ "date": "2026-11-12",
+ "pinned_bundle": "with-visible-20261112-ac59a4e3",
+ "alias_before": "9",
+ "target": "8",
+ "status": "Failed",
+ "error": "HOOK_EXECUTION_FAILURE",
+ "rollback": true,
+ "alias_after": "9",
+ "weights_after": {},
+ "loaded": "with-normalized-20261105-8baede93",
+ "hook_error": "not the pinned bundle"
+}

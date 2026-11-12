@@ -96,6 +96,8 @@ the model and its results are for non-commercial use.
 
 A new model is trained from my laptop (`make retrain`, which adds the emails I sent to this split and refits stage
 1, or a new split), must reproduce its report one email at a time
-(`make bundle`), pass the eval gate (`make gate`), and goes out through a canary (a smoke check, then 10% of traffic
-for 10 minutes, with automatic rollback). A weekly drift check compares the week's verdicts with this model's on
+(`make bundle`), pass the eval gate (`make gate`), and goes out through a canary: a smoke check that also fails a
+version whose loaded model isn't the pinned bundle, then 10% of traffic for 10 minutes, rolled back on the alarms. A
+deliberate deployment of the previous version was stopped by that check before any traffic moved
+([reports/canary_rollback.md](../reports/canary_rollback.md)). A weekly drift check compares the week's verdicts with this model's on
 held-out legitimate mail.

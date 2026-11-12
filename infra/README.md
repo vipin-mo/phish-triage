@@ -19,5 +19,9 @@ A deploy is three commands:
 3. `make deploy-apply` applies it, runs the canary (a smoke check, then 10% of traffic for 10 minutes, rolled back
    on the error, 5xx and latency alarms), warms the new version and checks that the loaded model is the pinned one.
 
-No deploy so far has rolled back, and with one user the 10% window often gets no scans, so the smoke check is what
-really tests a new version. The latency alarm needs 15 minutes of data, longer than the canary.
+The smoke check also fails a version whose loaded model isn't the bundle in `bundle-version`, before any traffic
+moves. `make rollback-check VERSION=<n>` deploys an older version on purpose: on 2026-11-12, version 8 (the previous
+model) passed the smoke emails but was stopped by that check, CodeDeploy rolled it back and `live` stayed on version
+9 ([reports/canary_rollback.md](../reports/canary_rollback.md)). The alarm-driven rollback during the 10% window
+hasn't had to run: with one user the window often gets no scans, so the smoke check is what really tests a new
+version, and the latency alarm needs 15 minutes of data, longer than the canary.
