@@ -107,7 +107,7 @@ class FakeExplainer:
 
 
 def test_an_explanation_is_on_demand_limited_per_key_and_by_the_days_budget(monkeypatch):
-    monkeypatch.setenv("PHISH_DAILY_LLM_USD", "0.010")  # the worst case of one explanation is about $0.006
+    monkeypatch.setenv("PHISH_DAILY_LLM_USD", "0.0085")  # the worst case of one explanation is about $0.003
     store, explainer = MemoryStore(), FakeExplainer(cost=0.003)
     key = store.add_key("tester")
     c = TestClient(api.create_app(FakeScanner, store, explanations=True, explainer_factory=lambda: explainer))
@@ -115,7 +115,7 @@ def test_an_explanation_is_on_demand_limited_per_key_and_by_the_days_budget(monk
     assert first.status_code == 200 and first.json()["scan_id"] == scan_id(EMAIL) and explainer.calls == 1
     assert "ZQX-secret-body" not in json.dumps(list(store.verdicts.values()))  # the email is never stored
     c.post("/v1/explain", content=EMAIL, headers={"x-api-key": key})  # $0.006 spent
-    # a third call's worst case no longer fits in $0.010, so it isn't made: the day's spend can't overshoot
+    # a third call's worst case no longer fits in $0.0085, so it isn't made: the day's spend can't overshoot
     over = c.post("/v1/explain", content=EMAIL, headers={"x-api-key": key})
     assert over.status_code == 429 and "budget" in over.json()["detail"] and explainer.calls == 2
     assert store.add_today(api.SPEND_COUNTER, 0) == 6_000  # reservations settled to the real cost

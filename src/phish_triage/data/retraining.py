@@ -29,6 +29,8 @@ SOURCE = "retraining"
 SPLIT = "with_retraining"
 # The same emails read with reader 2 (Phase 7.2): what the models train on changes, the split doesn't.
 NORMALIZED_SPLIT = "with_normalized"
+# And read with reader 3 (2026-11-12): text-indent, clip and transform hiding, and no fake signals block.
+VISIBLE_SPLIT = "with_visible"
 LABEL_OF = {"phish": "phish", "legit": "legit"}
 # Whose emails may be sent for retraining: the service refuses every other key, and `--pull` takes only these.
 # One owner per line; Terraform reads the same file (infra/service).

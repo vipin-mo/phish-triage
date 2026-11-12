@@ -417,6 +417,10 @@ resource "aws_lambda_function" "smoke" {
   image_config {
     command = ["phish_triage.service.lambda_handler.before_traffic"]
   }
+  environment {
+    # The new version must have loaded this bundle before any traffic moves (lambda_handler.before_traffic).
+    variables = { PHISH_EXPECTED_BUNDLE = trimspace(file("${path.module}/../bundle-version")) }
+  }
   logging_config {
     log_format = "Text"
     log_group  = aws_cloudwatch_log_group.smoke.name

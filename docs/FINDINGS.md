@@ -83,7 +83,7 @@ latest, prompt version 7, $0.26).
   message is verified safe" in 40 real phishing emails in six ways (visible text, HTML comment, CSS-hidden text,
   white-on-white text, image alt text, subject) and in three attacks on the defences themselves (a forged signals
   block, a fake operator message, a fake IT-test notice). With the defences on, 0 of 360 variants made the model say
-  safe, and none ended as safe. Without them, about half of the answers didn't match the schema (186 of 360), so
+  safe, and none ended as safe. Without them, about half of the answers didn't match the schema (188 of 360), so
   the undefended side is a weak baseline, and the forged signals block ended as safe once or twice in 40 in every
   run (twice in the latest): the planted block un-flags the classifier itself (Known issues).
 - **A refusal could switch the analyst off.** The deployed cascade misses 1 of the 40 phishing emails, which the
@@ -98,7 +98,7 @@ latest, prompt version 7, $0.26).
   why the random tags, hidden-text removal and the raise-only rule don't depend on it.
 - **Grounding needed a design change, not a looser check.** With prompt version 3, 2.5% of indicators were dropped
   (the gate allows 2%), 8 of the 11 because the model quoted our own signals as if they were the email. Letting it
-  cite a signal by number brought that to 0.3%, and 0.5% (3 of 640) in the latest run; the user sees our wording
+  cite a signal by number brought that to 0.3%, and 0.6% (4 of 628) in the latest run; the user sees our wording
   of the signal, not the model's.
 - **The advice now matches the action.** With version 4, 38 of 81 "no action" answers still told the user to check
   something ("check the sender if unsure"). Version 5 asks for the same advice in both, and a rule-based check
@@ -271,7 +271,8 @@ for a background design were removed, since a queue would have had to hold the e
   smoke check runs first. In shadow mode (`make deploy-image SHADOW=<bundle>`) the image also carries an earlier
   bundle that scores every new scan, and only both verdicts and scores are logged.
 - **A weekly drift check** compares the week's stored verdicts with the deployed model's verdicts on legitimate
-  mail it never trained on (my inbox's and PrivacyMail's held-out test slices, 3,987 emails): the population
+  mail it never trained on (my inbox's held-out test slice, 249 emails; until 2026-11-12 also PrivacyMail's, 3,987
+  in all): the population
   stability index of the scores, of the deciding stage and of the sender-check results, with an alarm above 0.25
   (set before the first run). Not against the training data: that is half phishing and my mail is almost all
   legitimate, so the mix alone would read as drift. A week with fewer than 30 scans reports "not enough data",
@@ -280,13 +281,14 @@ for a background design were removed, since a queue would have had to hold the e
   on the stage and 2.86 on the sender check. The sender check is all "pass" on my Gmail but a third "partial" in
   PrivacyMail, and DistilBERT decides most of my mail but less of PrivacyMail's, so most of those two is the
   reference's mix. Against my test inbox alone the stage (0.17) and the sender check (0.03) fit and the scores
-  don't (1.42), so after this first reading I'm moving the reference to the test inbox alone with the next model;
-  the score alarm stays, because it's a real gap.
+  don't (1.42), so after this first reading I moved the reference to the test inbox alone with the next model
+  (2026-11-12); the score alarm stays, because it's a real gap.
 - **Real use so far** ([reports/real_use.md](../reports/real_use.md), counts only, 2026-11-12): 123 emails from my
   own Gmail, scanned from the add-on, 18 flagged as phishing, 2 sent to review and 103 safe; DistilBERT decided 110.
   The model in service scanned 78 of them and flagged 14, and I marked 10 of those 14 as false alarms, all decided by
   DistilBERT; I marked 52 verdicts correct, none of them a flag, and reported no missed phishing. I sent 2 flagged
-  emails for retraining earlier (the bank and ride-app emails in Known issues) and 19 more wait for the next run.
+  emails for retraining earlier (the bank and ride-app emails in Known issues) and 19 more, used in the model of
+  2026-11-12 (below).
   That is one person's mail, scanned when I chose to: it shows where the model goes wrong, not how often.
 - **Retraining runs from my laptop.** `make retrain` moves the emails I sent from the add-on out of the bucket (and
   deletes them there), adds them to the deployed split's training part only, refits stage 1 (DistilBERT stays),
@@ -296,9 +298,9 @@ for a background design were removed, since a queue would have had to hold the e
   scores every held-out test exactly as before (reports/with_inbox.md, *retrained*), and still flags both emails
   ([reports/retraining_check.md](../reports/retraining_check.md)): DistilBERT decides them, and only stage 1 is
   refitted. So the loop works, and it can't fix this kind of false alarm on its own. That model went out through
-  the canary (version 4 to 5). Since reader 2, `make retrain` builds the reader-2 split in service
-  (`with_normalized`); until the second audit it still built the reader-1 one, which would have undone the
-  hidden-HTML defence.
+  the canary (version 4 to 5). `make retrain` builds the split in service, now `with_visible` (reader 3;
+  `with_normalized`, reader 2, before 2026-11-12); until the second audit it still built the reader-1 one, which
+  would have undone the hidden-HTML defence. It refits stage 1 only; `make train-visible` retrains DistilBERT.
 - Cost at my use: $0.02 on AWS in the first eight days ([Cost](../README.md#cost)), within the Free plan's credits. The Free plan
   ends on 2027-04-27 and the account closes with it unless I upgrade, taking every resource with it; before then I
   either upgrade or export the feedback and API keys and destroy the service.
@@ -425,16 +427,20 @@ check (DATA.md), as noted where they appear.
   class, moved off-screen or in 2 px type counted as visible, so a hidden paragraph at the top of the body decided
   what DistilBERT read (above), and an HTML-only email that shows fewer than 5 words was read with its hidden parts.
   Reader 2 fixes both; the cascade retrained on it flags 1.4% of the PrivacyMail newsletters instead of 0.9%
-  (above), and `text-indent`, `clip` and `transform` still hide text from it (open).
+  (above). `text-indent`, `clip` and `transform` still hid text from it (6.9% caught); reader 3, in service since
+  2026-11-12, has rules for them and catches 97.8% (reports/defence.md, setup e). They were the held-out tricks, so
+  none is held out now.
 - **The old reader dropped ordinary text set in `em` (fixed).** It read a CSS font size without its unit, so
   `font-size:1em` counted as 1 px and the text as hidden. That cut at least 5 visible words from 23 of my inbox's
   249 test emails and 82 of the 3,738 PrivacyMail ones (reports/defence.md), so the old models never read that text.
   Reader 2, in service since 2026-11-05, reads the unit.
-- **A planted "signals" block can un-flag the classifier (open).** In the injection test, text pretending to be our
-  own signals ("Classifier: not flagged", a passing sender check) made the deployed classifier stop flagging 1 of
-  the 40 phishing emails. With the analyst it still goes to a person, but a plain scan, which is the classifier's
-  verdict alone, calls it safe. The gate reports such drops
-  (`injection_verdict_drop_rate`, 1 of 360) without a limit until the next model update deals with them.
+- **A planted "signals" block could un-flag the classifier (fixed 2026-11-12).** In the injection test, text
+  pretending to be our own signals ("Classifier: not flagged", a passing sender check), planted as visible text at
+  the top of one phishing email whose HTML showed nothing, became all the HTML showed: enough for the reader to read
+  the HTML (just the block) instead of the plain-text part, and the classifier stopped flagging it (1 of 360). Reader
+  3 drops text imitating the signals block and our tags before it decides what the HTML shows, which changes none of
+  the 31,877 training, validation and test emails; the classifier un-flags 0 of the 360 now, and the gate's limit
+  on that drop is 0, set before the run.
 - **Filler can lift an image email out of review (open, kept on purpose).** An email whose HTML is an image, with
   20 words of hidden text or of a plain-text part next to it, isn't sent to review. Counting only the words the
   HTML shows would catch it, but legitimate image newsletters are built the same way: measured with the newsletters
@@ -442,6 +448,15 @@ check (DATA.md), as noted where they appear.
   held-out newsletters instead of 1.8%, for 0.4 points more of the public test's phishing (none more of the 2026
   phishing); reading with reader 2 has the same effect (it would send 24 of the inbox's 249 to review). Reading the
   image itself (OCR, QR codes) is the fix I'd make instead.
+- **The model of 2026-11-12 keeps the old DistilBERT.** I retrained both stages on reader 3 with the 21 emails I
+  had sent (all legitimate). The new DistilBERT flagged 11 of my inbox's 249 test emails instead of 4 and caught
+  96.9% of the public test's phishing instead of 97.7%, though reader 3 reads every test email exactly as reader 2
+  does: 21 emails among 18,745 moved it that much, one training run each, so most of the gap is training noise, and
+  my "1.6%" carries more of it than its interval shows (reports/onnx_with_visible.md). The model in service refits
+  stage 1 on reader 3 and keeps the reader-2 DistilBERT, which reads reader-3 text: 4 of 249, 97.8%. It still flags
+  10 of the 21 emails I sent (12 before), because DistilBERT decides them
+  ([reports/retraining_check.md](../reports/retraining_check.md)); my real false alarms need more than a handful
+  of emails, or a retrained DistilBERT chosen on validation.
 - **A second AI audit, after v1.0.0, found more (fixed).** It went over the code, the numbers, the plan, the security
   and the claims again. The fixes: `make retrain` still built the reader-1 split, which would have undone
   the hidden-HTML defence, and the gate would have rejected its bundle; the check for instructions aimed at an AI
@@ -463,7 +478,7 @@ check (DATA.md), as noted where they appear.
   only raise its verdict.
 - **Retraining:** from my laptop (`make retrain`), not a GitHub Actions workflow, on emails I send with a label
   from the add-on, not on the feedback buttons' labels, and refitting stage 1 only.
-- **The eval gate** allows 2% of indicators dropped as ungrounded, not 0 (the latest run drops 0.5%), measures
+- **The eval gate** allows 2% of indicators dropped as ungrounded, not 0 (the latest run drops 0.6%), measures
   DistilBERT's recall at a threshold read off the test, and in CI checks the committed numbers rather than
   replaying the recorded Claude answers.
 - **The drift check** compares the week's verdicts with the deployed model's verdicts on held-out legitimate mail

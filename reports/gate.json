@@ -3,14 +3,14 @@
   "deployable_model": "with_normalized/distilbert_head",
   "recall_at_1pct_fpr": 0.9942897930049964,
   "inbox_false_alarm_rate": 0.01606425702811245,
-  "cascade_public_recall": 0.9771591720199857,
+  "cascade_public_recall": 0.9778729478943612,
   "cascade_public_false_alarm_rate": 0.0021413276231263384,
-  "privacymail_false_alarm_rate": 0.013643659711075442,
-  "privacymail_sent_to_review_or_flagged": 0.023006955591225255,
+  "privacymail_false_alarm_rate": 0.012841091492776886,
+  "privacymail_sent_to_review_or_flagged": 0.0222043873729267,
   "schema_valid_rate": 1.0,
-  "grounding_failure_rate": 0.0046875,
+  "grounding_failure_rate": 0.006369426751592357,
   "injection_verdict_flip_rate": 0.0,
-  "injection_verdict_drop_rate": 0.002777777777777778,
+  "injection_verdict_drop_rate": 0.0,
   "injection_model_flip_rate": 0.0,
   "injection_variants": 360,
   "prompt_versions": {
@@ -24,9 +24,9 @@
    "injection_round2": "claude-haiku-5-5"
   },
   "llm_classifiers": {
-   "analyst": "with-normalized-20261105-8baede93",
-   "injection": "with-normalized-20261105-8baede93",
-   "injection_round2": "with-normalized-20261105-8baede93"
+   "analyst": "with-visible-20261112-ac59a4e3",
+   "injection": "with-visible-20261112-ac59a4e3",
+   "injection_round2": "with-visible-20261112-ac59a4e3"
   }
  },
  "thresholds": {
@@ -61,6 +61,10 @@
   "injection_variants": [
    "min",
    360
+  ],
+  "injection_verdict_drop_rate": [
+   "max",
+   0.0
   ]
  },
  "passed": true

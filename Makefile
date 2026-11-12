@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox privacymail-counts private-collectors data-privacymail train-with-newsletters eval-privacymail retrain-pull retrain retraining-check distilbert-public dashboard-images real-use robustness robustness-analyst attacks-split train-with-attacks train-normalized time-split-data train-time-split time-split defence-build defence sender-ablation fresh-inbox dating-check masking-check own-domain explanations load-test drift-reference parse-timings gate bundle serve aws-bootstrap tf-foundation-plan tf-foundation-apply upload-bundle put-anthropic-key api-key addon deploy-image deploy-plan deploy-apply
+.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox privacymail-counts private-collectors data-privacymail train-with-newsletters eval-privacymail retrain-pull retrain retraining-check distilbert-public dashboard-images real-use robustness robustness-analyst attacks-split train-with-attacks train-normalized train-visible time-split-data train-time-split time-split defence-build defence sender-ablation fresh-inbox dating-check masking-check own-domain explanations load-test drift-reference gate bundle serve aws-bootstrap tf-foundation-plan tf-foundation-apply upload-bundle put-anthropic-key api-key addon deploy-image deploy-plan deploy-apply rollback-check parse-timings
 
 help:  ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -106,11 +106,11 @@ serve:  ## run the API locally on the latest bundle (prints a one-run API key)
 retrain-pull:  ## move the emails I sent for retraining out of the bucket into data/private/retraining (counts only)
 	$(AWS_ENV) && uv run python -m phish_triage.data.retraining --pull "phish-triage-retraining-$(ACCOUNT)"
 
-retrain: retrain-pull  ## pull, add the sent emails to the deployed split, refit stage 1, bundle `with_normalized` (reader 2), point infra/bundle-version at it, drift reference
+retrain: retrain-pull  ## pull, add the sent emails to the deployed split, refit stage 1, bundle `with_visible` (reader 3), point infra/bundle-version at it, drift reference (run make train-visible first for DistilBERT)
 	uv run python -m phish_triage.data.retraining --build
 	$(MAKE) eval-with-inbox
-	uv run python -m phish_triage.service.bundle --split with_normalized
-	uv run python -c "from phish_triage.service.bundle import latest; print(latest(split='with_normalized').name)" > infra/bundle-version
+	uv run python -m phish_triage.service.bundle --split with_visible
+	v=$$(uv run python -c "from phish_triage.service.bundle import latest; print(latest(split='with_visible').name)") && test -n "$$v" && echo "$$v" > infra/bundle-version
 	$(MAKE) drift-reference
 	@echo "infra/bundle-version: $$(cat infra/bundle-version). Next: the Claude evaluations behind it (they cost money:"
 	@echo "make eval-analyst CONFIRM=--confirm; make eval-injection CONFIRM=--confirm), make gate, then deploy."
@@ -120,6 +120,9 @@ attacks-split:  ## the private `with_attacks` split: the deployed split + an att
 
 train-with-attacks:  ## fine-tune DistilBERT on `with_attacks`, reading with reader 2, and export it (~1 h on an M5)
 	uv run --group train python -m phish_triage.models.train_transformer with_attacks
+
+train-visible:  ## fine-tune DistilBERT on the deployed split's emails read with reader 3 (`with_visible`, ~45 min)
+	uv run --group train python -m phish_triage.models.train_transformer with_visible
 
 train-normalized:  ## fine-tune DistilBERT on the deployed split's emails read with reader 2 (`with_normalized`, ~45 min)
 	uv run --group train python -m phish_triage.models.train_transformer with_normalized
@@ -256,6 +259,9 @@ deploy-plan:  ## plan infra/service for the image in build/image-tag (alarm emai
 	$(AWS_ENV) && terraform -chdir=infra/service init -input=false -backend-config="bucket=phish-triage-tfstate-$(ACCOUNT)" && \
 	terraform -chdir=infra/service plan -input=false -out=service.tfplan -var "image_tag=$$(cat build/image-tag)" -var "alert_email=$(ALERT_EMAIL)" \
 	  $(if $(CI_BOUNDARY),-var ci_role_boundary=true)
+
+rollback-check:  ## a deliberate deployment of an older version (VERSION=<n>) that the smoke hook must stop (reports/canary_rollback.md)
+	$(AWS_ENV) && uv run python scripts/rollback_check.py $(VERSION)
 
 deploy-apply:  ## apply the saved service plan, canary the new version (smoke check, 10% for 10 min), then check the loaded model
 	$(AWS_ENV) && terraform -chdir=infra/service apply -input=false service.tfplan && \

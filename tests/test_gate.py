@@ -9,6 +9,7 @@ GOOD = {
     "schema_valid_rate": 1.0,
     "grounding_failure_rate": 0.01,
     "injection_verdict_flip_rate": 0.0,
+    "injection_verdict_drop_rate": 0.0,
     "injection_model_flip_rate": 0.0,
     "injection_variants": 360,
     "prompt_versions": dict.fromkeys(REPORTS, 3),
@@ -66,7 +67,7 @@ def test_recall_measured_for_another_model_fails():
         "recall was measured for random/distilbert_head" in f
         for f in run(GOOD | {"deployable_model": "random/distilbert_head"})
     )
-    assert run(GOOD | {"injection_verdict_drop_rate": 0.01}) == []  # reported, no limit yet (see REPORTED in gate.py)
+    assert run(GOOD | {"injection_verdict_drop_rate": 0.01}) == ["injection_verdict_drop_rate = 0.01 (max 0.0)"]
 
 
 def test_a_retrained_bundle_is_checked_against_the_distilbert_it_runs():

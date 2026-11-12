@@ -45,6 +45,7 @@ PRIVATE_SPLITS = (  # when named
     privacymail.NEWSLETTER_SPLIT,
     attacks.SPLIT,
     retraining.NORMALIZED_SPLIT,
+    retraining.VISIBLE_SPLIT,
     time_split.SPLIT,
 )
 
@@ -166,6 +167,7 @@ def onnx_markdown(r: dict, split: str = EXPORT_SPLIT) -> str:
         privacymail.NEWSLETTER_SPLIT: "make train-with-newsletters",
         attacks.SPLIT: "make train-with-attacks",
         retraining.NORMALIZED_SPLIT: "make train-normalized",
+        retraining.VISIBLE_SPLIT: "make train-visible",
         time_split.SPLIT: "make train-time-split",
     }.get(split, "make train-with-inbox")
     lines = [
@@ -229,6 +231,8 @@ def main(argv: list[str] | None = None) -> int:
         splits[attacks.SPLIT] = attacks.load_split()
     if retraining.NORMALIZED_SPLIT in args.splits:
         splits[retraining.NORMALIZED_SPLIT] = retraining.load_split()
+    if retraining.VISIBLE_SPLIT in args.splits:
+        splits[retraining.VISIBLE_SPLIT] = retraining.load_split()
     if time_split.SPLIT in args.splits:
         splits[time_split.SPLIT] = time_split.load_split()
     tokenizer = transformer.load_tokenizer()

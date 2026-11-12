@@ -76,10 +76,14 @@ SOURCES = {
     "with_retraining": (Path("artifacts/distilbert_with_newsletters"), "retrained"),
     # the retraining split's emails read with reader 2 (Phase 7.2, reports/defence.md); both stages trained on them
     "with_normalized": (Path("artifacts/distilbert_with_normalized"), "normalized"),
+    # the same emails read with reader 3 (2026-11-12): stage 1 refitted on them; DistilBERT is the reader-2 one, which
+    # reads reader-3 text (the same on every test email). A DistilBERT retrained on them was worse on the test inbox
+    # (reports/onnx_with_visible.md, docs/FINDINGS.md), so it isn't used.
+    "with_visible": (Path("artifacts/distilbert_with_normalized"), "visible"),
 }
-DISTILBERT_FROM = {"with_retraining": "with_newsletters"}
+DISTILBERT_FROM = {"with_retraining": "with_newsletters", "with_visible": "with_normalized"}
 # what a split's models read (`baselines.email_text`); else 1
-READER = {"with_attacks": 2, "with_normalized": 2, "with_time_split": 2}
+READER = {"with_attacks": 2, "with_normalized": 2, "with_time_split": 2, "with_visible": 3}
 
 
 def reader_of(split: str) -> int:
@@ -118,11 +122,11 @@ def load_split(name: str) -> tuple[dict[str, list[str]], dict]:
     from phish_triage.data import attacks, inbox, privacymail, retraining, time_split
 
     split, slices = inbox.load_split()
-    later = (retraining.SPLIT, retraining.NORMALIZED_SPLIT, attacks.SPLIT, time_split.SPLIT)
+    later = (retraining.SPLIT, retraining.NORMALIZED_SPLIT, retraining.VISIBLE_SPLIT, attacks.SPLIT, time_split.SPLIT)
     if name in (privacymail.NEWSLETTER_SPLIT, *later):
         split, extra = privacymail.load_split()
         slices = slices | extra
-    if name in (retraining.SPLIT, retraining.NORMALIZED_SPLIT):
+    if name in (retraining.SPLIT, retraining.NORMALIZED_SPLIT, retraining.VISIBLE_SPLIT):
         split = retraining.load_split()
     if name == attacks.SPLIT:
         split = attacks.load_split()

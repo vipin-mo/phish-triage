@@ -26,7 +26,12 @@ PATTERNS = {
     "pii phone": pii._PHONE,
     "pii code": pii._OTP,
     "date words": baselines.DATE_WORDS,
+    "fake signals block": baselines.FAKE_SIGNALS,
+    "fake signal lines": baselines.SIGNAL_LINES,
+    "clip lengths": html._UNIT_LENGTH,
 }
+# reader 3's patterns also meet our own markup repeated, which is what they look for
+ATTACKS += ["<signals>" * 20_000, "<signals" * 20_000, "Classifier:" * 10_000, "rect(" + "0px" * 30_000]
 
 
 def _seconds(fn) -> float:

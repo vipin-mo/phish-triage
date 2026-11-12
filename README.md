@@ -14,9 +14,9 @@ score, and is built to catch the shortcuts that fooled the course project:
   source, on newer phishing, on a test inbox and on newsletters, and recall reported at a fixed false-alarm rate.
   It still let some through, which I found later; they are under [Known issues](docs/FINDINGS.md#known-issues).
 - **A two-stage cascade:** a stacked model (trees on features plus a text score; about 5 ms an email on my laptop)
-  and a fine-tuned DistilBERT for what the first isn't sure of. In the model in service the first decides 89–94% of the public and 2026 test
-  emails; DistilBERT decides 74% of my test inbox and 38% of the held-out newsletters. A third stage, Claude, was measured
-  too; on a 1,000-email sample no email was uncertain enough to reach it.
+  and a fine-tuned DistilBERT for what the first isn't sure of. In the model in service the first decides 92–93% of
+  the public and 2026 test emails; DistilBERT decides 60% of my test inbox and 19% of the held-out newsletters. A
+  third stage, Claude, was measured too; on a 1,000-email sample no email was uncertain enough to reach it.
 - **A safe LLM step:** explanations on demand from Claude, grounded, schema-checked, able to raise risk but never
   lower it, and tested against prompt injection hidden inside phishing emails.
 - **Sender checks:** SPF, DKIM and DMARC results from the receiving mail provider, look-alike domains,
@@ -34,25 +34,24 @@ Terraform, Docker, GitHub Actions and Google Apps Script.
 
 ## Results
 
-The model in service (`with-normalized-20261105-8baede93`, since 2026-11-05; its [model card](docs/MODEL_CARD.md)), on
-test emails it never trained on ([reports/with_inbox.md](reports/with_inbox.md), *normalized*;
-[reports/defence.md](reports/defence.md), setup d, whose stage-1 model scores the same as the one in service on
-4,402 public, LLM-written and attacked emails), with Wilson 95% intervals (the reports give bootstrap ones, which
-differ by about a point):
+The model in service (`with-visible-20261112-ac59a4e3`, since 2026-11-12; its [model card](docs/MODEL_CARD.md)), on
+test emails it never trained on ([reports/with_inbox.md](reports/with_inbox.md), *visible*;
+[reports/defence.md](reports/defence.md), setup e, the bundle in service), with Wilson 95% intervals (the reports
+give bootstrap ones, which differ by about a point):
 
 | Test | Result | 95% interval |
 |---|---:|---:|
-| Public test phishing (Nazario, phishing_pot; 1,401 emails) | 97.7% caught | 96.8–98.4% |
+| Public test phishing (Nazario, phishing_pot; 1,401 emails) | 97.8% caught | 96.9–98.4% |
 | Public test legitimate mail (Apache lists; 1,401) | 3 flagged (0.2%) | 0.1–0.6% |
 | 2026 phishing (phishing_pot, the same months as training; 1,644) | 98.3% caught | 97.5–98.8% |
 | Phishing three months newer than training (a candidate trained on phishing up to July 2026; 354 October emails) | 83.1% caught (98.2% in August) | 78.8–86.6% |
 | Phishing that looks like a newsletter (31) | 23 caught (74%) | 57–86% |
 | My test inbox (a Gmail account I subscribed to newsletters and shops), 26 senders held out of training (249 emails; 2 of the senders share a domain with training, [DATA.md](docs/DATA.md)) | 4 flagged (1.6%; 5.8% averaged per sender) | 0.6–4.1% |
 | My test inbox's later mail from those 26 senders, which no model was chosen on (154 emails from 17 of them) | 6 flagged (3.9%) | 1.8–8.2% |
-| Newsletters from 189 websites held out of training (PrivacyMail; 3,738) | 51 flagged (1.4%), 86 (2.3%) with the ones sent to review | 1.0–1.8% |
+| Newsletters from 189 websites held out of training (PrivacyMail; 3,738) | 48 flagged (1.3%), 83 (2.2%) with the ones sent to review | 1.0–1.7% |
 | LLM-written phishing (Greco et al., written with WormGPT; 1,000) | 94.0% caught | 92.4–95.3% |
-| Public test phishing with text hidden by the three tricks the reader has rules for | 96.1–97.7% caught (16.9% before the defence) | |
-| ... hidden with `text-indent`, `clip` or `transform`, which it has no rule for | 6.9% caught | 5.6–8.3% |
+| Public test phishing with text hidden by the three tricks reader 2 has rules for | 96.2–97.8% caught (16.9% before the defence) | |
+| ... hidden with `text-indent`, `clip` or `transform` (held out until reader 3 got rules for them) | 97.8% caught (6.9% with reader 2) | 96.9–98.4% |
 | My real Gmail, from the add-on (78 emails scanned by the model in service, 45 more by an older one) | 14 flagged by the model in service; I marked 10 of them false alarms and none correct | |
 | Precision if 1 email in 100 were phishing (recall as above, false alarms as on my test inbox) | 0.38 | 0.19–0.61 |
 
@@ -120,12 +119,13 @@ it ([reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/inj
 - **Prompt injection:** 40 phishing emails, each with an instruction planted nine ways (visible and hidden text,
   a comment, alt text, the subject, a forged signals block, fake operator and IT-test notices): with the
   defences, 0 of the 360 ended as safe. Without them Claude's own answer said safe once in 360, but about half of
-  those answers didn't match the schema at all (186 of 360), so this shows the pipeline holds, not how much each
-  defence adds. The verdict here is the explanation's: a plain scan is the classifier's alone, and the forged
-  signals block un-flagged the classifier on 1 of the 40 ([Known issues](docs/FINDINGS.md#known-issues)).
-- **Ordinary mail:** 100% schema-valid answers; 0.5% of indicators dropped as ungrounded; it raised the one
-  phishing email of 100 the classifier missed to "suspicious", and 6 of the 100 legitimate (mailing-list) emails
-  too.
+  those answers didn't match the schema at all (188 of 360), so this shows the pipeline holds, not how much each
+  defence adds. The verdict here is the explanation's: a plain scan is the classifier's alone. The forged signals
+  block un-flagged the reader-2 classifier on 1 of the 40; reader 3 drops it, and the classifier un-flags none
+  ([Known issues](docs/FINDINGS.md#known-issues)).
+- **Ordinary mail:** 100% schema-valid answers; 0.6% of indicators dropped as ungrounded; it raised the one
+  phishing email of 100 the classifier missed to "suspicious", and 7 of the 100 legitimate (mailing-list) emails
+  too; the one legitimate email the classifier flagged stayed "phish", since it can't lower a verdict.
 
 ### Robustness, load and explanations
 
@@ -133,7 +133,8 @@ it ([reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/inj
   HTML text dropped the old model to 16.9%. A better reader (reader 2) and retraining brought it to 96.1–97.7% for
   the three tricks the reader has rules for, and LLM-written phishing from 88.8% to 94.0% (one training run each;
   across the setups I tried, LLM-written phishing ranged from 84.1% to 94.0%). Text hidden with
-  `text-indent`, `clip` or `transform`, which it has no rule for, gets through more often than before: 6.9%.
+  `text-indent`, `clip` or `transform`, which reader 2 had no rule for, got through: 6.9%. Reader 3 (in service
+  since 2026-11-12) has rules for them, and catches 97.8%; that also means no hidden-HTML trick is held out now.
 - **Load** ([reports/load_test.md](reports/load_test.md)): 543 requests of one short test email at up to 10 a
   second, a test of the rate limits rather than of real load. The limits refused the excess, nothing failed, and an
   answered scan took 45 ms at the gateway (p50); a real email takes about 0.2 s end to end.
@@ -160,7 +161,7 @@ it ([reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/inj
   2.29 on the scores, 1.09 on the deciding stage and 2.86 on the sender check, against a limit of 0.25. Measured
   against my test inbox alone instead of the inbox and PrivacyMail together, the stage (0.17) and the sender check
   (0.03) fit, and the scores still don't (1.42): half of my real scans land in the less-safe bins, against a tenth of
-  the test inbox's.
+  the test inbox's. Since 2026-11-12 the reference is the test inbox alone; the score alarm stays.
 
 ## Demo
 
@@ -230,8 +231,8 @@ outside this project.)
   learn from.
 - **Big brands asking me to act read as phishing.** A rule sending own-domain-signed mail to review moved as many
   phishing emails as false alarms, so it isn't used.
-- **Hidden text the reader has no rule for** (`text-indent`, `clip`, `transform`) still gets through, and a
-  planted block of fake "signals" un-flagged the classifier on 1 of 40 test phishing emails.
+- **Hidden text is caught trick by trick.** Reader 3 has rules for every hiding trick I test, so there is no
+  held-out one left; a new trick would get through until it has a rule.
 - **Images aren't read:** an image-only or QR-code email is judged on its few words (it goes to review when it has
   almost none).
 - **The AWS Free plan** blocks keyless CI deploys, so I deploy from my laptop with MFA, and the account closes on

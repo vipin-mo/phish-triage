@@ -36,13 +36,14 @@ CANDIDATES = {  # name -> (its split, its DistilBERT)
     "c_both": (SPLIT, Path("artifacts/distilbert_with_attacks")),
     "d_normalized": ("with_normalized", Path("artifacts/distilbert_with_normalized")),
 }
-SETUPS = ("deployed", "a_reader2", "b_stage1", "c_both", "d_normalized")
+SETUPS = ("deployed", "a_reader2", "b_stage1", "c_both", "d_normalized", "e_visible")
 SETUP_NAMES = {
     "deployed": "Deployed",
     "a_reader2": "(a) Reader 2",
     "b_stage1": "(b) + stage 1 retrained",
     "c_both": "(c) + DistilBERT retrained",
     "d_normalized": "(d) Reader 2, retrained without copies",
+    "e_visible": "(e) Reader 3, in service since 2026-11-12",
 }
 THREADS = 2  # per setup; the four setups run side by side
 
@@ -68,6 +69,8 @@ def scanner_for(setup: str):
     from phish_triage.service.bundle import CANDIDATE_ROOT, DEPLOYED_SPLIT, latest
     from phish_triage.service.scanner import Scanner
 
+    if setup == "e_visible":  # reader 3 (text-indent, clip, transform; no fake signals block): the bundle in service
+        return Scanner(latest(split="with_visible"), threads=THREADS)
     if setup in ("deployed", "a_reader2"):
         return Scanner(latest(split=DEPLOYED_SPLIT), threads=THREADS, reader=2 if setup == "a_reader2" else None)
     (folder,) = [p for p in (CANDIDATE_ROOT / setup).iterdir() if p.is_dir()]
