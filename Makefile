@@ -2,7 +2,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox privacymail-counts private-collectors data-privacymail train-with-newsletters eval-privacymail retrain-pull retrain retraining-check distilbert-public dashboard-images real-use robustness robustness-analyst attacks-split train-with-attacks train-normalized time-split-data train-time-split time-split defence-build defence sender-ablation fresh-inbox dating-check masking-check own-domain explanations load-test drift-reference gate bundle serve aws-bootstrap tf-foundation-plan tf-foundation-apply upload-bundle put-anthropic-key api-key addon deploy-image deploy-plan deploy-apply
+.PHONY: help setup lint format test check-data check data data-download data-build data-prepare data-splits audit eval-baselines eval-course train-transformer eval eval-analyst eval-injection eval-test-inbox data-inbox train-with-inbox eval-with-inbox privacymail-counts private-collectors data-privacymail train-with-newsletters eval-privacymail retrain-pull retrain retraining-check distilbert-public dashboard-images real-use robustness robustness-analyst attacks-split train-with-attacks train-normalized time-split-data train-time-split time-split defence-build defence sender-ablation fresh-inbox dating-check masking-check own-domain explanations load-test drift-reference parse-timings gate bundle serve aws-bootstrap tf-foundation-plan tf-foundation-apply upload-bundle put-anthropic-key api-key addon deploy-image deploy-plan deploy-apply
 
 help:  ## list targets
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -185,6 +185,9 @@ retraining-check:  ## how the sent emails score before and after retraining (BEF
 
 drift-reference:  ## the drift check's reference: bin counts of the bundle's verdicts on held-out legitimate mail
 	uv run python scripts/drift_reference.py
+
+parse-timings:  ## the parsing fixes timed against the code they replaced (reports/parse_timings.md; $0, local)
+	uv run python scripts/parse_timings.py
 
 gate:  ## measure the eval gate from local results -> reports/gate.json (CI runs the free --check)
 	uv run python -m phish_triage.evaluation.gate

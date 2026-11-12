@@ -1,0 +1,19 @@
+{
+ "email-address pattern (dedup)": {
+  "before": 28.358897750003962,
+  "now": 0.0020726250077132136
+ },
+ "domain-in-text pattern (features)": {
+  "before": 102.76735725000617,
+  "now": 0.06818400000338443
+ },
+ "visible HTML, 100,000 unclosed <div>": {
+  "before": null,
+  "now": 0.10662133400910534
+ },
+ "Tranco domain table, cold start": {
+  "before": 2.9775038750085514,
+  "now": 0.19147341698408127,
+  "domains": 1000000
+ }
+}
