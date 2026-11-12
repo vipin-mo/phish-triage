@@ -1,28 +1,29 @@
 {
  "prompt_version": 7,
  "llm_model": "claude-haiku-5-5",
- "classifier": "with-normalized-20261105-8baede93",
+ "classifier": "with-visible-20261112-ac59a4e3",
  "emails": 200,
  "schema_valid_rate": 1.0,
- "indicators": 640,
- "grounding_failures": 3,
- "grounding_failure_rate": 0.0046875,
- "kept_indicators_citing_a_signal": 355,
+ "indicators": 628,
+ "grounding_failures": 4,
+ "grounding_failure_rate": 0.006369426751592357,
+ "kept_indicators_citing_a_signal": 351,
  "answers_with_a_dropped_indicator": 2,
- "no_action_answers": 81,
- "no_action_with_advice_in_summary": 4,
+ "no_action_answers": 72,
+ "no_action_with_advice_in_summary": 1,
  "errors": {},
  "verdicts": {
-  "legit -> safe": 94,
-  "legit -> suspicious": 6,
+  "legit -> phish": 1,
+  "legit -> safe": 92,
+  "legit -> suspicious": 7,
   "phish -> phish": 99,
   "phish -> suspicious": 1
  },
  "schema_valid_first_try": 0.995,
  "retried": 1,
  "latency_s": {
-  "p50": 2.4063932915159967,
-  "p95": 3.2374050791928313,
-  "cost_usd": 0.005797305000000001
+  "p50": 2.5833502919995226,
+  "p95": 3.5891550976055444,
+  "cost_usd": 0.005997305
  }
 }

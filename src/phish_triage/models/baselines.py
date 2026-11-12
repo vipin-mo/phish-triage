@@ -65,28 +65,49 @@ def without_dates(text: str) -> str:
     return DATE_WORDS.sub(" ", text)
 
 
+# Reader 3: text that imitates the analyst prompt's own markup (the `<signals>` block and the `<email>` tags, which
+# the code is public about) or its signal lines is dropped from what the models read, before the reader decides
+# whether the HTML shows enough to read. Written into an email whose HTML showed nothing, a fake "Classifier: ...
+# (not flagged) / Sender check: pass" block was enough visible text for the reader to read the HTML (just the block)
+# instead of the plain-text part, and the classifier un-flagged a phishing email in the injection test.
+FAKE_SIGNALS = re.compile(
+    r"<\s{0,4}signals\b[^<>]{0,64}>.{0,2000}?<\s{0,4}/\s{0,4}signals\s{0,4}>", re.IGNORECASE | re.DOTALL
+)
+OUR_TAGS = re.compile(r"<\s{0,4}/?\s{0,4}(?:email|signals)\b[^<>]{0,64}>", re.IGNORECASE)
+SIGNAL_LINES = re.compile(r"^[\W_]{0,4}(?:classifier|sender check)\s{0,4}:[^\n]{0,300}$", re.IGNORECASE | re.MULTILINE)
+
+
+def without_fake_signals(text: str) -> str:
+    return SIGNAL_LINES.sub(" ", OUR_TAGS.sub(" ", FAKE_SIGNALS.sub(" ", text)))
+
+
 def body_text(record: dict, reader: int = 1) -> str:
     """The body a reader sees: the visible HTML text, or the plain-text part when the HTML shows almost nothing.
 
     Reader 2 (Phase 7.2) reads the HTML with `visible_html`'s reader 2; when the HTML shows almost nothing and the
     email has no plain-text part of its own (the parser made the text from the HTML, hidden parts included), it keeps
-    the little the HTML shows; and it cleans the text with `normalize_text`. Reader 1 is the deployed bundles'."""
+    the little the HTML shows; and it cleans the text with `normalize_text`. Reader 3 also drops text imitating the
+    signals block, before counting what the HTML shows. Reader 1 is the first bundles'."""
     html = record.get("html") or ""
     clean = normalize_text if reader >= 2 else (lambda text: text)
+    drop = without_fake_signals if reader >= 3 else (lambda text: text)
     if html:
         visible = visible_html(html, reader).text
-        if len(visible.split()) >= MIN_VISIBLE_WORDS or (
+        # The HTML keeps the source's names in URLs and addresses for the link features; masked here as in the
+        # plain-text part, or 5.6% of the legitimate mail would show `apache` to the text models.
+        read = drop(clean(mask_source_names(visible)))
+        shown = read if reader >= 3 else visible
+        if len(shown.split()) >= MIN_VISIBLE_WORDS or (
             reader >= 2 and (record.get("text") or "") == html_to_text(html)
         ):
-            # The HTML keeps the source's names in URLs and addresses for the link features; masked here as in the
-            # plain-text part, or 5.6% of the legitimate mail would show `apache` to the text models.
-            return clean(mask_source_names(visible))
-    return clean(record.get("text") or "")
+            return read
+    return drop(clean(record.get("text") or ""))
 
 
 def email_text(record: dict, reader: int = 1) -> str:
     subject = record.get("subject") or ""
     subject = normalize_text(subject) if reader >= 2 else subject
+    subject = without_fake_signals(subject) if reader >= 3 else subject
     return without_dates(f"{subject}\n{body_text(record, reader)[:TEXT_CHARS]}")
 
 

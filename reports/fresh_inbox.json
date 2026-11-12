@@ -1,5 +1,5 @@
 {
- "bundle": "with-normalized-20261105-8baede93",
+ "bundle": "with-visible-20261112-ac59a4e3",
  "matching": {
   "second_export": 3087,
   "in the first export": 1701,
@@ -21,9 +21,9 @@
   "training senders": {
    "emails": 1204,
    "senders": 65,
-   "flagged": 25,
-   "sent_to_review": 38,
-   "flagged_per_sender_mean": 0.014184042982100029,
+   "flagged": 21,
+   "sent_to_review": 40,
+   "flagged_per_sender_mean": 0.01343357393894806,
    "categories": {
     "promotions": 144,
     "purchases": 6,

@@ -71,6 +71,17 @@ def test_the_hook_passes_only_a_version_whose_smoke_check_passed():
     assert unreadable.status == "Failed"
 
 
+def test_the_hook_fails_a_version_that_loaded_another_bundle(monkeypatch):
+    from phish_triage.service.lambda_handler import before_traffic
+
+    event = {"DeploymentId": "d-1", "LifecycleEventHookExecutionId": "h-1"}
+    monkeypatch.setenv("PHISH_EXPECTED_BUNDLE", "with-visible-20261112-aaaaaaaa")
+    for loaded, expected in [("with-visible-20261112-aaaaaaaa", "Succeeded"), ("with-normalized-old", "Failed")]:
+        codedeploy = FakeCodeDeploy()
+        answer = {"passed": True, "model_version": loaded}
+        assert before_traffic(event, None, codedeploy, FakeLambda(answer))["status"] == expected == codedeploy.status
+
+
 def test_shadow_mode_logs_both_verdicts_and_never_changes_the_answer(caplog):
     store = MemoryStore()
     key = store.add_key("tester")

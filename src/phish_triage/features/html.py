@@ -100,8 +100,10 @@ def visible_html(html: str, reader: int = 1) -> VisibleHtml:
 
     Reader 2 (Phase 7.2, the robustness defence) also hides what a `<style>` block hides (rules with a simple selector
     outside `@media` and other at-rules: a tag, an id, classes), text moved off-screen (absolute or fixed positioning
-    at least 100 px off the page), and text under 4 px (0.3 em, 30%). Reader 1 is what the deployed bundles read."""
-    parser = _VisibilityParser(StyleRules.parse(html) if reader >= 2 else None)
+    at least 100 px off the page), and text under 4 px (0.3 em, 30%). Reader 3 also hides text pushed out of its box
+    with `text-indent` (100 px or more to the left), clipped to nothing (`clip: rect(...)` or `clip-path` with no
+    area left) or transformed away (`scale(0)` on either axis, or translated 100 px or more off the page)."""
+    parser = _VisibilityParser(StyleRules.parse(html) if reader >= 2 else None, reader=reader)
     try:
         parser.feed(html)
         parser.close()
@@ -216,6 +218,51 @@ def _off_screen(style: dict[str, str]) -> bool:
     return any((x := _length(style.get(side, ""))) is not None and x[0] <= -100 for side in ("left", "top", "right"))
 
 
+def _px(value: str) -> float | None:
+    """A length in px (1 em = 16 px), or None."""
+    length = _length(value.strip())
+    if length is None:
+        return None
+    size, unit = length
+    return size * {"px": 1, "pt": 4 / 3, "em": 16, "rem": 16, "": 1}.get(unit, 1)
+
+
+_RECT = re.compile(r"rect\(([^)]*)\)")
+_UNIT_LENGTH = re.compile(r"-?\d{0,9}\.?\d{1,9}(?:px|pt|em|rem)")
+_SCALE = re.compile(r"scale([xy]?)\(([^)]*)\)")
+_TRANSLATE = re.compile(r"translate([xy]?)\(([^)]*)\)")
+
+
+def _pushed_away(style: dict[str, str]) -> bool:
+    """Reader 3: text moved out of sight by text-indent, clip, clip-path or transform."""
+    indent = _px(style.get("text-indent", ""))
+    if indent is not None and indent <= -100:
+        return True
+    if m := _RECT.search(style.get("clip", "")):
+        args = m.group(1)  # the declarations have their spaces removed: "rect(0 0 0 0)" arrives as "rect(0000)"
+        if not re.search(r"[1-9]", args):
+            return True
+        parts = args.split(",") if "," in args else _UNIT_LENGTH.findall(args)
+        sides = [_px(v) for v in parts]
+        if len(sides) == 4 and None not in sides and (sides[0] >= sides[2] or sides[3] >= sides[1]):
+            return True  # rect(top right bottom left): no height or no width left
+    clip_path = style.get("clip-path", "").replace(" ", "")
+    if clip_path.startswith(("inset(50%", "inset(100%", "circle(0", "ellipse(0")):
+        return True
+    transform = style.get("transform", "")
+    for axis, args in _SCALE.findall(transform):
+        values = [_number(v) for v in args.split(",")]
+        if axis or len(values) == 1:
+            if values[0] == 0:
+                return True
+        elif 0 in values:
+            return True
+    for _, args in _TRANSLATE.findall(transform):
+        if any((x := _px(v)) is not None and x <= -100 for v in args.split(",")):
+            return True
+    return False
+
+
 def _number(value: str) -> float | None:
     digits = "".join(ch for ch in value if ch.isdigit() or ch == ".")
     try:
@@ -225,7 +272,7 @@ def _number(value: str) -> float | None:
 
 
 def _hiding(
-    tag: str, attrs: dict[str, str], background: str, rules: StyleRules | None = None
+    tag: str, attrs: dict[str, str], background: str, rules: StyleRules | None = None, reader: int = 1
 ) -> tuple[str | None, str]:
     """(technique that hides this element or None, the background colour its children sit on). With `rules` (reader
     2), the `<style>` block's declarations apply under the element's own."""
@@ -237,6 +284,8 @@ def _hiding(
         return "off_screen", bg
     if rules is not None and _tiny(style.get("font-size", "")):
         return "tiny_or_transparent", bg
+    if reader >= 3 and _pushed_away(style):
+        return "off_screen", bg
     # Reader 1 reads the size without its unit, so 1em or 0.8em (ordinary text) counts as tiny; reader 2 uses `_tiny`.
     size = _number(style.get("font-size", "")) if rules is None else None
     opacity = _number(style.get("opacity", ""))
@@ -296,9 +345,10 @@ class _VisibilityParser(HTMLParser):
     """Each stack entry carries its *effective* state (hidden by itself or by an ancestor), so looking it up is O(1);
     re-scanning the stack made 100,000 unclosed tags take 30 seconds."""
 
-    def __init__(self, rules: StyleRules | None = None) -> None:
+    def __init__(self, rules: StyleRules | None = None, reader: int = 1) -> None:
         super().__init__(convert_charrefs=True)
         self.rules = rules
+        self.reader = reader
         self.stack: list[tuple[str, str | None, str]] = []  # (tag, effective hiding technique, background)
         self.visible: list[str] = []
         self.hidden_parts: list[str] = []
@@ -322,7 +372,7 @@ class _VisibilityParser(HTMLParser):
             return
         technique = "skipped" if tag in SKIPPED else None
         if technique is None:
-            technique, background = _hiding(tag, values, background, self.rules)
+            technique, background = _hiding(tag, values, background, self.rules, self.reader)
             if technique and not inherited:
                 self._count(technique)
         self.stack.append((tag, technique or inherited, background))  # the nearest hiding element decides

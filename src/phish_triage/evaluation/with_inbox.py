@@ -54,7 +54,7 @@ from phish_triage.evaluation.test_inbox import MODELS, fmt_share, share
 from phish_triage.features.domains import default_ranks
 from phish_triage.features.extract import FEATURE_NAMES, matrix
 from phish_triage.models.baselines import email_text, fit_all, without_dates
-from phish_triage.service.bundle import reader_of
+from phish_triage.service.bundle import distilbert_split, reader_of
 from phish_triage.service.triage import LITTLE_TEXT_WORDS, too_little_text
 
 REPORTS_DIR = Path("reports")
@@ -65,6 +65,7 @@ SETUPS = {
     "newsletters": privacymail.NEWSLETTER_SPLIT,
     "retrained": retraining.SPLIT,  # once `make retrain` has built it: stage 1 refitted with the emails I sent
     "normalized": retraining.NORMALIZED_SPLIT,  # the retrained setup's emails read with reader 2, both stages trained
+    "visible": retraining.VISIBLE_SPLIT,  # read with reader 3: stage 1 refitted, normalized's DistilBERT
 }
 DISTILBERT = "distilbert_head"  # served as ONNX fp32: int8 scores depend on the batch
 SHORTCUT_POINTS = 0.02
@@ -210,6 +211,16 @@ def to_markdown(r: dict) -> str:
                 "removed, look-alike letters undone); both stages are trained on them.",
             ]
             if "normalized" in present
+            else []
+        ),
+        *(
+            [
+                "",
+                "*Visible:* the same emails read with reader 3, which also hides text pushed away with `text-indent`, "
+                "`clip` or `transform` and drops text imitating the analyst's signals block; stage 1 is refitted on "
+                "them and DistilBERT is the normalized setup's, reading reader-3 text.",
+            ]
+            if "visible" in present
             else []
         ),
         "",
@@ -425,6 +436,8 @@ def main(argv: list[str] | None = None) -> int:
             splits["retrained"] = retraining.load_split()
             if retraining.NORMALIZED_SPLIT in predictions.available():  # once `make train-normalized` has run
                 splits["normalized"] = retraining.load_split()
+            if distilbert_split(retraining.VISIBLE_SPLIT) in predictions.available():
+                splits["visible"] = retraining.load_split()
     eval_ids = list(
         dict.fromkeys(
             slices["public_test"]
@@ -440,10 +453,10 @@ def main(argv: list[str] | None = None) -> int:
     texts = {i: email_text(r) for i, r in records.items()}
     features = dict(zip(records, matrix(list(records.values()), ranks), strict=True))
     read = {1: (texts, features)}
-    if any(reader_of(SETUPS[s]) == 2 for s in splits):  # what reader 2's setups read (`baselines.email_text`)
-        read[2] = (
-            {i: email_text(r, 2) for i, r in records.items()},
-            dict(zip(records, matrix(list(records.values()), ranks, 2), strict=True)),
+    for reader in sorted({reader_of(SETUPS[s]) for s in splits} - {1}):  # what the other readers' setups read
+        read[reader] = (
+            {i: email_text(r, reader) for i, r in records.items()},
+            dict(zip(records, matrix(list(records.values()), ranks, reader), strict=True)),
         )
     print(f"{len(records)} emails prepared", file=sys.stderr)
     slices = slices | {"newsletter_like_phish": newsletter_like_phish(features, records, slices)}

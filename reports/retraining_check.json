@@ -1,26 +1,27 @@
 {
- "emails": 2,
+ "emails": 21,
  "labels": {
-  "legit": 2
+  "legit": 21
  },
  "before": {
-  "bundle": "with-newsletters-20261104-e7f1d257",
+  "bundle": "with-normalized-20261105-8baede93",
   "flagged": {
    "phish": 0,
-   "legit": 2
+   "legit": 12
   },
   "decided_by": {
-   "distilbert": 2
+   "distilbert": 21
   }
  },
  "after": {
-  "bundle": "with-retraining-20261104-6addaf34",
+  "bundle": "with-visible-20261112-ac59a4e3",
   "flagged": {
    "phish": 0,
-   "legit": 2
+   "legit": 10
   },
   "decided_by": {
-   "distilbert": 2
+   "distilbert": 16,
+   "stacked": 5
   }
  }
 }

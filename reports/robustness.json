@@ -1,122 +1,116 @@
 {
- "bundle": "with-retraining-20261104-6addaf34",
+ "bundle": "with-visible-20261112-ac59a4e3",
  "public_phish": {
   "clean": {
    "emails": 1401,
-   "flagged": 1364,
-   "recall": 0.9735902926481085,
-   "review": 4,
-   "decided_by_stage_1": 2,
-   "distilbert_recall": 0.9735902926481085
+   "flagged": 1370,
+   "recall": 0.9778729478943612,
+   "review": 5,
+   "decided_by_stage_1": 1235,
+   "distilbert_recall": 0.9750178443968593
   },
   "lookalike_letters": {
    "emails": 1401,
-   "flagged": 1395,
-   "recall": 0.9957173447537473,
-   "review": 0,
-   "decided_by_stage_1": 4,
-   "distilbert_recall": 0.9957173447537473,
-   "lost": 2
+   "flagged": 1370,
+   "recall": 0.9778729478943612,
+   "review": 5,
+   "decided_by_stage_1": 1237,
+   "distilbert_recall": 0.9750178443968593,
+   "lost": 0
   },
   "hidden_characters": {
    "emails": 1401,
-   "flagged": 1362,
-   "recall": 0.9721627408993576,
+   "flagged": 1370,
+   "recall": 0.9778729478943612,
    "review": 5,
-   "decided_by_stage_1": 5,
-   "distilbert_recall": 0.9721627408993576,
-   "lost": 2
+   "decided_by_stage_1": 1235,
+   "distilbert_recall": 0.9750178443968593,
+   "lost": 0
   },
   "hidden_html_display_none": {
    "emails": 1401,
-   "flagged": 1328,
-   "recall": 0.9478943611705924,
+   "flagged": 1370,
+   "recall": 0.9778729478943612,
    "review": 1,
-   "decided_by_stage_1": 4,
-   "distilbert_recall": 0.9478943611705924,
-   "lost": 36,
-   "hidden_read": 47,
-   "lost_with_hidden_read": 36
+   "decided_by_stage_1": 1247,
+   "distilbert_recall": 0.9750178443968593,
+   "lost": 0
   },
   "hidden_html_style_class": {
    "emails": 1401,
-   "flagged": 237,
-   "recall": 0.16916488222698073,
+   "flagged": 1348,
+   "recall": 0.9621698786581013,
    "review": 0,
-   "decided_by_stage_1": 186,
-   "distilbert_recall": 0.1827266238401142,
-   "lost": 1127,
-   "hidden_read": 1382,
-   "lost_with_hidden_read": 1127
+   "decided_by_stage_1": 1230,
+   "distilbert_recall": 0.9593147751605996,
+   "lost": 22,
+   "hidden_read": 22,
+   "lost_with_hidden_read": 22
   },
   "hidden_html_off_screen": {
    "emails": 1401,
-   "flagged": 237,
-   "recall": 0.16916488222698073,
+   "flagged": 1370,
+   "recall": 0.9778729478943612,
    "review": 0,
-   "decided_by_stage_1": 186,
-   "distilbert_recall": 0.1827266238401142,
-   "lost": 1127,
-   "hidden_read": 1382,
-   "lost_with_hidden_read": 1127
+   "decided_by_stage_1": 1247,
+   "distilbert_recall": 0.9750178443968593,
+   "lost": 0
   },
   "hidden_html_tiny_text": {
    "emails": 1401,
-   "flagged": 237,
-   "recall": 0.16916488222698073,
+   "flagged": 1370,
+   "recall": 0.9778729478943612,
    "review": 0,
-   "decided_by_stage_1": 186,
-   "distilbert_recall": 0.1827266238401142,
-   "lost": 1127,
-   "hidden_read": 1382,
-   "lost_with_hidden_read": 1127
+   "decided_by_stage_1": 1247,
+   "distilbert_recall": 0.9750178443968593,
+   "lost": 0
   },
   "shortened_links": {
    "emails": 1401,
-   "flagged": 1362,
-   "recall": 0.9721627408993576,
-   "review": 5,
-   "decided_by_stage_1": 3,
-   "distilbert_recall": 0.9721627408993576,
-   "lost": 2
+   "flagged": 1373,
+   "recall": 0.9800142755174875,
+   "review": 4,
+   "decided_by_stage_1": 1267,
+   "distilbert_recall": 0.9757316202712348,
+   "lost": 0
   },
   "all_four": {
    "emails": 1401,
-   "flagged": 178,
-   "recall": 0.1270521056388294,
+   "flagged": 1352,
+   "recall": 0.9650249821556032,
    "review": 0,
-   "decided_by_stage_1": 202,
-   "distilbert_recall": 0.14489650249821556,
-   "lost": 1187,
-   "hidden_read": 1382,
-   "lost_with_hidden_read": 1187
+   "decided_by_stage_1": 1261,
+   "distilbert_recall": 0.9607423269093505,
+   "lost": 21,
+   "hidden_read": 21,
+   "lost_with_hidden_read": 21
   },
   "hidden_html_style_class_at_end": {
    "emails": 1401,
-   "flagged": 1042,
-   "recall": 0.7437544610992148,
+   "flagged": 1352,
+   "recall": 0.9650249821556032,
    "review": 0,
-   "decided_by_stage_1": 25,
-   "distilbert_recall": 0.7466095645967167,
-   "lost": 322,
-   "hidden_read": 1153,
-   "lost_with_hidden_read": 322
+   "decided_by_stage_1": 1228,
+   "distilbert_recall": 0.9621698786581013,
+   "lost": 18,
+   "hidden_read": 26,
+   "lost_with_hidden_read": 18
   }
  },
  "greco_llm_phish": {
   "emails": 1000,
-  "flagged": 888,
-  "recall": 0.888,
+  "flagged": 940,
+  "recall": 0.94,
   "review": 0,
-  "decided_by_stage_1": 1,
-  "distilbert_recall": 0.888
+  "decided_by_stage_1": 550,
+  "distilbert_recall": 0.94
  },
  "greco_legit_file": {
   "emails": 998,
-  "flagged": 820,
-  "recall": 0.8216432865731463,
+  "flagged": 863,
+  "recall": 0.8647294589178357,
   "review": 0,
-  "decided_by_stage_1": 0,
-  "distilbert_recall": 0.8216432865731463
+  "decided_by_stage_1": 418,
+  "distilbert_recall": 0.8647294589178357
  }
 }

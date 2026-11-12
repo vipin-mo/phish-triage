@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 from phish_triage.service import analyst
 
-CALL_TIMEOUT_S = 12  # API Gateway answers at 29 s: two calls (the retry) plus the scan must fit
+CALL_TIMEOUT_S = 12  # API Gateway answers at 29 s: two calls (the schema retry, 24 s) plus the scan must fit
 
 
 @dataclass
@@ -32,7 +32,9 @@ def _valid(raw: str | None) -> bool:
     return analyst.parse_answer(raw) is not None
 
 
-CLIENT_RETRIES = 1  # the Anthropic client's own retry of a failed request (`anthropic_client`)
+# The Anthropic client's own retries of a failed request (`anthropic_client`). None: with one, the worst case was
+# 4 calls of 12 s, 48 s, past API Gateway's 29 s; a failed explanation can simply be asked for again.
+CLIENT_RETRIES = 0
 
 
 def worst_case_microusd(model: str = analyst.MODEL) -> int:

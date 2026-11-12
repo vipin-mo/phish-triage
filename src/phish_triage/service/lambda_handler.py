@@ -73,10 +73,13 @@ def before_traffic(event, context, codedeploy=None, lambda_client=None):
 
     The target comes from the deployment's description, which `scripts/canary.py` writes as
     "<function>: version <current> -> <target>" (the only way these deployments are made): AWS keeps only a hash of
-    an AppSpec given as content. A status is always reported, even when something here fails, so a deployment never
-    waits for the hook's hour-long timeout.
+    an AppSpec given as content. The new version must also have loaded the bundle named in infra/bundle-version
+    (`PHISH_EXPECTED_BUNDLE`, set by Terraform), so a stale image fails here, before any traffic moves, not after. A
+    status is always reported, even when something here fails, so a deployment never waits for the hook's hour-long
+    timeout.
     """
     import json
+    import os
     import re
 
     import boto3
@@ -99,7 +102,11 @@ def before_traffic(event, context, codedeploy=None, lambda_client=None):
         )
         result = json.loads(answer["Payload"].read() or b"{}")
         log |= result
-        if not answer.get("FunctionError") and result.get("passed"):
+        expected = os.environ.get("PHISH_EXPECTED_BUNDLE", "")
+        if expected and result.get("model_version") != expected:
+            log["error"] = "not the pinned bundle"
+            log["expected"] = expected
+        elif not answer.get("FunctionError") and result.get("passed"):
             status = "Succeeded"
     except Exception as exc:  # noqa: BLE001 - any failure fails the deployment
         log["error"] = type(exc).__name__

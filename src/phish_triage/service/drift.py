@@ -5,7 +5,10 @@ stage, sender-check result; never an email) and compares three distributions wit
 stability index (PSI): the scores in fixed bins, the share each stage decides, and the sender-check results.
 
 **The reference** (`drift_reference.json`, written by `scripts/drift_reference.py`) is the deployed bundle's verdicts
-on legitimate mail it never trained on: my test inbox's held-out senders and PrivacyMail's held-out websites. Not
+on legitimate mail it never trained on: my test inbox's held-out senders. Until 2026-11-12 it also had PrivacyMail's
+held-out websites (3,987 emails in all); the first full week of real use alarmed on all three distributions against
+that mix, and two of them came from the mix itself (PrivacyMail's sender results are a third "partial", my Gmail's
+all "pass"), so after that first reading the reference became the test inbox alone, the mail closest to mine. Not
 the training data: that is about half phishing, and the mail I scan is almost all legitimate, so the class mix alone
 would read as drift every week. Only bin counts are kept, and the gate fails if the reference was made with another
 bundle than `infra/bundle-version`.

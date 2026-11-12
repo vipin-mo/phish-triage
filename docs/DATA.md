@@ -224,8 +224,9 @@ legitimate emails, so the date alone says nothing about the label. That gives 9,
 | `spam` | Spam as a hard negative (test only) | | | 1,509 |
 | `with_inbox` (private) | `random` plus part of my test inbox, split by sender, and as many 2026 phishing emails | 13,946 | 3,104 | 4,695 |
 | `with_newsletters` (private) | `with_inbox` plus PrivacyMail newsletters, split by website (at most 10 per website in train and val, at most 25 in test) | 18,724 | 4,699 | 8,433 |
-| `with_retraining` (private) | `with_newsletters` plus the emails I sent from the add-on for retraining, in train only (`data/retraining.py`) | 18,726 | 4,699 | 8,433 |
-| `with_normalized` (private, deployed) | `with_retraining`'s emails read with reader 2 (the robustness defence); both stages trained on them | 18,726 | 4,699 | 8,433 |
+| `with_retraining` (private) | `with_newsletters` plus the emails I sent from the add-on for retraining, in train only (`data/retraining.py`; 21 by 2026-11-12) | 18,745 | 4,699 | 8,433 |
+| `with_normalized` (private, deployed 2026-11-05 to 11-12) | `with_retraining`'s emails read with reader 2 (the robustness defence); both stages trained on them, with the first 2 sent emails | 18,726 | 4,699 | 8,433 |
+| `with_visible` (private, deployed) | The same emails read with reader 3; stage 1 refitted on them, DistilBERT the `with_normalized` one | 18,745 | 4,699 | 8,433 |
 | `with_time_split` (private, measured, not deployed) | `with_normalized` without any phishing dated 2026-08 or later in train and val; those 1,899 are a test of newer phishing (`data/time_split.py`, [reports/time_split.md](../reports/time_split.md)) | 17,986 | 4,510 | 9,362 |
 | `with_attacks` (private, measured, not deployed) | `with_retraining` plus an attacked copy of each training phishing email (`data/attacks.py`, [reports/defence.md](../reports/defence.md)) | 25,699 | 4,699 | 8,433 |
 
