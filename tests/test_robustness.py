@@ -85,7 +85,8 @@ def test_all_four_and_the_attack_list():
     a = rb.all_four(record(PLAIN, urls=["https://login.example.com/verify"]))
     assert all(u.startswith("https://bit.ly/") for u in a["urls"]) and rb.ZERO_WIDTH in a["text"]
     assert ".note{display:none}" in a["html"]
-    assert set(rb.ANALYST_ATTACKS) <= set(rb.ATTACKS) and set(rb.NAMES) == set(rb.ATTACKS) | set(rb.HELD_OUT)
+    assert set(rb.ANALYST_ATTACKS) <= set(rb.ATTACKS)
+    assert set(rb.NAMES) == set(rb.ATTACKS) | set(rb.HELD_OUT) | set(rb.HELD_OUT_2)
 
 
 def test_summary_counts_the_same_emails_lost():
@@ -161,3 +162,12 @@ def test_held_out_tricks():
     for trick, (before, _) in rb.HELD_OUT_HIDING.items():
         d = rb.HELD_OUT[f"hidden_html_{trick}"](record(html=HTML, text="x"))
         assert d["html"].count(rb.HARMLESS[:20]) == rb.HIDDEN_COPIES and before in d["html"]
+
+
+def test_the_second_held_out_tricks_hide_text_reader_3_still_shows():
+    # Held out on purpose: a person doesn't see the paragraph, and reader 3 has no rule for it (yet)
+    from phish_triage.features.html import visible_html
+
+    for trick in rb.HELD_OUT_2_HIDING:
+        attacked = rb.hidden_html({"html": "<p>Your account is on hold.</p>", "text": ""}, trick)
+        assert rb.HARMLESS.split()[0] in visible_html(attacked["html"], 3).text, trick

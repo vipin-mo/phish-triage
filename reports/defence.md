@@ -30,7 +30,7 @@ Reader 1 reads a CSS font size without its unit, so text at `1em` or smaller cou
 
 ## Held-out attacks (caught)
 
-Set before the defence was written (`robustness.HELD_OUT`); reader 2 has no rule written for `text-indent`, `clip` or `transform`, and no training copy uses any of these.
+Set before the defence was written (`robustness.HELD_OUT`); reader 2 has no rule written for `text-indent`, `clip` or `transform`, and no training copy uses any of these. Reader 3, setup *(e)*, has rules for those three, so for it they aren't held out.
 
 | | Deployed | (a) Reader 2 | (b) + stage 1 retrained | (c) + DistilBERT retrained | (d) Reader 2, retrained without copies | (e) Reader 3, in service since 2026-11-12 |
 |---|---:|---:|---:|---:|---:|---:|
@@ -42,6 +42,19 @@ Set before the defence was written (`robustness.HELD_OUT`); reader 2 has no rule
 | Held out: `clip:rect(0 0 0 0)` on a 1 px box | 16.9% | 16.2% | 16.1% | 8.5% | 6.9% | 97.8% |
 | Held out: `transform:scale(0)` | 16.9% | 16.2% | 16.1% | 8.5% | 6.9% | 97.8% |
 | Held out: tinyurl links | 97.1% | 97.2% | 97.8% | 97.9% | 97.9% | 98.0% |
+
+## Held out since 2026-11-13 (caught)
+
+Set before any run (`robustness.HELD_OUT_2`): six more ways to hide text from a person, none of which reader 3 has a rule for, measured on the setup in service only.
+
+| | Deployed | (a) Reader 2 | (b) + stage 1 retrained | (c) + DistilBERT retrained | (d) Reader 2, retrained without copies | (e) Reader 3, in service since 2026-11-12 |
+|---|---:|---:|---:|---:|---:|---:|
+| Held out since 2026-11-13: hidden by a `<style>` rule inside `@media screen` | — | — | — | — | — | 7.3% |
+| Held out since 2026-11-13: moved off-screen to the right (`left:9999px`) | — | — | — | — | — | 7.3% |
+| Held out since 2026-11-13: a 1 px box with `overflow:hidden` | — | — | — | — | — | 7.3% |
+| Held out since 2026-11-13: `color:transparent` | — | — | — | — | — | 7.3% |
+| Held out since 2026-11-13: `filter:opacity(0)` | — | — | — | — | — | 7.3% |
+| Held out since 2026-11-13: `clip-path` with an empty polygon | — | — | — | — | — | 7.3% |
 
 ## LLM-written phishing (Greco et al.)
 

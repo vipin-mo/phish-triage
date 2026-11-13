@@ -40,6 +40,9 @@ jobs:
       TF_VAR_ci_role_boundary: "true"
       TF_VAR_image_tag: ${{ github.event.pull_request.head.sha }}
     steps:
+      - name: Stop without an alarm address
+        # As `make deploy-plan` does: an empty one would remove the alarm emails (infra/service/variables.tf checks too)
+        run: test -n "$TF_VAR_alert_email" || { echo "the ALERT_EMAIL secret is empty; the plan would remove the alarm emails"; exit 1; }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd  # v6.3.0
         with:
@@ -94,6 +97,9 @@ jobs:
       TF_VAR_ci_role_boundary: "true"
       TF_VAR_image_tag: ${{ github.sha }}
     steps:
+      - name: Stop without an alarm address
+        # As `make deploy-plan` does: an empty one would remove the alarm emails (infra/service/variables.tf checks too)
+        run: test -n "$TF_VAR_alert_email" || { echo "the ALERT_EMAIL secret is empty; the plan would remove the alarm emails"; exit 1; }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2  # v10.3.3
       - name: The eval gate (committed numbers, as `make deploy-image` checks them)

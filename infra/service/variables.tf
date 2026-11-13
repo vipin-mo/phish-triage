@@ -51,6 +51,11 @@ variable "alert_email" {
   description = "Where alarms are emailed (ALERT_EMAIL=... or ~/.config/phish-triage/alert-email, never committed)"
   type        = string
   sensitive   = true # kept out of plan output, so it can't end up in a log or a PR comment
+  validation {
+    # An empty address would remove the alarm emails; the message doesn't show the value.
+    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", trimspace(var.alert_email)))
+    error_message = "alert_email is empty or not an email address: the plan would remove the alarm emails."
+  }
 }
 
 variable "ci_role_boundary" {

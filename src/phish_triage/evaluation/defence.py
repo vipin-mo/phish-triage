@@ -115,7 +115,8 @@ def measure_setup(setup: str) -> dict:
         out["clean"][name] = {"emails": len(ids), "flagged": sum(flagged(records[i]) for i in ids)}
     public = [records[i] for i in sets["public_phish"]]
     attacks = {k: v for k, v in rb.ATTACKS.items() if k not in ("clean", "hidden_html_style_class_at_end")}
-    for name, attack in (attacks | rb.HELD_OUT).items():
+    held_out_2 = rb.HELD_OUT_2 if setup == "e_visible" else {}  # only the setup in service is measured on these
+    for name, attack in (attacks | rb.HELD_OUT | held_out_2).items():
         out["attacks"][name] = {"emails": len(public), "flagged": sum(flagged(attack(r)) for r in public)}
         print(f"{setup} {name}: {out['attacks'][name]['flagged']}", file=sys.stderr)
     llm = [r for r in greco.records() if r["label"] == "phish"]
@@ -176,7 +177,7 @@ def _reader_check(r: dict) -> list[str]:
 
 
 def to_markdown(r: dict) -> str:
-    from phish_triage.evaluation.robustness import ATTACKS, HELD_OUT, NAMES
+    from phish_triage.evaluation.robustness import ATTACKS, HELD_OUT, HELD_OUT_2, NAMES
 
     setups = [s for s in SETUPS if s in r["setups"]]
     header = "| | " + " | ".join(SETUP_NAMES[s] for s in setups) + " |"
@@ -185,12 +186,13 @@ def to_markdown(r: dict) -> str:
     def row(label: str, group: str, key: str, counts: bool = False) -> str:
         cells = []
         for s in setups:
-            v = r["setups"][s][group][key]
-            cells.append(f"{v['flagged']} of {v['emails']:,}" if counts else f"{_share(v)}")
+            v = r["setups"][s][group].get(key)
+            cells.append("—" if v is None else f"{v['flagged']} of {v['emails']:,}" if counts else f"{_share(v)}")
         return f"| {label} | " + " | ".join(cells) + " |"
 
-    attacks = list(r["setups"][setups[0]]["attacks"])
+    attacks = list(dict.fromkeys(a for s in setups for a in r["setups"][s]["attacks"]))
     part1, held_out = [a for a in attacks if a in ATTACKS], [a for a in attacks if a in HELD_OUT]
+    held_out_2 = [a for a in attacks if a in HELD_OUT_2]
     lines = [
         "# The robustness defence: reader 2 and training on attacked copies",
         "",
@@ -222,12 +224,28 @@ def to_markdown(r: dict) -> str:
         "## Held-out attacks (caught)",
         "",
         "Set before the defence was written (`robustness.HELD_OUT`); reader 2 has no rule written for "
-        "`text-indent`, `clip` or `transform`, and no training copy uses any of these.",
+        "`text-indent`, `clip` or `transform`, and no training copy uses any of these. Reader 3, setup *(e)*, has "
+        "rules for those three, so for it they aren't held out.",
         "",
         header,
         rule,
         *[row(NAMES[a], "attacks", a) for a in held_out],
         "",
+        *(
+            [
+                "## Held out since 2026-11-13 (caught)",
+                "",
+                "Set before any run (`robustness.HELD_OUT_2`): six more ways to hide text from a person, none of "
+                "which reader 3 has a rule for, measured on the setup in service only.",
+                "",
+                header,
+                rule,
+                *[row(NAMES[a], "attacks", a) for a in held_out_2],
+                "",
+            ]
+            if held_out_2
+            else []
+        ),
         "## LLM-written phishing (Greco et al.)",
         "",
         header,
