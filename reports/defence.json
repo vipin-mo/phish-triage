@@ -594,6 +594,30 @@
      "emails": 1401,
      "flagged": 1373
     },
+    "hidden_html_media_query": {
+     "emails": 1401,
+     "flagged": 102
+    },
+    "hidden_html_off_right": {
+     "emails": 1401,
+     "flagged": 102
+    },
+    "hidden_html_one_px_box": {
+     "emails": 1401,
+     "flagged": 102
+    },
+    "hidden_html_transparent": {
+     "emails": 1401,
+     "flagged": 102
+    },
+    "hidden_html_filter_opacity": {
+     "emails": 1401,
+     "flagged": 102
+    },
+    "hidden_html_polygon_clip": {
+     "emails": 1401,
+     "flagged": 102
+    },
     "greco_llm_phish": {
      "emails": 1000,
      "flagged": 940

@@ -75,8 +75,8 @@ Two of the 26 inbox test senders share a domain with training (docs/DATA.md). It
   mail, mostly bulk mail.
 - Newsletter-like phishing is its weak spot (23 of 31), and genuine notices from big brands asking me to act can
   read as phishing ([Known issues](FINDINGS.md#known-issues)).
-- Hidden text is caught trick by trick: reader 3 has a rule for every trick I test (97.8% under `text-indent`,
-  `clip` and `transform`, 6.9% with reader 2), so no held-out trick is left, and a new one would get through.
+- Hidden text is caught trick by trick: 97.8% under `text-indent`, `clip` and `transform`, which reader 3 has rules
+  for (6.9% with reader 2), but 7.3% under six new tricks held out since 2026-11-13, which it has none for.
 - On my real mail it flags more than the tests show: 10 of the 14 emails the previous model flagged were false
   alarms I marked, all decided by DistilBERT, which this model didn't retrain.
 - It ages within months: trained on phishing up to July 2026, a candidate caught 98.2% of August's phishing,
@@ -99,5 +99,5 @@ A new model is trained from my laptop (`make retrain`, which adds the emails I s
 (`make bundle`), pass the eval gate (`make gate`), and goes out through a canary: a smoke check that also fails a
 version whose loaded model isn't the pinned bundle, then 10% of traffic for 10 minutes, rolled back on the alarms. A
 deliberate deployment of the previous version was stopped by that check before any traffic moved
-([reports/canary_rollback.md](../reports/canary_rollback.md)). A weekly drift check compares the week's verdicts with this model's on
-held-out legitimate mail.
+([reports/canary_rollback.md](../reports/canary_rollback.md)). A weekly drift check compares the week's verdicts
+with this model's on held-out legitimate mail.

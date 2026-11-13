@@ -83,6 +83,17 @@ HELD_OUT_HIDING = {
     "clip": ("", '<div style="position:absolute;clip:rect(0 0 0 0);width:1px;height:1px;overflow:hidden">{}</div>'),
     "scale_zero": ("", '<div style="transform:scale(0)">{}</div>'),
 }
+# Held out again (2026-11-13), set before any run: reader 3 has rules for text-indent, clip and transform, so those
+# are no longer held out. These six hide text from a person and reader 3 has no rule for any of them (checked on the
+# reader alone, before measuring recall); none is in any training copy.
+HELD_OUT_2_HIDING = {
+    "media_query": ("<style>@media screen{.pre{display:none}}</style>", '<div class="pre">{}</div>'),
+    "off_right": ("", '<div style="position:absolute;left:9999px">{}</div>'),
+    "one_px_box": ("", '<div style="height:1px;width:1px;overflow:hidden">{}</div>'),
+    "transparent": ("", '<div style="color:transparent">{}</div>'),
+    "filter_opacity": ("", '<div style="filter:opacity(0)">{}</div>'),
+    "polygon_clip": ("", '<div style="clip-path:polygon(0 0,0 0,0 0)">{}</div>'),
+}
 # Text that stays as it is: links, addresses, HTML entities; and in HTML, the markup, styles, scripts and comments.
 _PROTECTED = re.compile(rf"{URL_RE.pattern}|[\w.+-]+@[\w-]+(?:\.[\w-]+)+|&#?\w+;", re.IGNORECASE)
 _MARKUP = re.compile(r"<(style|script)\b.*?</\1\s*>|<!--.*?-->|<[^>]*>", re.IGNORECASE | re.DOTALL)
@@ -151,7 +162,7 @@ def hidden_html(record: dict, trick: str, at_end: bool = False, filler: str | No
     derived = bool(html) and (r.get("text") or "") == html_to_text(html)
     if not html:
         html = as_html(r.get("text") or "")
-    before, block = (HIDING | HELD_OUT_HIDING)[trick]
+    before, block = (HIDING | HELD_OUT_HIDING | HELD_OUT_2_HIDING)[trick]
     hidden = block.format(html_lib.escape(filler or " ".join([HARMLESS] * HIDDEN_COPIES)))
     lower = html.lower()
     at = lower.find(">", lower.find("<body")) + 1 if "<body" in lower else 0
@@ -202,6 +213,7 @@ HELD_OUT = {
     **{f"hidden_html_{trick}": (lambda r, t=trick: hidden_html(r, t)) for trick in HELD_OUT_HIDING},
     "tinyurl_links": lambda r: shortened_links(r, "tinyurl.com"),
 }
+HELD_OUT_2 = {f"hidden_html_{trick}": (lambda r, t=trick: hidden_html(r, t)) for trick in HELD_OUT_2_HIDING}
 ANALYST_ATTACKS = (
     "clean",
     "lookalike_letters",
@@ -230,6 +242,12 @@ NAMES = {
     "hidden_html_clip": "Held out: `clip:rect(0 0 0 0)` on a 1 px box",
     "hidden_html_scale_zero": "Held out: `transform:scale(0)`",
     "tinyurl_links": "Held out: tinyurl links",
+    "hidden_html_media_query": "Held out since 2026-11-13: hidden by a `<style>` rule inside `@media screen`",
+    "hidden_html_off_right": "Held out since 2026-11-13: moved off-screen to the right (`left:9999px`)",
+    "hidden_html_one_px_box": "Held out since 2026-11-13: a 1 px box with `overflow:hidden`",
+    "hidden_html_transparent": "Held out since 2026-11-13: `color:transparent`",
+    "hidden_html_filter_opacity": "Held out since 2026-11-13: `filter:opacity(0)`",
+    "hidden_html_polygon_clip": "Held out since 2026-11-13: `clip-path` with an empty polygon",
 }
 
 

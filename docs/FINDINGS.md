@@ -44,11 +44,11 @@ From [reports/course_reproduction.md](../reports/course_reproduction.md) and [re
 
 From [docs/RESULTS.md](RESULTS.md), rebuilt by `make eval` from saved predictions:
 
-- **How much LLM is needed: on this sample, none.** On a fixed 1,000-email sample, the cascade (a model taking about 5 ms on
-  my laptop, then DistilBERT) caught 498 of 500 phishing emails with no false alarms, and no email was uncertain enough to go on
-  to Claude Haiku 5.5 (0.2% did before the November 2026 input fixes). Haiku on every email caught 97.4% with 0.8%
-  false alarms, sent all mail to a third party, and would cost about $167 a day at 1 million emails. With 500
-  emails of each kind in the sample, one email is 0.2%, so the intervals are wide.
+- **How much LLM is needed: on this sample, none.** On a fixed 1,000-email sample, the cascade (a model taking about
+  5 ms on my laptop, then DistilBERT) caught 498 of 500 phishing emails with no false alarms, and no email was
+  uncertain enough to go on to Claude Haiku 5.5 (0.2% did before the November 2026 input fixes). Haiku on every
+  email caught 97.4% with 0.8% false alarms, sent all mail to a third party, and would cost about $167 a day at 1
+  million emails. With 500 emails of each kind in the sample, one email is 0.2%, so the intervals are wide.
 - **On 2023–2026 mail,** the cascade (recall 0.990, 0.32% false alarms) beats either model alone tuned on the test
   data to the same false-alarm rate (0.958 for the stacked model, 0.978 for DistilBERT), while 95.3% of emails are
   decided by the 5 ms model.
@@ -123,16 +123,16 @@ latest, prompt version 7, $0.26).
   fails if they were measured on an older prompt, another Claude model or another model bundle than the one in
   `infra/bundle-version`, or if one is missing. CI doesn't measure them: they come from `make gate` on my laptop
   after the evaluations, and CI doesn't replay the recorded Claude answers, so a code change that weakens the
-  analyst shows only when I re-measure (a prompt change forces it, through the prompt version). It also checks the model I deploy (trained with part of my
-  inbox and of PrivacyMail): false alarms on my inbox's unseen senders (1.6%, at most 5%, a limit I set before the
-  run) and on PrivacyMail websites kept out of training (1.4%, at most 5%, added after the inbox model passed the
-  inbox limit and failed on PrivacyMail), and DistilBERT's recall at 1% false alarms on the public test (0.994, at
-  least 0.98). That last one measures how well DistilBERT ranks phishing, at a threshold picked on the test; the
-  service runs the cascade at stricter thresholds picked on validation, where it catches 97.7% at 0.21% false
-  alarms. A code review found the gate's wording implied the second; the gate now reports it next to the first,
-  without a limit, since one set after seeing the number would mean little. The Phase 4 Claude runs cost $1.06
-  together up to 2026-11-02; each later re-run (behind a new model, or after the analyst's own fixes) cost
-  $0.25–0.27, and all of Claude came to $3.50 ([Cost](../README.md#cost)).
+  analyst shows only when I re-measure (a prompt change forces it, through the prompt version). It also checks the
+  model I deploy (trained with part of my inbox and of PrivacyMail): false alarms on my inbox's unseen senders
+  (1.6%, at most 5%, a limit I set before the run) and on PrivacyMail websites kept out of training (1.4%, at most
+  5%, added after the inbox model passed the inbox limit and failed on PrivacyMail), and DistilBERT's recall at 1%
+  false alarms on the public test (0.994, at least 0.98). That last one measures how well DistilBERT ranks phishing,
+  at a threshold picked on the test; the service runs the cascade at stricter thresholds picked on validation, where
+  it catches 97.7% at 0.21% false alarms. A code review found the gate's wording implied the second; the gate now
+  reports it next to the first, without a limit, since one set after seeing the number would mean little. The Phase
+  4 Claude runs cost $1.06 together up to 2026-11-02; each later re-run (behind a new model, or after the analyst's
+  own fixes) cost $0.25–0.27, and all of Claude came to $3.50 ([Cost](../README.md#cost)).
 
 ## What my private test inbox showed
 
@@ -253,18 +253,20 @@ for a background design were removed, since a queue would have had to hold the e
 - **The AWS Free plan blocks GitHub's keyless sign-in (OIDC):** AWS denies `iam:*Provider*` on Free plan accounts.
   Rather than store AWS keys in GitHub, I deploy from my laptop with an MFA session (`make deploy-*`). A CI deploy
   workflow and roles are written but switched off. Since the second audit a CI deploy runs the gate, the canary
-  and the loaded-model check as a laptop deploy does; unlike `make deploy-plan`, it doesn't yet stop on an empty
-  alarm address.
+  and the loaded-model check as a laptop deploy does, and since 2026-11-13 it stops on an empty alarm address as
+  `make deploy-plan` does (and Terraform refuses one in any plan).
 - **A privacy gap the live test found:** the sender check's warnings name the sender's domain, and the stored
   verdict kept them. The service now returns and stores a fixed sentence per kind of warning instead.
 - **The deploy checks itself.** A review of the deploy steps found that a deploy whose model failed to load still
   printed success, that a plan without the alarm address removed the alarm emails, and that five test images would
   have pushed the running image out of the registry. Now the deploy stops unless the loaded model is the one in
   `infra/bundle-version` (since 2026-11-12 the smoke hook checks it before any traffic moves, and a deliberate
-  deployment of the previous version was stopped that way, [reports/canary_rollback.md](../reports/canary_rollback.md)); only a clean, merged `main` is deployed; plans refuse an empty alarm address; test images
-  are cleaned up first; the tables can't be deleted by a plan; and the scan function can only read API keys. The
-  slowness alarm fired on both deploys with nobody waiting, because it watched the function's run time, which
-  counts the warm-up pings and the 60 s first load on a new image; it now watches the API's latency instead.
+  deployment of the previous version was stopped that way,
+  [reports/canary_rollback.md](../reports/canary_rollback.md)); only a clean, merged `main` is deployed; plans
+  refuse an empty alarm address; test images are cleaned up first; the tables can't be deleted by a plan; and the
+  scan function can only read API keys. The slowness alarm fired on both deploys with nobody waiting, because it
+  watched the function's run time, which counts the warm-up pings and the 60 s first load on a new image; it now
+  watches the API's latency instead.
 - **A new version reaches traffic through a canary.** Each image is a numbered Lambda version behind a `live` alias.
   CodeDeploy first runs a smoke check on the new version (a hand-made phishing email must come back phish and a
   clean newsletter safe), then sends it 10% of traffic for 10 minutes, then all of it, and rolls back if the error,
@@ -302,9 +304,9 @@ for a background design were removed, since a queue would have had to hold the e
   the canary (version 4 to 5). `make retrain` builds the split in service, now `with_visible` (reader 3;
   `with_normalized`, reader 2, before 2026-11-12); until the second audit it still built the reader-1 one, which
   would have undone the hidden-HTML defence. It refits stage 1 only; `make train-visible` retrains DistilBERT.
-- Cost at my use: $0.02 on AWS in the first eight days ([Cost](../README.md#cost)), within the Free plan's credits. The Free plan
-  ends on 2027-04-27 and the account closes with it unless I upgrade, taking every resource with it; before then I
-  either upgrade or export the feedback and API keys and destroy the service.
+- Cost at my use: $0.02 on AWS in the first eight days ([Cost](../README.md#cost)), within the Free plan's credits.
+  The Free plan ends on 2027-04-27 and the account closes with it unless I upgrade, taking every resource with it;
+  before then I either upgrade or export the feedback and API keys and destroy the service.
 
 ## What the attacks showed
 
@@ -355,9 +357,10 @@ removing as many random words.
   take 0.135, close to the 0.139 of occlusion (each word's own effect when it alone is removed, the best pick one
   word at a time). At 10 words it falls behind: 0.175 against 0.260. For DistilBERT, the 10 words Integrated
   Gradients ranks highest cut the log-odds by 2.16, random ones by 0.53.
-- **For most emails, no handful of words decides the verdict.** Without its 10 top words, 12% of the emails fall to the text model's
-  threshold by LIME's choice (25% by occlusion's, 0.3% at random), and 20% to DistilBERT's (7% at random). The
-  score rests on many words, so a word list is evidence of what a model leans on, not the reason for one verdict.
+- **For most emails, no handful of words decides the verdict.** Without its 10 top words, 12% of the emails fall to
+  the text model's threshold by LIME's choice (25% by occlusion's, 0.3% at random), and 20% to DistilBERT's (7% at
+  random). The score rests on many words, so a word list is evidence of what a model leans on, not the reason for
+  one verdict.
 
 ## Known issues
 
@@ -395,9 +398,9 @@ check (DATA.md), as noted where they appear.
   shown as "phishing probability 0.00 (flagged)". It is now told only whether the classifier flagged the email.
 - **The int8 model's scores depended on the batch (fixed).** Its dynamic quantization picks its scales from the
   whole batch, so an email scored alone got a different score than in the batch of 32 the evaluation used: up to
-  0.074 apart on my inbox's test emails with the model of the time, enough to flip 1 of the 249. The packaged model would have disagreed
-  with its own report. The service now runs DistilBERT as ONNX fp32 (under 0.000001 apart), the reports for the
-  deployed model use fp32 scores, and packaging stops unless the package reproduces the report
+  0.074 apart on my inbox's test emails with the model of the time, enough to flip 1 of the 249. The packaged model
+  would have disagreed with its own report. The service now runs DistilBERT as ONNX fp32 (under 0.000001 apart), the
+  reports for the deployed model use fp32 scores, and packaging stops unless the package reproduces the report
   ([reports/bundle.md](../reports/bundle.md)). The `random` split's comparison tables still show int8 as measured.
 - **The inbox model learned my inbox's senders (fixed).** Trained with my inbox, the cascade flagged 4.0% of its
   unseen senders' mail but 76.5% of PrivacyMail's newsletters. Trained with part of PrivacyMail too, it flagged 0.9%
@@ -430,7 +433,10 @@ check (DATA.md), as noted where they appear.
   Reader 2 fixes both; the cascade retrained on it flags 1.4% of the PrivacyMail newsletters instead of 0.9%
   (above). `text-indent`, `clip` and `transform` still hid text from it (6.9% caught); reader 3, in service since
   2026-11-12, has rules for them and catches 97.8% (reports/defence.md, setup e). They were the held-out tricks, so
-  none is held out now.
+  I set six new ones on 2026-11-13, before measuring (a `<style>` rule inside `@media`, moved off-screen to the
+  right, a 1 px box, `color:transparent`, `filter:opacity(0)`, an empty `clip-path` polygon): reader 3 has no rule
+  for any, and each drops recall to 7.3% (102 of 1,401; open). A rule per trick doesn't generalize; what would is
+  reading what a page actually shows (a rendered layout) or not letting a long block decide the first 512 tokens.
 - **The old reader dropped ordinary text set in `em` (fixed).** It read a CSS font size without its unit, so
   `font-size:1em` counted as 1 px and the text as hidden. That cut at least 5 visible words from 23 of my inbox's
   249 test emails and 82 of the 3,738 PrivacyMail ones (reports/defence.md), so the old models never read that text.

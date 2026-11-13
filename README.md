@@ -52,6 +52,7 @@ give bootstrap ones, which differ by about a point):
 | LLM-written phishing (Greco et al., written with WormGPT; 1,000) | 94.0% caught | 92.4–95.3% |
 | Public test phishing with text hidden by the three tricks reader 2 has rules for | 96.2–97.8% caught (16.9% before the defence) | |
 | ... hidden with `text-indent`, `clip` or `transform` (held out until reader 3 got rules for them) | 97.8% caught (6.9% with reader 2) | 96.9–98.4% |
+| ... hidden six new ways reader 3 has no rule for (held out since 2026-11-13: `@media` rules, off-screen to the right, a 1 px box, `color:transparent`, `filter:opacity(0)`, an empty `clip-path`) | 7.3% caught | 6.0–8.8% |
 | My real Gmail, from the add-on (78 emails scanned by the model in service, 45 more by an older one) | 14 flagged by the model in service; I marked 10 of them false alarms and none correct | |
 | Precision if 1 email in 100 were phishing (recall as above, false alarms as on my test inbox) | 0.38 | 0.19–0.61 |
 
@@ -134,7 +135,8 @@ it ([reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/inj
   the three tricks the reader has rules for, and LLM-written phishing from 88.8% to 94.0% (one training run each;
   across the setups I tried, LLM-written phishing ranged from 84.1% to 94.0%). Text hidden with
   `text-indent`, `clip` or `transform`, which reader 2 had no rule for, got through: 6.9%. Reader 3 (in service
-  since 2026-11-12) has rules for them, and catches 97.8%; that also means no hidden-HTML trick is held out now.
+  since 2026-11-12) has rules for them, and catches 97.8%. Six new tricks held out since, which it has no rule
+  for, get through as before: 7.3%. The reader catches the tricks it was written for, not hiding in general.
 - **Load** ([reports/load_test.md](reports/load_test.md)): 543 requests of one short test email at up to 10 a
   second, a test of the rate limits rather than of real load. The limits refused the excess, nothing failed, and an
   answered scan took 45 ms at the gateway (p50); a real email takes about 0.2 s end to end.
@@ -231,8 +233,8 @@ outside this project.)
   learn from.
 - **Big brands asking me to act read as phishing.** A rule sending own-domain-signed mail to review moved as many
   phishing emails as false alarms, so it isn't used.
-- **Hidden text is caught trick by trick.** Reader 3 has rules for every hiding trick I test, so there is no
-  held-out one left; a new trick would get through until it has a rule.
+- **Hidden text is caught trick by trick.** Reader 3 catches the tricks it has rules for (97.8%), but six new ones
+  it has no rule for drop recall to 7.3%: a hidden paragraph that fills DistilBERT's 512 tokens still decides it.
 - **Images aren't read:** an image-only or QR-code email is judged on its few words (it goes to review when it has
   almost none).
 - **The AWS Free plan** blocks keyless CI deploys, so I deploy from my laptop with MFA, and the account closes on
