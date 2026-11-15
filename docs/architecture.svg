@@ -49,7 +49,7 @@
 <rect x="608" y="185" width="148" height="145" rx="14" fill="#E0F2FE" stroke="#0284C7" stroke-width="2" filter="url(#sh)"/>
 <rect x="608" y="185" width="148" height="6" rx="3" fill="#0284C7"/>
 <text x="682.0" y="215" font-size="15" font-weight="700" fill="#111827" text-anchor="middle">Parse + mask</text>
-<text x="682.0" y="237" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">reader 2: the text</text>
+<text x="682.0" y="237" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">reader 3: the text</text>
 <text x="682.0" y="255" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">a mail program shows</text>
 <text x="682.0" y="273" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">(hidden HTML removed)</text>
 <circle cx="612" cy="189" r="13" fill="#0284C7" stroke="white" stroke-width="2.5"/>
@@ -60,7 +60,8 @@
 <text x="846.0" y="215" font-size="15" font-weight="700" fill="#111827" text-anchor="middle">Stage 1</text>
 <text x="846.0" y="237" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">stacked model</text>
 <text x="846.0" y="255" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">42 features + TF-IDF</text>
-<text x="846.0" y="273" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">~5 ms, decides most</text>
+<text x="846.0" y="273" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">~5 ms; decides 92–93%</text>
+<text x="846.0" y="291" font-size="12" font-weight="400" fill="#374151" text-anchor="middle">of public test email</text>
 <circle cx="776" cy="189" r="13" fill="#16A34A" stroke="white" stroke-width="2.5"/>
 <text x="776" y="193.5" font-size="13" font-weight="800" fill="white" text-anchor="middle">2</text>
 <line x1="921" y1="257" x2="935" y2="257" stroke="#475569" stroke-width="2.5" marker-end="url(#a_475569)"/>
@@ -87,7 +88,7 @@
 <rect x="608" y="400" width="640" height="118" rx="14" fill="#FBEDE7" stroke="#D97757" stroke-width="2" filter="url(#sh)"/>
 <text x="624" y="426" font-size="15" font-weight="700" fill="#9a3412" text-anchor="start">Explain (only when I click)</text>
 <text x="624" y="450" font-size="12.5" font-weight="400" fill="#7c2d12" text-anchor="start">• hidden text removed · personal data redacted · email inside random per-request tags</text>
-<text x="624" y="471" font-size="12.5" font-weight="400" fill="#7c2d12" text-anchor="start">• answer must match a schema · every quote exact · every URL from the email</text>
+<text x="624" y="471" font-size="12.5" font-weight="400" fill="#7c2d12" text-anchor="start">• answer must match a schema · every quote found in the email · every URL from the email</text>
 <text x="624" y="492" font-size="12.5" font-weight="400" fill="#7c2d12" text-anchor="start">• can raise a verdict, never lower it · refusal or bad answer → a person</text>
 <rect x="345" y="575" width="225" height="130" rx="14" fill="#E0E7FF" stroke="#3B48CC" stroke-width="2" filter="url(#sh)"/>
 <rect x="345" y="575" width="225" height="6" rx="3" fill="#3B48CC"/>

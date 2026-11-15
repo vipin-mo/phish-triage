@@ -52,7 +52,7 @@ The TF-IDF models and DistilBERT read `baselines.email_text`: the subject and th
   by 16–20 points).
 - **No source names,** masked as in the plain text, links included ([DATA.md](DATA.md)).
 
-That is reader 1. The model in service (since 2026-11-05) reads with **reader 2** (the robustness defence,
+That is reader 1. The model in service from 2026-11-05 to 11-12 read with **reader 2** (the robustness defence,
 [reports/defence.md](../reports/defence.md)), set by the bundle's `reader` and used by both stages and the analyst:
 
 - it applies the `<style>` block's rules, so a class or id that hides text hides it here too;
@@ -63,7 +63,15 @@ That is reader 1. The model in service (since 2026-11-05) reads with **reader 2*
 - when the HTML shows almost nothing and the email has no plain-text part of its own, it keeps the little the HTML
   shows, instead of the parser's text with the hidden parts in it.
 
-It has no rule for text hidden with `text-indent`, `clip` or `transform`, which still gets through.
+The model in service since 2026-11-12 reads with **reader 3**, which keeps all of that and adds:
+
+- it removes text pushed away with `text-indent` (−100 px or further), `clip: rect` or `clip-path` with no area, or
+  `transform` (`scale(0)` on either axis, `translate` of −100 px or further);
+- it drops text imitating the analyst's signals block before deciding what the HTML shows.
+
+Every rule is for a trick I tested. Six tricks held out since 2026-11-13 (an `@media` rule, off-screen to the
+right, a 1 px box, `color:transparent`, `filter:opacity(0)`, an empty `clip-path` polygon) have no rule, and
+get through: 7.3% caught ([reports/defence.md](../reports/defence.md)).
 
 **Too little text goes to review** (`service/triage.py`). An email with images or attachments and fewer than 20
 visible words in the body (an image-only or QR-code email, or one whose content is all in an attachment) gives the
