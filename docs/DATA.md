@@ -293,7 +293,7 @@ What this shows:
   ([reports/with_inbox.md](../reports/with_inbox.md)), but 76.5% of 18,682 PrivacyMail newsletters from 944
   websites ([reports/privacymail.md](../reports/privacymail.md)): 26 senders were too few. With part of PrivacyMail
   in training too, split by website, it flagged 0.9% of newsletters from 189 held-out websites and 2.0% of the
-  inbox's unseen senders; the model in service (the same emails read with reader 2) flags 1.4% and 1.6%.
+  inbox's unseen senders; the model in service (the same emails read with reader 3) flags 1.3% and 1.6%.
 - **My inbox's legitimate mail is all bulk mail from large senders,** so on it the number of links and an
   own-domain DKIM signature mark legitimate mail (ROC AUC 0.92–0.96 on their own, against 0.51–0.58 on the public
   test). The cascade decides the same without them; what it misses more is phishing that reads like a

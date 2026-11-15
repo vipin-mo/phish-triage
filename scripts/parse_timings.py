@@ -79,7 +79,8 @@ def to_markdown(r: dict) -> str:
             "domain table has "
             f"{r['Tranco domain table, cold start']['domains']:,} registered domains; *before* builds it from the "
             "Tranco list as a cold start did before commit 8c7d353, *now* loads the finished table the bundle ships. "
-            "On Lambda at 2 GB the build took 7.9 s of a 19 s cold start (the function's per-step load log).",
+            "On Lambda at 2 GB, before its memory was raised to 3 GB, the build took 7.9 s of a 19 s cold start "
+            "(the function's per-step load log).",
             "",
             "| What | Before | Now |",
             "|---|---:|---:|",

@@ -125,14 +125,14 @@ latest, prompt version 7, $0.26).
   after the evaluations, and CI doesn't replay the recorded Claude answers, so a code change that weakens the
   analyst shows only when I re-measure (a prompt change forces it, through the prompt version). It also checks the
   model I deploy (trained with part of my inbox and of PrivacyMail): false alarms on my inbox's unseen senders
-  (1.6%, at most 5%, a limit I set before the run) and on PrivacyMail websites kept out of training (1.4%, at most
+  (1.6%, at most 5%, a limit I set before the run) and on PrivacyMail websites kept out of training (1.3%, at most
   5%, added after the inbox model passed the inbox limit and failed on PrivacyMail), and DistilBERT's recall at 1%
   false alarms on the public test (0.994, at least 0.98). That last one measures how well DistilBERT ranks phishing,
   at a threshold picked on the test; the service runs the cascade at stricter thresholds picked on validation, where
-  it catches 97.7% at 0.21% false alarms. A code review found the gate's wording implied the second; the gate now
+  it catches 97.8% at 0.21% false alarms. A code review found the gate's wording implied the second; the gate now
   reports it next to the first, without a limit, since one set after seeing the number would mean little. The Phase
   4 Claude runs cost $1.06 together up to 2026-11-02; each later re-run (behind a new model, or after the analyst's
-  own fixes) cost $0.25–0.27, and all of Claude came to $3.50 ([Cost](../README.md#cost)).
+  own fixes) cost $0.25–0.27, and all of Claude came to $3.84 ([Cost](../README.md#cost)).
 
 ## What my private test inbox showed
 
@@ -404,7 +404,7 @@ check (DATA.md), as noted where they appear.
   ([reports/bundle.md](../reports/bundle.md)). The `random` split's comparison tables still show int8 as measured.
 - **The inbox model learned my inbox's senders (fixed).** Trained with my inbox, the cascade flagged 4.0% of its
   unseen senders' mail but 76.5% of PrivacyMail's newsletters. Trained with part of PrivacyMail too, it flagged 0.9%
-  of newsletters from held-out websites and 2.0% of my inbox (the model in service: 1.4% and 1.6%), and the gate
+  of newsletters from held-out websites and 2.0% of my inbox (the model in service: 1.3% and 1.6%), and the gate
   now checks both (above).
 - **Big brands asking me to act read as phishing (open).** In my own Gmail, a bank's "make your debit card Tap & Pay
   ready" and a ride app's "take our travel survey" were flagged at 0.9998 and 0.9996, though each was DKIM-signed by
@@ -508,4 +508,4 @@ check (DATA.md), as noted where they appear.
   takes several `make` commands, not one, and CI deploys with OIDC are written but off (the Free plan blocks them).
 - **Smaller:** the course reproduction uses an 80/20 split, not 5-fold cross-validation; the load test had no cold
   start and never reached the concurrency cap (the rate limits refused first); shadow mode is built but hasn't been
-  run on real traffic; and only releases are tagged (v1.0.0, v1.1.0), not the planned milestone tags.
+  run on real traffic; and only releases are tagged (v1.0.0 to v1.2.1), not the planned milestone tags.

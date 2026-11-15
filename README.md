@@ -50,7 +50,7 @@ give bootstrap ones, which differ by about a point):
 | My test inbox's later mail from those 26 senders, which no model was chosen on (154 emails from 17 of them) | 6 flagged (3.9%) | 1.8–8.2% |
 | Newsletters from 189 websites held out of training (PrivacyMail; 3,738) | 48 flagged (1.3%), 83 (2.2%) with the ones sent to review | 1.0–1.7% |
 | LLM-written phishing (Greco et al., written with WormGPT; 1,000) | 94.0% caught | 92.4–95.3% |
-| Public test phishing with text hidden by the three tricks reader 2 has rules for | 96.2–97.8% caught (16.9% before the defence) | |
+| Public test phishing with text hidden by the three tricks reader 2 got rules for | 96.2–97.8% caught (16.9% before the defence) | |
 | ... hidden with `text-indent`, `clip` or `transform` (held out until reader 3 got rules for them) | 97.8% caught (6.9% with reader 2) | 96.9–98.4% |
 | ... hidden six new ways reader 3 has no rule for (held out since 2026-11-13: `@media` rules, off-screen to the right, a 1 px box, `color:transparent`, `filter:opacity(0)`, an empty `clip-path`) | 7.3% caught | 6.0–8.8% |
 | My real Gmail, from the add-on (78 emails scanned by the model in service, 45 more by an older one) | 14 flagged by the model in service; I marked 10 of them false alarms and none correct | |
@@ -132,7 +132,7 @@ it ([reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/inj
 
 - **Evasion** ([reports/robustness.md](reports/robustness.md), [reports/defence.md](reports/defence.md)): hidden
   HTML text dropped the old model to 16.9%. A better reader (reader 2) and retraining brought it to 96.1–97.7% for
-  the three tricks the reader has rules for, and LLM-written phishing from 88.8% to 94.0% (one training run each;
+  the three tricks the reader has rules for (96.2–97.8% for the reader-3 model in service, in the table above), and LLM-written phishing from 88.8% to 94.0% (one training run each;
   across the setups I tried, LLM-written phishing ranged from 84.1% to 94.0%). Text hidden with
   `text-indent`, `clip` or `transform`, which reader 2 had no rule for, got through: 6.9%. Reader 3 (in service
   since 2026-11-12) has rules for them, and catches 97.8%. Six new tricks held out since, which it has no rule
@@ -158,7 +158,8 @@ it ([reports/analyst.md](reports/analyst.md), [reports/injection.md](reports/inj
 - **Real use** ([reports/real_use.md](reports/real_use.md)): 123 of my own emails scanned from the add-on by
   2026-11-12, 78 of them by the model in service. It flagged 14 of those 78, and I marked 10 of the 14 as false
   alarms (none as correct, no phishing missed). All 10 were DistilBERT's calls, so `make retrain`, which refits stage
-  1 only, can't fix them; the next model update retrains both stages with the 19 emails I've sent since.
+  1 only, can't fix them. The model update of 2026-11-12 refit stage 1 with my 21 sent emails and kept the old
+  DistilBERT (retrained on them, it flagged more of the test inbox), so 10 of the 21 are still flagged.
 - **The drift check's first reading** (the week to 2026-11-08, 48 scans) alarmed on all three distributions: PSI
   2.29 on the scores, 1.09 on the deciding stage and 2.86 on the sender check, against a limit of 0.25. Measured
   against my test inbox alone instead of the inbox and PrivacyMail together, the stage (0.17) and the sender check
@@ -214,7 +215,7 @@ spend ledger my Claude runs write:
 | API Gateway | $0.002 |
 | Lambda, CloudWatch, KMS, SNS, Budgets | $0.000 (inside the free tier) |
 | **This project on AWS, eight days** | **$0.02**, paid from the Free plan's credits |
-| Claude, every evaluation in this README (Haiku 5.5, and Sonnet 5.5 on 200 emails in Phase 3) | $3.50 |
+| Claude, every evaluation in this README (Haiku 5.5, and Sonnet 5.5 on 200 emails in Phase 3) | $3.84 |
 
 A live explanation costs about $0.001. Most of the money went to measuring, not running. Keeping the service up
 costs about $1 a month at AWS's list prices, nearly all of it storage: about $0.60 for the last 10 container images
@@ -281,7 +282,7 @@ Requires [uv](https://docs.astral.sh/uv/), Python 3.12 and, for the commit hook,
 
 ```bash
 make setup   # create .venv, install dev deps, install git hooks
-make check   # lint, the raw-data and secret checks, the 273 tests, the eval gate (what CI runs)
+make check   # lint, the raw-data and secret checks, the 283 tests, the eval gate (what CI runs)
 ```
 
 Raw email datasets are never committed. A pre-commit hook and a CI check block mail, archive, dataset and model
